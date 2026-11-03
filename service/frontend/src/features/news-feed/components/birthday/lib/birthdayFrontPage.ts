@@ -6,6 +6,7 @@
 import { useEffect, useState } from 'react';
 import { fetchFrontPage, type BigKindsArticle, type FrontPageData } from '@/shared/lib/api/timelineApi';
 import { dateLabel } from './birthdayModel';
+import { NAVER_FROM, NEWSPAPER_SCENE, frontRequestDate, isPaperlessSunday, loadNewspaperYear, type NaverRow, type NewspaperYear } from './birthdayNewspaper';
 import { nb } from './keepTogether';
 
 export const FRONT_PAGE_RULES = {
@@ -21,8 +22,11 @@ export const FRONT_LOOKBACK_DAYS = 10;
 export type FrontPageNotice = 'before-founding' | 'suspended' | 'before-archive';
 export type FrontPageState =
   | { status: 'loading'; date: string }
-  | { status: 'ok'; date: string; data: FrontPageData }
+  /** naver: 보여 줄 날짜의 네이버 1면 목록(연도 파일에 있을 때만, 신문 장면 스위치가 켜졌을 때만). data는 서버가 준 그대로이고 공유 카드가 쓴다. */
+  | { status: 'ok'; date: string; data: FrontPageData; naver?: NaverRow[] }
   | { status: 'notice'; date: string; notice: FrontPageNotice }
+  /** 기사 목록 없이 그날 1면 사진만 시도하는 시기(1990년 이전, 스위치가 켜졌을 때만). */
+  | { status: 'image-only'; date: string }
   | { status: 'error'; date: string };
 
 /** 생일 당일이 아닌 날의 신문을 보여 줄 때 지면 위에 붙이는 안내. */
@@ -123,7 +127,54 @@ export function loadFrontPage(date: string, fetcher: FrontPageFetcher = fetchFro
 /** '타임머신 타기'를 누른 뒤에만 부른다. 서버에 묻지 않는 날짜(창간 전·지면 공백·보관본 전)는 보내지 않는다. */
 export function prefetchFrontPage(date: string, fetcher?: FrontPageFetcher) {
   if (frontPageNotice(date)) return;
-  void loadFrontPage(date, fetcher);
+  if (!NEWSPAPER_SCENE) { void loadFrontPage(date, fetcher); return; }
+  // 신문 장면은 결과 화면과 같은 날짜(일요일이면 월요일)로 묻고, 네이버 목록 파일도 함께 받아 둔다.
+  const request = frontRequestDate(date);
+  void loadFrontPage(request, fetcher);
+  if (request >= NAVER_FROM) void loadNewspaperYear(Number(request.slice(0, 4)));
+}
+
+export interface FrontScene {
+  /** 서버가 고른 신문 그대로(생일 기준으로 맞춘 date·reason만 다르다). 공유 카드가 쓴다. */
+  data: FrontPageData;
+  /** 보여 줄 날짜의 네이버 1면 목록. 없으면 null. */
+  naver: NaverRow[] | null;
+}
+interface SceneDeps {
+  front: (date: string) => Promise<FrontPageData | null>;
+  year: (year: number) => Promise<NewspaperYear | null>;
+}
+
+/** 서버는 요청한 날짜(일요일이면 월요일)를 기준으로 답한다. 화면은 생일 기준으로 읽으므로 date와 까닭을 맞춘다. */
+function asBirthday(data: FrontPageData, birthDate: string): FrontPageData {
+  const substituted = data.kind !== 'none' && data.shown_date !== null && data.shown_date !== birthDate;
+  // 일요일자가 없는 시기의 일요일은 서버가 어떤 까닭(no_paper·not_yet)을 적었든 '일요일이라 없다'가 사실이다.
+  const reason = substituted && isPaperlessSunday(birthDate) ? 'sunday' : data.reason;
+  return data.date === birthDate && reason === data.reason ? data : { ...data, date: birthDate, reason };
+}
+
+/**
+ * 생일 birthDate의 그날 신문. 신문 장면이 꺼져 있으면 서버 답 그대로이고, 켜져 있으면
+ * ① 일요일이면 월요일부터 묻고(없으면 서버가 토요일을 고른다) ② 서버가 고른 날짜가 네이버 1면 목록 제공 시기면 연도 파일의 그날 목록을 붙인다.
+ * 연도 파일이 없거나 그날이 없어도 실패가 아니다(빅카인즈 기사로 보여 준다). 서버 요청이 실패하면 null.
+ */
+export async function loadFrontScene(birthDate: string, deps: SceneDeps = { front: loadFrontPage, year: loadNewspaperYear }, enabled = NEWSPAPER_SCENE): Promise<FrontScene | null> {
+  if (!enabled) {
+    const data = await deps.front(birthDate);
+    return data && { data, naver: null };
+  }
+  const request = frontRequestDate(birthDate);
+  const requestYear = Number(request.slice(0, 4));
+  // 목록 파일은 서버 답을 기다리지 않고 함께 받는다 — 보여 줄 날짜는 대개 요청한 날짜와 같은 해다.
+  const early = request >= NAVER_FROM ? deps.year(requestYear) : null;
+  const served = await deps.front(request);
+  if (!served) return null;
+  const data = asBirthday(served, birthDate);
+  const shown = data.kind === 'none' ? null : data.shown_date;
+  if (!shown || shown < NAVER_FROM) return { data, naver: null };
+  const shownYear = Number(shown.slice(0, 4));
+  const file = await (early && shownYear === requestYear ? early : deps.year(shownYear));
+  return { data, naver: file?.days[shown] ?? null };
 }
 
 /** birthDate가 null이면(연도만 공유된 결과) 조회하지 않는다. */
@@ -135,14 +186,16 @@ export function useFrontPage(birthDate: string | null) {
   useEffect(() => {
     if (!birthDate || notice) return;
     let cancelled = false;
-    void loadFrontPage(birthDate).then(data => {
+    void loadFrontScene(birthDate).then(scene => {
       if (cancelled) return;
-      setLoaded(data ? { status: 'ok', date: birthDate, data } : { status: 'error', date: birthDate });
+      setLoaded(scene ? { status: 'ok', date: birthDate, data: scene.data, ...(scene.naver ? { naver: scene.naver } : {}) } : { status: 'error', date: birthDate });
     });
     return () => { cancelled = true; };
   }, [birthDate, notice, attempt]);
 
   const state: FrontPageState | null = !birthDate ? null
+    // 1990년 이전 시기는 서버에 묻지 않는다. 신문 장면이 켜져 있으면 그날 1면 사진이 있는지만 본다.
+    : notice === 'before-archive' && NEWSPAPER_SCENE ? { status: 'image-only', date: birthDate }
     : notice ? { status: 'notice', date: birthDate, notice }
     : loaded && loaded.date === birthDate ? loaded
     : { status: 'loading', date: birthDate };

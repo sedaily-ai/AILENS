@@ -1,0 +1,135 @@
+// "그날 서울경제" 신문 장면 — 1면 사진·기사 목록·안내·문구를 정하는 규칙(화면은 이 결과를 그리기만 한다).
+// 표시 규칙과 안내 문구 정본: timemachine-data/261103_타임머신_신문장면_표시규칙.md (1~4절).
+// 신문 장면 스위치(NEWSPAPER_SCENE)가 꺼져 있으면 화면이 이 파일을 쓰지 않고 지금 문구를 그대로 쓴다.
+import type { BigKindsArticle, FrontPageData } from '@/shared/lib/api/timelineApi';
+import { frontSourceNote, weekdayOf, type FrontNotice, type FrontPageState } from './birthdayFrontPage';
+import { dateLabel } from './birthdayModel';
+import { isPaperlessSunday, naverArticles, shiftDate } from './birthdayNewspaper';
+import { nb } from './keepTogether';
+
+/** 사진을 불러오는 중 · 불러옴 · 못 찾음(없음과 네트워크 문제를 구분할 수 없다). */
+export type PhotoState = 'loading' | 'ok' | 'missing';
+/** naver 네이버 1면 목록 · front 빅카인즈 1면(면 번호 시기) · day 빅카인즈 그날 기사 · none 목록 없음. */
+export type ListSource = 'naver' | 'front' | 'day' | 'none';
+
+export interface NewspaperView {
+  /** 사진·기사 목록·제호 줄의 날짜. 생일 당일 신문이 아니면 생일과 다르다. */
+  shown: string;
+  list: ListSource;
+  articles: BigKindsArticle[];
+  /** 생일 당일이 아닌 날을 보여 줄 때 지면 위에 붙이는 안내. */
+  substitute: FrontNotice | null;
+  /** 사진이나 목록 자리를 대신하는 지면 안 안내. */
+  empty: { title: string; body: string } | null;
+  kicker: string;
+  /** 화면 낭독용 장면 제목. */
+  heading: string;
+  /** 지면 아래 출처 줄(고른 자료와 기준). */
+  source: string;
+}
+
+interface Plan {
+  shown: string;
+  list: ListSource;
+  articles: BigKindsArticle[];
+  /** 생일이 오늘인데 아직 보관본에 없는 경우. */
+  today: boolean;
+  data: FrontPageData | null;
+}
+
+/** 어느 날짜의 사진·목록을 보여 줄지. 사진을 시도하지 않는 상태(찾는 중·오류·안내)는 null. */
+function plan(state: FrontPageState, birthDate: string): Plan | null {
+  if (state.status === 'image-only') return { shown: birthDate, list: 'none', articles: [], today: false, data: null };
+  if (state.status !== 'ok') return null;
+  const { data, naver } = state;
+  // 오늘 신문은 대신 어제 신문을 보여 주지 않는다. 오늘 사진이 올라와 있으면 사진만 보여 준다.
+  if (data.reason === 'not_yet') return { shown: birthDate, list: 'none', articles: [], today: true, data };
+  if (data.kind === 'none' || !data.shown_date) return { shown: birthDate, list: 'none', articles: [], today: false, data };
+  if (naver?.length) return { shown: data.shown_date, list: 'naver', articles: naverArticles(naver), today: false, data };
+  if (!data.articles.length) return { shown: data.shown_date, list: 'none', articles: [], today: false, data };
+  return { shown: data.shown_date, list: data.kind, articles: data.articles, today: false, data };
+}
+
+/** 사진을 불러올 날짜. null이면 사진 자리를 만들지 않는다. */
+export function newspaperPhotoDate(state: FrontPageState, birthDate: string) {
+  return plan(state, birthDate)?.shown ?? null;
+}
+
+// 월·일만 쓰되 해가 다르면(12월 31일 → 1월 1일 등) 연도까지 쓴다. 날짜는 한 줄에 붙여 둔다.
+const dayLabel = (date: string, birthDate: string) => nb(date.slice(0, 4) === birthDate.slice(0, 4) ? dateLabel(date).replace(/^\d+년 /, '') : dateLabel(date));
+
+function substituteNotice(birthDate: string, shown: string, oneFace: boolean): FrontNotice {
+  const paper = oneFace ? '서울경제 1면을' : '서울경제를';
+  const when = `${dayLabel(shown, birthDate)} ${weekdayOf(shown)}요일자`;
+  if (isPaperlessSunday(birthDate)) {
+    const lines = ['일요일이라 서울경제가 나오지 않았어요.'];
+    if (shown > birthDate) lines.push(`대신 다음 날인 ${nb(when)} ${paper} ${nb('보여 줘요.')}`);
+    else lines.push(`월요일에도 신문이 없어서 ${shown === shiftDate(birthDate, -1) ? '하루 전인' : '가장 가까운 지난 신문인'} ${nb(when)} ${paper} ${nb('보여 줘요.')}`);
+    return { title: '생일에는 신문이 나오지 않았어요', lines };
+  }
+  return {
+    title: '그날 1면을 찾지 못했어요',
+    lines: ['명절 등으로 쉬었거나 보관본에서 빠진 날이에요.', `대신 가장 가까운 지난 신문인 ${nb(when)} ${paper} ${nb('보여 줘요.')}`],
+  };
+}
+
+const TODAY = { title: '오늘 1면은 아직 올라오지 않았어요', body: '오늘자 서울경제 1면이 올라오면 볼 수 있어요.' };
+const NO_LIST = { title: '이 시기는 1면 기사 목록이 없어요', body: '1면 사진을 크게 보면 기사를 읽을 수 있어요.' };
+const NO_PHOTO = { title: '이 날의 1면 사진을 찾지 못했어요', body: '대신 그날 서울경제 기사를 보여 드려요.' };
+
+function emptyNotice(p: Plan, photo: PhotoState, birthDate: string) {
+  if (photo === 'missing') {
+    if (p.list !== 'none') return NO_PHOTO;
+    if (p.today) return TODAY;
+    // 1978-01-01~1980-11-25는 보관된 지면이 아예 없다고 알려진 구간이다.
+    const known = birthDate >= '1978-01-01' && birthDate <= '1980-11-25';
+    return {
+      title: '이 날의 1면은 보관돼 있지 않아요',
+      body: known ? `${nb('1978년 1월 1일')}부터 ${nb('1980년 11월 25일')}까지는 보관된 지면이 없어요.` : '서울경제는 발행됐지만 1면 사진과 기사를 구하지 못했어요.',
+    };
+  }
+  return photo === 'ok' && p.list === 'none' && !p.today ? NO_LIST : null;
+}
+
+const PICTURE = '1면 사진은 서울경제 지면 이미지예요.';
+const NOT_PAPER = '실제 지면을 옮긴 것이 아니에요.';
+
+/** 그날 기사 시기에서 기사를 고른 기준 — frontSourceNote(지금 문구)와 같은 기준 문장이다. */
+function dayBasis(data: FrontPageData) {
+  if (data.basis !== 'issue') return `기사는 본문이 긴 순서로, 사진 설명은 맨 뒤에 ${nb('보여 줘요.')}`;
+  const filled = data.articles.some(article => !article.coverage);
+  return `그날 여러 언론이 가장 많이 다룬 소식을 ${nb('보여 줘요.')}${filled ? ` 이슈로 고르지 못한 칸은 본문이 긴 ${nb('기사로 채워요.')}` : ''}`;
+}
+
+function sourceNote(p: Plan, photo: PhotoState) {
+  const picture = photo === 'ok' ? PICTURE : '';
+  const notPaper = photo === 'ok' ? '' : NOT_PAPER;
+  const join = (...parts: string[]) => parts.filter(Boolean).join(' ');
+  if (p.list === 'naver') return join(picture, `1면 기사 목록은 네이버 신문보기에서 ${nb('가져왔어요.')}`, notPaper);
+  if (p.list === 'front') return join(picture, `기사는 빅카인즈 보관본에서 고른 1면 기사예요. 본문이 긴 순서로, 사진 설명은 맨 뒤에 ${nb('보여 줘요.')}`, notPaper);
+  if (p.list === 'day' && p.data) {
+    // 사진이 없을 때는 지금 문구(frontSourceNote) 그대로다.
+    return photo === 'ok' ? join(picture, `기사는 빅카인즈 보관본에서 고른 그날 서울경제 기사예요. 1면 기사 목록이 아니에요. ${dayBasis(p.data)}`) : frontSourceNote(p.data);
+  }
+  return picture;
+}
+
+/**
+ * 신문 장면 상태 → 화면에 그릴 것. 찾는 중·오류·안내(창간 전·발행 중단)처럼 사진을 시도하지 않는 상태는 null(화면이 기존 모양으로 그린다).
+ * photo는 plan이 정한 날짜(newspaperPhotoDate)의 사진 상태다. '1면'이라는 말은 사진이 떴거나 1면 목록(네이버·빅카인즈 면 번호 시기)일 때만 쓴다.
+ */
+export function newspaperView(state: FrontPageState, birthDate: string, photo: PhotoState): NewspaperView | null {
+  const p = plan(state, birthDate);
+  if (!p) return null;
+  const oneFace = photo === 'ok' || p.list === 'naver' || p.list === 'front';
+  return {
+    shown: p.shown,
+    list: p.list,
+    articles: p.articles,
+    substitute: p.shown !== birthDate ? substituteNotice(birthDate, p.shown, oneFace) : null,
+    empty: emptyNotice(p, photo, birthDate),
+    kicker: `${p.shown === birthDate ? '내가 태어난 날' : '내 생일 무렵'} 서울경제${oneFace ? ' 1면' : ''}`,
+    heading: oneFace ? '그날의 서울경제 1면' : '그날의 서울경제',
+    source: sourceNote(p, photo),
+  };
+}
