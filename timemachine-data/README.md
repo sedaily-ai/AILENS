@@ -9,7 +9,7 @@
 |---|---|---|
 | `collect/crawl_naver_front.py` | 네이버 서울경제(언론사 011) 신문보기에서 1면 기사 목록 수집 → CSV | 완료(2026-01-01~11-03 샘플 1,171건) |
 | `collect/fetch_epaper_front.py` | e-Paper 최신호 1면 이미지 받기(→ 폴더 또는 S3 `timemachine-newspaper/img/`). 시험 `collect/test_fetch_epaper_front.py` | 작성(2026-11-03), 시험 13개 통과 |
-| `upload/check_images.py` | 원본 이미지 올리기 전 점검(→ `newspaper_manifest.csv`)·올린 뒤 S3 목록 대조 | 작성(2026-11-03) |
+| `upload/check_images.py` | 원본 이미지 올리기 전 점검(→ `newspaper_manifest.csv`)·올린 뒤 S3 목록 대조(일일 수집분은 따로 알림). 시험 `upload/test_check_images.py` | 작성(2026-11-03), 대조 시험 17개 통과 |
 | `collect/naver_daily.py`, `collect/daily_handler.py` | 네이버 1면 목록 일일 수집(연도 파일에 이어 붙임), 누락 목록, 알림 지표, 날짜 지정 재처리. 시험 `collect/test_naver_daily.py`. AWS: `aws/provision_daily.sh`(Lambda·EventBridge·SNS·알람), `aws/deploy_daily.sh` | 작성(2026-11-03), 시험 42개 통과. **네이버 수집은 꺼진 채**(`NAVER_DAILY`) |
 | `upload/count_day_types.py` | 날짜 종류별 개수표: 날짜마다 1면 사진·네이버 1면 목록이 있는지 세어 연도별 표와 사진이 이어서 없는 구간을 만든다. 시험 `upload/test_count_day_types.py` | 작성(2026-11-03), 시험 18개 통과 |
 | `build/build_year_files.py` | 1면 기사 CSV → 연도 파일(`timemachine-newspaper/index/v1/YYYY.json`). 연도 파일 전체를 새로 만든다(아래 "연도 파일 만들기"). 시험 `build/test_build_year_files.py` | 작성(2026-11-03), 시험 11개 통과 |
@@ -159,7 +159,7 @@ cd collect && python3 -m unittest test_fetch_epaper_front -v                    
 - 만들기: `bash timemachine-data/aws/provision.sh`(AWS 자격 증명이 있는 기기). 계정·버킷 확인 → 로그 그룹(30일) → IAM 역할 → 코드 묶음 → Lambda → 규칙·호출 권한·대상 → 태그를 다시 조회해 `Service=lens` 확인. 이미 있는 리소스는 건너뛴다. 코드만 바꿀 때는 `bash timemachine-data/aws/deploy.sh`(`CodeSha256`과 `State`·`LastUpdateStatus`로 확인). 권한과 코드가 함께 바뀌었으면 `provision.sh`(권한 정책을 덮어써 최신으로 맞춤) → `deploy.sh` 순서로 실행한다.
 - 태그는 `Project=Sedaily-LENS`, `CostCenter=sedaily-ai`, `ServiceName=Sedaily-LENS`, `Environment=prod`, `Service=lens`, `Workload=timemachine-newspaper-capture`.
 - 새 호가 올라오는 시각 확인(CloudWatch Logs Insights, 로그 그룹 `/aws/lambda/<함수 이름>`): `fields @timestamp, date, status | filter event = "capture" and status = "saved" | sort @timestamp asc`
-- 일일 수집이 올린 날짜(2026-11-03 이후)는 보관 이미지 점검 목록(`newspaper_manifest.csv`)에 없어서, 올린 뒤 대조(`check_images.py --compare`)에서 "목록에 없는데 올라간 파일"로 나오는 것이 정상이다.
+- 일일 수집이 올린 사진(2026-11-03 이후)은 보관 이미지 점검 목록(`newspaper_manifest.csv`)에 없다. 올린 뒤 대조(`check_images.py --compare`)는 목록의 마지막 날짜 뒤이고 2026-11-03 이후인 파일을 "자동 수집분"으로 따로 알리고 차이로 세지 않는다. 오늘 날짜는 조건에 넣지 않는다(대조가 도는 기기의 시계가 틀려도 결과가 같아야 해서). 이름이 날짜가 아닌 파일, 시작일 이전 파일, 목록 범위 안의 목록 외 파일은 그대로 차이로 센다. 시험 `upload/test_check_images.py`.
 - 아직 없는 것: 실패·미게시 알림(알림 채널 결정 필요).
 
 남은 요구사항: 2011-07-09 이전 텍스트는 네이버에 없고 기존 빅카인즈 경로(1994-01~1996-07 1면)가 후퇴하지 않아야 한다. 매일 최신호 1면(e-Paper) 이미지와 네이버 1면 텍스트를 자동 수집하고, 실패 재시도와 누락 알림이 필요하다.

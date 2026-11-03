@@ -9,6 +9,7 @@
 대조: python3 upload/check_images.py --compare <newspaper_manifest.csv> <listing.json>
   - listing.json = aws s3api list-objects-v2 --bucket sedaily-lens-timemachine-newspaper --prefix timemachine-newspaper/img/ --output json 결과.
   - 빠진 파일·남는 파일·크기 다름·내용 다름(한 번에 올린 파일은 ETag가 MD5)을 센다. 차이가 있으면 종료 코드 1.
+  - 목록의 마지막 날짜 뒤이고 2026-11-03(자동 수집 시작일) 이후인 파일은 e-Paper 일일 수집이 올린 것이라 '자동 수집분'으로 따로 알리고 차이로 세지 않는다.
 표준 라이브러리만 쓴다(Windows·macOS 공통). 규격: timemachine-data/261103_타임머신_1면이미지_인수규격.md
 """
 import argparse
@@ -26,6 +27,8 @@ FOUNDED = date(1960, 8, 1)
 SUSPENDED = (date(1980, 11, 26), date(1988, 7, 31))
 # 이날부터 일요일자 신문이 없다 — 백엔드 time_machine.py SUNDAY_CLOSED_FROM 과 같은 값.
 SUNDAY_CLOSED_FROM = date(1996, 9, 29)
+# e-Paper 일일 수집(Lambda)이 같은 경로에 사진을 올리기 시작한 날 — collect/lambda_handler.py. 이 날부터의 사진은 보유자 목록에 없는 것이 정상이다.
+AUTO_CAPTURE_FROM = date(2026, 11, 3)
 S3_PREFIX = 'timemachine-newspaper/img/'
 NAME = re.compile(r'^(\d{4})/(\d{2})/(\d{4})(\d{2})(\d{2})\.jpg$')
 JPEG_SUFFIXES = ('.jpg', '.jpeg')
@@ -163,14 +166,36 @@ def read_json(path: Path):
     raise SystemExit(f'JSON 으로 읽지 못함: {path}')
 
 
+def key_date(key: str):
+    """S3 키의 날짜. timemachine-newspaper/img/YYYY/MM/YYYYMMDD.jpg 형식이 아니거나 없는 날짜면 None."""
+    m = NAME.match(key[len(S3_PREFIX):]) if key.startswith(S3_PREFIX) else None
+    if not m or (m.group(1), m.group(2)) != (m.group(3), m.group(4)):
+        return None
+    try:
+        return date(int(m.group(3)), int(m.group(4)), int(m.group(5)))
+    except ValueError:
+        return None
+
+
 def compare(manifest_path: Path, listing_path: Path) -> int:
     with manifest_path.open(encoding='utf-8-sig') as f:
         expected = {row['key']: row for row in csv.DictReader(f)}
     actual = {obj['Key']: obj for obj in (read_json(listing_path) or {}).get('Contents', [])}
+    last = max(filter(None, map(key_date, expected)), default=None)
+
+    def automatic(key: str) -> bool:
+        """일일 수집이 올린 사진: 목록의 마지막 날짜 뒤이고 자동 수집 시작일 이후의 날짜. 이름이 날짜가 아닌 파일은 아니다.
+        '오늘 이하'는 조건에 두지 않는다 — 이 대조는 보유자 기기에서 도는데, 기기 시계가 틀리면 정상 사진이 미래 날짜로 보여 차이로 남기 때문이다.
+        (미래 날짜 파일은 올리기 전 점검이 이미 오류로 거른다.)"""
+        day = key_date(key)
+        return bool(last and day and day > last and day >= AUTO_CAPTURE_FROM)
+
+    extra = sorted(actual.keys() - expected.keys())
+    auto = [key for key in extra if automatic(key)]
     both = expected.keys() & actual.keys()
     diffs = {
         '올라가지 않은 파일': sorted(expected.keys() - actual.keys()),
-        '목록에 없는데 올라간 파일': sorted(actual.keys() - expected.keys()),
+        '목록에 없는데 올라간 파일': [key for key in extra if not automatic(key)],
         '크기가 다른 파일': sorted(k for k in both if int(expected[k]['bytes']) != int(actual[k]['Size'])),
         '내용이 다른 파일': sorted(k for k in both if '-' not in actual[k]['ETag']
                             and actual[k]['ETag'].strip('"') != expected[k]['md5']),
@@ -180,6 +205,8 @@ def compare(manifest_path: Path, listing_path: Path) -> int:
         print(f'{label} {len(keys):,}건')
         for key in keys[:10]:
             print(f'  {key}')
+    if auto:
+        print(f'자동 수집분 {len(auto):,}개 ({key_date(auto[0])} ~ {key_date(auto[-1])}) — 목록의 마지막 날짜({last}) 뒤에 일일 수집이 올린 사진이라 차이로 세지 않아요')
     failed = sum(len(keys) for keys in diffs.values())
     print('차이 0건 — 올리기 완료' if not failed else '차이가 있어요. 같은 sync 명령을 다시 실행한 뒤 다시 대조해 주세요.')
     return 1 if failed else 0
