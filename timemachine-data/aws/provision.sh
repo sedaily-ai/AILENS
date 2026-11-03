@@ -1,8 +1,10 @@
 #!/usr/bin/env bash
 # 타임머신 신문 1면 이미지 일일 수집의 AWS 구성(2026-11-03): Lambda + EventBridge 매시간.
-# e-Paper 최신호 1면을 받아 S3 버킷(TIMEMACHINE_NEWSPAPER_BUCKET)의 timemachine-newspaper/img/YYYY/MM/YYYYMMDD.jpg 에 저장한다.
+# e-Paper 최신호 1면을 받아 S3 버킷(TIMEMACHINE_NEWSPAPER_BUCKET)의 timemachine-newspaper/img/YYYY/MM/YYYYMMDD.jpg 에 저장하고,
+# 그날 1면 기사 제목·영역은 timemachine-newspaper/epaper/YYYY/MM/YYYYMMDD.json 에 저장한다.
 #
-# 이미 있는 리소스는 건너뛰므로 다시 실행해도 안전하다. 코드만 바꿀 때는 deploy.sh.
+# 이미 있는 리소스는 건너뛰므로 다시 실행해도 안전하다(역할 권한 정책은 매번 덮어써서 최신으로 맞춘다).
+# 코드만 바꿀 때는 deploy.sh. 권한과 코드가 함께 바뀌었으면 provision.sh → deploy.sh 순서로 실행한다.
 # 비용태깅_규칙: 리소스를 만들기 전에 태그를 붙이고, 끝에서 다시 조회해 Service=lens 를 확인한다.
 # 사용: AWS 자격 증명이 있는 기기에서 저장소 어디서든 bash timemachine-data/aws/provision.sh
 set -euo pipefail
@@ -43,7 +45,7 @@ else
 fi
 aws logs put-retention-policy --log-group-name "${LOG_GROUP}" --retention-in-days 30 --region "${REGION}"
 
-echo "=== 2/7 IAM 역할 (Lambda 실행용, 권한은 로그 쓰기 + 이 버킷 img/ 목록·저장만) ==="
+echo "=== 2/7 IAM 역할 (Lambda 실행용, 권한은 로그 쓰기 + 이 버킷 img/·epaper/ 목록·저장만) ==="
 TRUST='{"Version":"2012-10-17","Statement":[{"Effect":"Allow","Principal":{"Service":"lambda.amazonaws.com"},"Action":"sts:AssumeRole"}]}'
 ROLE_NEW=0
 if aws iam get-role --role-name "${ROLE}" >/dev/null 2>&1; then
@@ -57,8 +59,8 @@ fi
 POLICY="$(cat <<JSON
 {"Version":"2012-10-17","Statement":[
 {"Sid":"WriteLogs","Effect":"Allow","Action":["logs:CreateLogStream","logs:PutLogEvents"],"Resource":"arn:aws:logs:${REGION}:${ACCOUNT}:log-group:${LOG_GROUP}:*"},
-{"Sid":"ListImagePrefix","Effect":"Allow","Action":"s3:ListBucket","Resource":"arn:aws:s3:::${BUCKET}","Condition":{"StringLike":{"s3:prefix":["timemachine-newspaper/img/*"]}}},
-{"Sid":"PutImages","Effect":"Allow","Action":"s3:PutObject","Resource":"arn:aws:s3:::${BUCKET}/timemachine-newspaper/img/*"}
+{"Sid":"ListCapturePrefixes","Effect":"Allow","Action":"s3:ListBucket","Resource":"arn:aws:s3:::${BUCKET}","Condition":{"StringLike":{"s3:prefix":["timemachine-newspaper/img/*","timemachine-newspaper/epaper/*"]}}},
+{"Sid":"PutCaptures","Effect":"Allow","Action":"s3:PutObject","Resource":["arn:aws:s3:::${BUCKET}/timemachine-newspaper/img/*","arn:aws:s3:::${BUCKET}/timemachine-newspaper/epaper/*"]}
 ]}
 JSON
 )"
