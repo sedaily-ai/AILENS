@@ -8,6 +8,7 @@
 | 경로 | 역할 | 상태 |
 |---|---|---|
 | `collect/crawl_naver_front.py` | 네이버 서울경제(언론사 011) 신문보기에서 1면 기사 목록 수집 → CSV | 완료(2026-01-01~11-03 샘플 1,171건) |
+| `collect/fetch_epaper_front.py` | e-Paper 최신호 1면 이미지 받기(→ 폴더 또는 S3 `timemachine-newspaper/img/`). 시험 `collect/test_fetch_epaper_front.py` | 작성(2026-11-03), 시험 13개 통과 |
 | `upload/check_images.py` | 원본 이미지 올리기 전 점검(→ `newspaper_manifest.csv`)·올린 뒤 S3 목록 대조 | 작성(2026-11-03) |
 | `build/` | 연도 파일(`timemachine-newspaper/index/v1/YYYY.json`) 생성 | 네이버 과거 수집 뒤 작성 |
 | `261103_타임머신_지면1면_요구사항.html` | 개요, 로드맵, 과제와 목표, 수집 출처 | v1.3 |
@@ -52,7 +53,7 @@ python3 collect/crawl_naver_front.py 2026-01-01 2026-11-03 naver_front_2026.csv
 | 받은 자료 | `intake/check/`(점검 결과), `intake/text/`(네이버 CSV) |
 | 연도 파일 | `timemachine-newspaper/index/v1/YYYY.json`. 개발이 만든다. `Cache-Control: public, max-age=600` |
 | 태그 | Service=lens, Project=Sedaily-LENS, ServiceName=Sedaily-LENS, Environment=prod, CostCenter=sedaily-ai, Purpose=timemachine-newspaper, DoNotDelete=true |
-| AWS 상태 | 버킷 생성 완료(2026-11-03). 태그·공개 차단·버전 관리·수명 주기·소유권을 만든 뒤 다시 조회해 확인했다. 업로드 전용 정책 `lens-timemachine-newspaper-upload`는 만들었고 아직 누구에게도 연결하지 않았다. 사이트 경로(`/timemachine-newspaper/*`) 연결은 아직 안 했고 AWS를 쓰는 기기에서 한다 |
+| AWS 상태 | 버킷 생성 완료(2026-11-03). 태그·공개 차단·버전 관리·수명 주기·소유권을 만든 뒤 다시 조회해 확인했다. 업로드 전용 정책 `lens-timemachine-newspaper-upload`는 만들었고 아직 누구에게도 연결하지 않았다. 사이트 CloudFront에 `/timemachine-newspaper/*` 경로를 연결했다(2026-11-03, 원본 접근 제어 `lens-timemachine-newspaper-oac`). 시험 파일은 200·`image/jpeg`로 열렸고 확인 뒤 삭제했으며, 없는 파일은 404였다 |
 
 새 버킷을 쓰는 이유: 기존 미디어 버킷(`sedaily-mbti-cms-media-dev`)은 S3 주소로 공개 읽기·CloudFront 미경유이고, admin이 객체를 지운다. 21GB 원본 보관은 권한을 따로 둔다.
 
@@ -78,5 +79,24 @@ python3 collect/crawl_naver_front.py 2026-01-01 2026-11-03 naver_front_2026.csv
 - 형식을 바꾸면 `index/v2/`를 새로 만들고 화면의 버전 값만 바꾼다. 이미지 경로는 바꾸지 않는다. 파일이 커서 느리면 월별 파일로 나눌 수 있다.
 - 화면 표시·문구·대체 규칙은 `261103_타임머신_신문장면_표시규칙.md`.
 - 원본은 평균 1.3MB라 모바일 첫 표시가 느릴 수 있다. 필요해지면 비율 그대로 줄인 사본을 `timemachine-newspaper/web/`에 따로 만들고 원본은 그대로 둔다(지금은 만들지 않는다).
+
+## 일일 수집: e-Paper 최신호 1면 이미지(2026-11-03 확인)
+
+로그인 없이 받을 수 있는 건 최신호 1면뿐이라 매일 받아 두어야 한다.
+
+- `https://epaper.sedaily.com/` 첫 화면에 최신호 정보가 박혀 있다: 발행일 `FREE_PUB_DATE`, 1시간짜리 이미지 토큰 `imgToken`, 면 목록 `pdfData`(32면, 면마다 이미지 폴더·파일명과 기사 제목·영역).
+- 이미지 주소는 `CDN_URL + 면 폴더 + 파일명 + '?' + IMG_TOKEN_NAME + '=' + imgToken`이다. 서버가 토큰의 슬래시를 `\/`로 내보내서 풀어 써야 한다(안 풀면 403). Referer나 로그인은 필요 없다.
+- 2026-11-03 1면은 2495×3507, 905,533바이트 JPEG이고(보관 원본은 평균 1.3MB) `upload/check_images.py`를 오류 없이 통과한다. 가로세로 비율은 1.405배다.
+- 같은 날짜의 파일이 이미 있으면 내용이 같을 때 건너뛰고, 다르면 그대로 두고 알린다(`--force`로만 덮어쓴다). 토큰·서명값은 출력하지 않는다(시험이 확인).
+- `pdfData`의 1면 항목에는 기사 8개의 제목(`headLine`)과 영역(`poly`)이 있다. 아직 저장하지 않는다.
+- 아직 없는 것: 정해진 시각 실행, 새 호가 올라오는 시각 측정, 새 호가 안 올라왔을 때 알림, S3 올리기 실제 시험(AWS 필요).
+
+```
+cd timemachine-data
+python3 collect/fetch_epaper_front.py --out local-capture                          # 폴더에 YYYY/MM/YYYYMMDD.jpg (local-capture/는 저장소에 넣지 않는다)
+python3 collect/fetch_epaper_front.py --s3-bucket sedaily-lens-timemachine-newspaper   # S3 timemachine-newspaper/img/YYYY/MM/YYYYMMDD.jpg
+python3 collect/fetch_epaper_front.py --dry-run                                    # 받아서 확인만
+cd collect && python3 -m unittest test_fetch_epaper_front -v                       # 시험(네트워크·AWS 없이)
+```
 
 남은 요구사항: 2011-07-09 이전 텍스트는 네이버에 없고 기존 빅카인즈 경로(1994-01~1996-07 1면)가 후퇴하지 않아야 한다. 매일 최신호 1면(e-Paper) 이미지와 네이버 1면 텍스트를 자동 수집하고, 실패 재시도와 누락 알림이 필요하다.
