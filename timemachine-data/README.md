@@ -12,7 +12,7 @@
 | `upload/check_images.py` | 원본 이미지 올리기 전 점검(→ `newspaper_manifest.csv`)·올린 뒤 S3 목록 대조 | 작성(2026-11-03) |
 | `collect/naver_daily.py`, `collect/daily_handler.py` | 네이버 1면 목록 일일 수집(연도 파일에 이어 붙임), 누락 목록, 알림 지표, 날짜 지정 재처리. 시험 `collect/test_naver_daily.py`. AWS: `aws/provision_daily.sh`(Lambda·EventBridge·SNS·알람), `aws/deploy_daily.sh` | 작성(2026-11-03), 시험 42개 통과. **네이버 수집은 꺼진 채**(`NAVER_DAILY`) |
 | `upload/count_day_types.py` | 날짜 종류별 개수표: 날짜마다 1면 사진·네이버 1면 목록이 있는지 세어 연도별 표와 사진이 이어서 없는 구간을 만든다. 시험 `upload/test_count_day_types.py` | 작성(2026-11-03), 시험 18개 통과 |
-| `build/` | 연도 파일(`timemachine-newspaper/index/v1/YYYY.json`) 생성 | 네이버 과거 수집 뒤 작성 |
+| `build/build_year_files.py` | 1면 기사 CSV → 연도 파일(`timemachine-newspaper/index/v1/YYYY.json`). 연도 파일 전체를 새로 만든다(아래 "연도 파일 만들기"). 시험 `build/test_build_year_files.py` | 작성(2026-11-03), 시험 11개 통과 |
 | `261103_타임머신_지면1면_요구사항.html` | 개요, 로드맵, 과제와 목표, 수집 출처 | v1.3 |
 | `261103_타임머신_1면이미지_인수규격.md` | 이미지 저장소·형식·구조·업로드·검증 기준 | v1 |
 | `261103_타임머신_신문장면_표시규칙.md` | 신문 장면의 기사 출처·표시·"1면" 문구·대체 규칙·안내 문구 | v1 |
@@ -34,6 +34,22 @@ python3 collect/crawl_naver_front.py 2026-01-01 2026-11-03 naver_front_2026.csv
 - 이어받기: 같은 명령을 다시 실행하면 CSV에 있는 날짜는 건너뛴다.
 - 지면이 없는 날(일요일·휴간)은 행이 없다.
 - 요청 간 0.7초 대기, 일 1회 요청.
+- **대량 수집 전에 확인할 것**: `https://media.naver.com/robots.txt`는 모든 봇에 `Disallow: /`이고 AI 학습·RAG 목적 수집을 금지한다고 적혀 있다(2026-11-03 확인). 2011-07-09~2025-12-31(약 4,600일)을 이 방식으로 모으기 전에 허용 여부를 확인한다. 같은 자료를 서울경제 내부 지면 데이터에서 받을 수 있는지도 함께 본다(e-Paper 페이지 설명에 1960년 창간호부터 최근호까지 볼 수 있다고 적혀 있다).
+- 확인한 페이지 모양(날짜당 1건): 2011-07-09부터 1면 목록이 있고(2011-07-08은 "발행된 종이신문이 없거나 신문게재 정보가 입력되지 않았습니다"), 일요일·휴간일도 같은 문구다. 2011·2013·2018년 모두 같은 구조로 읽혔다(기사 6·4·5건).
+
+### 연도 파일 만들기
+
+```
+cd timemachine-data
+python3 build/build_year_files.py --csv naver_front_2026.csv --covers 2026-01-01:2026-11-03 --out year-files
+cd build && python3 -m unittest test_build_year_files -v
+```
+
+- 입력 CSV는 `date`·`rank`·`title`·`url` 열이 있으면 된다(수집 스크립트의 CSV 그대로). `--csv`와 `--covers`는 여러 번 쓸 수 있다.
+- `--covers`는 그 기간의 모든 날짜를 확인했다는 선언이다. 확인한 기간에 기사가 없는 날은 "1면 기사가 없는 날", 확인하지 않은 기간은 화면이 기존 방식(빅카인즈)으로 채운다. 선언한 기간 밖의 행이 있으면 오류다.
+- 같은 입력이면 같은 파일이 나오고, `updated_at`만 다르면 파일을 다시 쓰지 않는다(`unchanged`). 기사 수가 3~6건이 아니거나 순서가 이어지지 않으면 `[확인]`으로 알린다.
+- **이 도구는 연도 파일 전체를 새로 만든다.** S3에 이미 있는 같은 해 파일 위에 올리면 그 파일이 통째로 바뀐다. 일일 수집(`collect/daily_handler.py`)이 켜져 이어 붙인 해의 파일은 옛 CSV로 다시 만들어 올리지 않는다(이어 붙인 날이 사라진다). 그래서 **연도 파일은 일일 수집을 켜기 전에 올리고**, 켠 뒤에 다시 만들어야 하면 이어 붙인 날짜까지 CSV에 넣는다.
+- 만든 파일은 일일 수집(`naver_daily.py`), 개수표(`upload/count_day_types.py`), 화면(`parseNewspaperYear`)이 같은 형식으로 읽는 것을 확인했다(빌더로 만든 파일에 일일 수집이 하루를 이어 붙인 결과까지).
 
 ## CSV 컬럼
 
