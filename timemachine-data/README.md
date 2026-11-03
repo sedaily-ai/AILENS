@@ -12,6 +12,7 @@
 | `build/` | 연도 파일(`timemachine-newspaper/index/v1/YYYY.json`) 생성 | 네이버 과거 수집 뒤 작성 |
 | `261103_타임머신_지면1면_요구사항.html` | 개요, 로드맵, 과제와 목표, 수집 출처 | v1.3 |
 | `261103_타임머신_1면이미지_인수규격.md` | 이미지 저장소·형식·구조·업로드·검증 기준 | v1 |
+| `261103_타임머신_신문장면_표시규칙.md` | 신문 장면의 기사 출처·표시·"1면" 문구·대체 규칙·안내 문구 | v1 |
 
 ## 수집 범위(2026-11-03 확인)
 
@@ -51,7 +52,7 @@ python3 collect/crawl_naver_front.py 2026-01-01 2026-11-03 naver_front_2026.csv
 | 받은 자료 | `intake/check/`(점검 결과), `intake/text/`(네이버 CSV) |
 | 연도 파일 | `timemachine-newspaper/index/v1/YYYY.json`. 개발이 만든다. `Cache-Control: public, max-age=600` |
 | 태그 | Service=lens, Project=Sedaily-LENS, ServiceName=Sedaily-LENS, Environment=prod, CostCenter=sedaily-ai, Purpose=timemachine-newspaper, DoNotDelete=true |
-| AWS 상태 | 버킷 생성 완료(2026-11-03). 태그·공개 차단·버전 관리·수명 주기·소유권을 만든 뒤 다시 조회해 확인했다. 업로드 전용 정책 `lens-timemachine-newspaper-upload`는 만들었고 아직 누구에게도 연결하지 않았다. 사이트 경로(`/timemachine-newspaper/*`) 연결은 이미지를 올린 뒤 AWS를 쓰는 기기에서 한다 |
+| AWS 상태 | 버킷 생성 완료(2026-11-03). 태그·공개 차단·버전 관리·수명 주기·소유권을 만든 뒤 다시 조회해 확인했다. 업로드 전용 정책 `lens-timemachine-newspaper-upload`는 만들었고 아직 누구에게도 연결하지 않았다. 사이트 경로(`/timemachine-newspaper/*`) 연결은 아직 안 했고 AWS를 쓰는 기기에서 한다 |
 
 새 버킷을 쓰는 이유: 기존 미디어 버킷(`sedaily-mbti-cms-media-dev`)은 S3 주소로 공개 읽기·CloudFront 미경유이고, admin이 객체를 지운다. 21GB 원본 보관은 권한을 따로 둔다.
 
@@ -65,18 +66,17 @@ python3 collect/crawl_naver_front.py 2026-01-01 2026-11-03 naver_front_2026.csv
   "text_covers": [["2014-01-01", "2014-12-31"]],
   "days": {
     "2014-05-17": {
-      "w": 4465, "h": 6100,
       "articles": [{ "rank": 1, "title": "기사 제목", "url": "https://n.news.naver.com/..." }]
     }
   }
 }
 ```
 
-- 이미지와 기사는 날짜로 짝이 맞는다. 이미지 주소는 날짜로 정해지고(`/timemachine-newspaper/img/2014/05/20140517.jpg`), 같은 날짜의 기사가 같은 항목(`days`)에 들어 있다.
-- `days`에는 이미지나 기사 중 하나라도 있는 날이 모두 있다. `w`·`h`가 있으면 이미지가 있는 날이고(이미지가 뜨기 전 자리를 잡는 데 쓴다, 값은 `newspaper_manifest.csv`), `articles`가 있으면 네이버 1면 기사가 있는 날이다. 한쪽만 있는 날도 빠지지 않는다.
-- 기사는 순서(`rank`)대로 모두 담고, 화면이 앞에서 4건을 골라 보여 준다(지금 화면과 같다). 네이버 1면은 3~6건이다.
-- `text_covers`는 네이버 목록을 날짜별로 확인한 기간이다. 2011-07-09 이전과 기사가 없는 날의 기사를 기존 1면 조회(`/time-machine?front=`)로 채우는 규칙은 화면 작업 때 정한다.
-- 형식을 바꾸면 `index/v2/`를 새로 만들고 화면의 버전 값만 바꾼다. 이미지 경로는 바꾸지 않는다.
+- 이미지는 연도 파일에 없다. 화면이 날짜로 정해진 주소(`/timemachine-newspaper/img/2014/05/20140517.jpg`)를 직접 불러서, 이미지를 올리면 바로 보인다. 없으면 안내한다.
+- `days`에는 네이버 1면 기사가 있는 날만 있다. `articles`는 네이버가 준 순서(`rank`) 그대로 3~6건을 모두 담고, 화면이 앞 4건을 쓴다. 썸네일 유무(`is_top`)는 쓰지 않는다.
+- `days`의 날짜는 2011-07-09 이후 대체할 날(일요일·명절)을 찾는 데도 쓴다. `text_covers`는 네이버 목록을 확인한 기간이고, 이 밖의 날짜와 기사가 없는 날은 기존 1면 조회(`/time-machine?front=`)로 채운다.
+- 형식을 바꾸면 `index/v2/`를 새로 만들고 화면의 버전 값만 바꾼다. 이미지 경로는 바꾸지 않는다. 파일이 커서 느리면 월별 파일로 나눌 수 있다.
+- 화면 표시·문구·대체 규칙은 `261103_타임머신_신문장면_표시규칙.md`.
 - 원본은 평균 1.3MB라 모바일 첫 표시가 느릴 수 있다. 필요해지면 비율 그대로 줄인 사본을 `timemachine-newspaper/web/`에 따로 만들고 원본은 그대로 둔다(지금은 만들지 않는다).
 
 남은 요구사항: 2011-07-09 이전 텍스트는 네이버에 없고 기존 빅카인즈 경로(1994-01~1996-07 1면)가 후퇴하지 않아야 한다. 매일 최신호 1면(e-Paper) 이미지와 네이버 1면 텍스트를 자동 수집하고, 실패 재시도와 누락 알림이 필요하다.
