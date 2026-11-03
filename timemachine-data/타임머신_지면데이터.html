@@ -75,15 +75,5 @@ figure{margin:8px 0}figure img{width:100%;max-width:760px;border:1px solid var(-
 텍스트  GET https://media.naver.com/press/011/newspaper?date=20261103</pre>
 <p class="cap">이미지: 페이지 HTML에 내장된 서명 토큰(만료 약 1시간)을 읽어 요청. 비로그인은 최신 발행일 1면만 무료(<code>FREE_PUB_DATE</code>, <code>FREE_PAGE_NO=1</code>), 실측 jpg 2495×3507·905KB. 텍스트: 일자(<code>date</code>)만 바꿔 GET, 서버 렌더링 HTML 파싱. 수집 코드 <code>collect/crawl_naver_front.py</code>.</p>
 
-<h2><span>5</span>확인 필요</h2>
-<table>
-<tr><th>#</th><th>항목</th><th>상태</th></tr>
-<tr><td>1</td><td class="k">e-Paper 이미지의 서비스 노출·자동 수집 허용 여부</td><td class="ng">미확인. 사내 확인 필요</td></tr>
-<tr><td>2</td><td class="k">네이버 자동 수집 정책, 2011-07~2025 전수 수집 가능 여부</td><td class="ng">전수 미확인. 네이버 미디어 robots.txt가 전체 차단(<code>Disallow: /</code>)으로 표기됨</td></tr>
-<tr><td>3</td><td class="k">e-Paper 토큰 범위·검증 방식</td><td class="ng">캡처 토큰은 <code>acl=/svc/epaper/*</code>, 페이지 내장 토큰은 해당 일자 1건. 빈 값 쿠키로 200이 나온 시험 1회. 원인 미확인</td></tr>
-<tr><td>4</td><td class="k">이미지 없는 구간(1978~87, 1991~93), 1998 종료(05-30), 1989 저해상도, 이미지 수집 경로 기록</td><td class="ng">미확인</td></tr>
-<tr><td>5</td><td class="k">2026-03-21 네이버 누락, 톱 기사 없는 11일</td><td class="ng">원인 미확인</td></tr>
-<tr><td>6</td><td class="k">AWS 계정·권한, CloudFront 구성, 이미지 변환 크기</td><td class="ng">미확인·미측정</td></tr>
-</table>
 <div class="ft">근거: 폴더 파일 집계(2026-11-03), 네이버·e-Paper 조회와 캡처, <code>service/backend/handlers/timeline/time_machine.py</code>, <code>config/resources.env</code> · 수치 중 "추정"·"미확인" 표기 외에는 실행·집계로 확인한 값</div>
 </main></body></html>
