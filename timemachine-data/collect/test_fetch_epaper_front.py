@@ -11,6 +11,7 @@ from pathlib import Path
 from unittest import mock
 
 import fetch_epaper_front as ep
+import lambda_handler as lh
 
 TOKEN = 'st=1000000000~exp=1000003920~acl=/svc/epaper/*~hmac=testsignature'
 
@@ -90,6 +91,69 @@ class Save(unittest.TestCase):
             self.assertEqual(list(root.rglob('*.part')), [])
 
 
+class FakeS3:
+    def __init__(self, existing=None):
+        self.existing = existing or {}  # key -> (etag, size)
+        self.puts = []
+        self.list_calls = []
+
+    def list_objects_v2(self, Bucket, Prefix, MaxKeys):
+        self.list_calls.append(Prefix)
+        return {'Contents': [{'Key': k, 'ETag': f'"{e}"', 'Size': s} for k, (e, s) in self.existing.items() if k.startswith(Prefix)]}
+
+    def put_object(self, **kwargs):
+        self.puts.append(kwargs)
+
+
+class SaveS3(unittest.TestCase):
+    KEY = '2026/11/20261103.jpg'
+    OBJ = 'timemachine-newspaper/img/2026/11/20261103.jpg'
+
+    def run_save(self, fake, data, force=False):
+        boto3 = mock.Mock()
+        boto3.client.return_value = fake
+        with mock.patch.dict('sys.modules', {'boto3': boto3}):
+            return ep.save_s3('test-bucket', 'us-east-1', self.KEY, data, force)
+
+    def test_new_file_is_put_under_the_img_prefix_with_cache_headers(self):
+        fake, data = FakeS3(), jpeg()
+        self.assertEqual(self.run_save(fake, data), 'saved')
+        put = fake.puts[0]
+        self.assertEqual((put['Bucket'], put['Key'], put['ContentType']), ('test-bucket', self.OBJ, 'image/jpeg'))
+        self.assertEqual(put['CacheControl'], 'public, max-age=2592000')
+        self.assertEqual(fake.list_calls, [self.OBJ])  # 목록 조회는 접두어 제한 안의 정확한 키로만
+
+    def test_same_content_is_skipped(self):
+        import hashlib
+        data = jpeg()
+        fake = FakeS3({self.OBJ: (hashlib.md5(data).hexdigest(), len(data))})
+        self.assertEqual(self.run_save(fake, data), 'exists')
+        self.assertEqual(fake.puts, [])
+
+    def test_different_content_is_kept_unless_forced(self):
+        data = jpeg()
+        fake = FakeS3({self.OBJ: ('0' * 32, len(data) + 1)})
+        self.assertEqual(self.run_save(fake, data), 'conflict')
+        self.assertEqual(fake.puts, [])
+        self.assertEqual(self.run_save(fake, data, force=True), 'saved')
+
+    def test_multipart_object_is_compared_by_size(self):
+        data = jpeg()
+        self.assertEqual(self.run_save(FakeS3({self.OBJ: ('abc-3', len(data))}), data), 'exists')
+        self.assertEqual(self.run_save(FakeS3({self.OBJ: ('abc-3', len(data) + 1)}), data), 'conflict')
+
+    def test_similar_key_does_not_count_as_existing(self):
+        fake = FakeS3({self.OBJ + '.part': ('0' * 32, 1)})
+        self.assertEqual(self.run_save(fake, jpeg()), 'saved')
+
+    def test_s3_errors_are_reported_without_details(self):
+        fake = FakeS3()
+        fake.list_objects_v2 = mock.Mock(side_effect=PermissionError('secret detail'))
+        with self.assertRaisesRegex(ep.CaptureError, r'S3 확인 실패\(PermissionError\)') as ctx:
+            self.run_save(fake, jpeg())
+        self.assertNotIn('secret detail', str(ctx.exception))
+
+
 class Secrets(unittest.TestCase):
     def test_mask_hides_signature_values(self):
         text = f'실패 https://x/y.jpg?sedailypdf={TOKEN}'
@@ -126,6 +190,53 @@ class Secrets(unittest.TestCase):
             with contextlib.redirect_stdout(io.StringIO()):
                 self.assertEqual(ep.main(['--dry-run']), 0)
             self.assertEqual(list(Path(tmp).iterdir()), [])
+
+
+class LambdaHandler(unittest.TestCase):
+    def setUp(self):
+        self.env = mock.patch.dict('os.environ', {'NEWSPAPER_BUCKET': 'test-bucket', 'AWS_REGION': 'us-east-1'})
+        self.env.start()
+        self.addCleanup(self.env.stop)
+
+    def run_handler(self, status='saved'):
+        data = jpeg()
+        with mock.patch.object(ep, 'fetch_text', return_value=page_html()), \
+                mock.patch.object(ep, 'fetch_bytes', return_value=data), \
+                mock.patch.object(ep, 'save_s3', return_value=status) as save:
+            out = io.StringIO()
+            with contextlib.redirect_stdout(out):
+                result = lh.handler({}, None)
+        return result, save, data, out.getvalue()
+
+    def test_saves_under_the_issue_date_and_returns_a_summary(self):
+        result, save, data, _ = self.run_handler()
+        save.assert_called_once_with('test-bucket', 'us-east-1', '2026/11/20261103.jpg', data)
+        self.assertEqual(result, {'date': '2026-11-03', 'status': 'saved', 'width': 2495, 'height': 3507, 'bytes': len(data)})
+
+    def test_already_saved_issue_is_not_an_error(self):
+        result, _, _, _ = self.run_handler('exists')
+        self.assertEqual(result['status'], 'exists')
+
+    def test_different_file_on_the_same_date_fails_the_run(self):
+        with self.assertRaisesRegex(RuntimeError, '다른 파일이 이미 있어'):
+            self.run_handler('conflict')
+
+    def test_log_is_one_json_line_without_the_token(self):
+        _, _, _, log = self.run_handler()
+        line = json.loads(log.strip())
+        self.assertEqual((line['event'], line['status'], line['date']), ('capture', 'saved', '2026-11-03'))
+        self.assertNotIn('testsignature', log)
+
+    def test_page_problem_fails_the_run_with_a_masked_message(self):
+        with mock.patch.object(ep, 'fetch_text', return_value='<html>다른 화면</html>'):
+            out = io.StringIO()
+            with contextlib.redirect_stdout(out), self.assertRaisesRegex(RuntimeError, '페이지 구조가 달라졌어요'):
+                lh.handler({}, None)
+            self.assertEqual(json.loads(out.getvalue().strip())['status'], 'error')
+
+    def test_missing_bucket_setting_fails_clearly(self):
+        with mock.patch.dict('os.environ', {}, clear=True), self.assertRaisesRegex(RuntimeError, 'NEWSPAPER_BUCKET'):
+            lh.handler({}, None)
 
 
 if __name__ == '__main__':

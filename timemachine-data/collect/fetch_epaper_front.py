@@ -189,28 +189,41 @@ def save_local(root: Path, key: str, data: bytes, force: bool = False) -> str:
 
 
 def save_s3(bucket: str, region: str, key: str, data: bytes, force: bool = False) -> str:
-    import boto3  # AWS 자격 증명이 있는 기기에서만 쓴다
-    from botocore.exceptions import ClientError
+    import boto3  # AWS 자격 증명이 있는 기기·Lambda 에서만 쓴다
 
     s3 = boto3.client('s3', region_name=region)
     object_key = S3_IMG_PREFIX + key
+    # head_object 대신 목록 조회로 있는지 본다 — 없는 파일에 head 를 하면 목록 권한이 없을 때 403 이 와서 404 와 구분되지 않고,
+    # 목록 권한을 접두어 제한 없이 줘야 한다. 목록 조회는 접두어 제한 그대로 쓸 수 있다.
     try:
-        head = s3.head_object(Bucket=bucket, Key=object_key)
-        if head['ETag'].strip('"') == hashlib.md5(data).hexdigest():
+        listed = s3.list_objects_v2(Bucket=bucket, Prefix=object_key, MaxKeys=1)
+    except Exception as e:  # noqa: BLE001
+        raise CaptureError(f'S3 확인 실패({type(e).__name__})') from None
+    existing = next((o for o in listed.get('Contents', []) if o['Key'] == object_key), None)
+    if existing:
+        etag = existing['ETag'].strip('"')
+        # 여러 조각으로 올린 파일(ETag 에 '-')은 해시를 비교할 수 없어 크기로 본다.
+        same = existing['Size'] == len(data) if '-' in etag else etag == hashlib.md5(data).hexdigest()
+        if same:
             return 'exists'
         if not force:
             return 'conflict'
-    except ClientError as e:
-        if e.response.get('Error', {}).get('Code') not in ('404', 'NoSuchKey', 'NotFound'):
-            raise CaptureError(f'S3 확인 실패({e.response.get("Error", {}).get("Code")})')
-    s3.put_object(Bucket=bucket, Key=object_key, Body=data, ContentType='image/jpeg', CacheControl=S3_CACHE_CONTROL)
+    try:
+        s3.put_object(Bucket=bucket, Key=object_key, Body=data, ContentType='image/jpeg', CacheControl=S3_CACHE_CONTROL)
+    except Exception as e:  # noqa: BLE001
+        raise CaptureError(f'S3 저장 실패({type(e).__name__})') from None
     return 'saved'
 
 
-def capture(out: Optional[Path], bucket: Optional[str], region: str, force: bool, dry_run: bool) -> int:
+def fetch_latest() -> Tuple[Issue, bytes, Tuple[int, int]]:
+    """최신호 1면 이미지를 받아 확인까지 마친다. (발행 정보, 이미지 바이트, (가로, 세로))"""
     issue = parse_issue(fetch_text(PAGE_URL))
     data = fetch_bytes(issue.image_url)
-    width, height = validate_image(data)
+    return issue, data, validate_image(data)
+
+
+def capture(out: Optional[Path], bucket: Optional[str], region: str, force: bool, dry_run: bool) -> int:
+    issue, data, (width, height) = fetch_latest()
     print(f'발행일 {issue.iso_date} · 1면 {width}×{height} · {len(data):,}바이트 · 1면 기사 영역 {len(issue.articles)}개')
     if dry_run:
         print('확인만 했어요(저장 안 함)')
