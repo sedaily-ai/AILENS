@@ -6,10 +6,10 @@
 import type { BigKindsArticle } from '@/shared/lib/api/timelineApi';
 
 /**
- * 신문 장면(1면 사진·네이버 1면 목록·새 문구·일요일 대체) 스위치. 이미지 업로드를 확인한 뒤 true로 바꾼다. 꺼져 있으면 지금과 같게 동작한다.
- * 로컬 확인용으로 NEXT_PUBLIC_TIMEMACHINE_NEWSPAPER=on 도 켠다. NEXT_PUBLIC_* 는 빌드 때 고정되고 운영 빌드는 이 값을 넘기지 않는다(service/frontend/Dockerfile).
+ * 신문 장면(1면 사진·네이버 1면 목록·새 문구·일요일 대체) 스위치. 이미지 업로드를 확인한 뒤 2026-11-04에 켰다. false로 되돌리면 켜기 전과 같게(사진·연도 파일 요청 없음) 동작한다.
+ * NEXT_PUBLIC_TIMEMACHINE_NEWSPAPER=on 은 스위치가 꺼진 채 로컬에서 확인할 때 쓴다. NEXT_PUBLIC_* 는 빌드 때 고정되고 운영 빌드는 이 값을 넘기지 않는다(service/frontend/Dockerfile).
  */
-const SWITCHED_ON = false;
+const SWITCHED_ON = true;
 export const NEWSPAPER_SCENE = SWITCHED_ON || process.env.NEXT_PUBLIC_TIMEMACHINE_NEWSPAPER === 'on';
 
 export const NEWSPAPER_BASE = '/timemachine-newspaper';
