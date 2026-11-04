@@ -6,7 +6,7 @@ import type { FrontNotice, FrontPageNotice, FrontPageState } from './lib/birthda
 import { FRONT_LOOKBACK_DAYS, frontArticleHref, frontNotice, frontSourceNote, shareableFront, weekdayOf } from './lib/birthdayFrontPage';
 import { dateLabel } from './lib/birthdayModel';
 import { NEWSPAPER_SCENE } from './lib/birthdayNewspaper';
-import { needsOwnPhotoProbe, newspaperPhotoDate, newspaperView, type PhotoState } from './lib/birthdayNewspaperView';
+import { frontLayout, needsOwnPhotoProbe, newspaperPhotoDate, newspaperView, type PhotoState } from './lib/birthdayNewspaperView';
 import { nb } from './lib/keepTogether';
 import { BirthdayNewspaperPhoto } from './BirthdayNewspaperPhoto';
 import styles from './birthdayStory.module.css';
@@ -52,8 +52,12 @@ function FrontNote({ note }: { note: FrontNotice | null }) {
   </div>;
 }
 
-function Headlines({ articles }: { articles: FrontPageData['articles'] }) {
-  return <ol className={styles.headlines}>{articles.slice(0, SHOWN_ARTICLES).map((article, index) => {
+/**
+ * 기사 제목 목록. compact(신문 장면)는 제목만 — 첫 기사의 본문 요약을 빼서 제목 4개와 사진이 한눈에 들어오게 하고, 첫 제목만 한 단계 크게 둔다.
+ * compact가 아니면(신문 장면 스위치가 꺼졌을 때의 옛 모양) 첫 기사 요약을 그대로 보여 준다.
+ */
+function Headlines({ articles, compact = false }: { articles: FrontPageData['articles']; compact?: boolean }) {
+  return <ol className={styles.headlines} data-compact={compact || undefined}>{articles.slice(0, SHOWN_ARTICLES).map((article, index) => {
     const href = frontArticleHref(article);
     const title = <>{article.title}{href && <ExternalLink size={14} aria-hidden="true" />}</>;
     return <li key={article.news_id || index} data-lead={index === 0 || undefined}>
@@ -61,7 +65,7 @@ function Headlines({ articles }: { articles: FrontPageData['articles'] }) {
       {/* 그날 서울경제(면 번호 없는 시기)를 이슈 순위로 골랐을 때 — 왜 이 기사인지 근거를 기사마다 붙인다. */}
       {/* li > span 은 링크 없는 제목 줄(44px) 규칙이라 small 을 쓴다. */}
       {article.coverage ? <small className={styles.coverage}>{`그날 언론 기사 ${article.coverage.toLocaleString('ko-KR')}건이 다룬 소식`}</small> : null}
-      {index === 0 && article.content && <p>{article.content}</p>}
+      {!compact && index === 0 && article.content && <p>{article.content}</p>}
     </li>;
   })}</ol>;
 }
@@ -89,6 +93,8 @@ export function BirthdayFrontPage({ state, birthDate, onRetry, onUseBirthday, on
   const shown = view?.shown ?? data?.shown_date ?? birthDate;
   const sameDay = shown === birthDate;
   const canShare = shareableFront(state).length > 0;
+  // 지면 안의 배치(신문 장면이 켜져 view가 있을 때만). view와 함께 한 덩어리로 다뤄 분기 안에서 null 검사를 되풀이하지 않는다.
+  const scene = view ? { view, layout: frontLayout(view), notice: view.empty ? <div className={styles.paperEmpty}><strong>{view.empty.title}</strong><p>{view.empty.body}</p></div> : null } : null;
   const source = view ? view.source : frontSourceNote(data);
   const [, month, day] = shown.split('-').map(Number);
   // 화면 낭독기용 상태 문장 — 늘 있는 요소의 글만 갈아 끼워야 읽힌다(로딩이 끝나 요소가 사라지면 결과가 알려지지 않는다).
@@ -108,10 +114,13 @@ export function BirthdayFrontPage({ state, birthDate, onRetry, onUseBirthday, on
         // 실패 원인(네트워크·보관본 응답·형식)을 화면에서는 가릴 수 없어 단정하지 않는다.
         : state.status === 'error' ? <div className={styles.paperEmpty} role="alert"><strong>그날 신문을 불러오지 못했어요</strong><p>{`연결이 원활하지 않을 수 있어요. 잠시 뒤 다시 ${nb('불러와 주세요.')}`}</p><button type="button" className={styles.sceneAction} onClick={onRetry}>다시 불러오기</button></div>
         : state.status === 'notice' ? <div className={styles.paperEmpty}><strong>{NOTICES[state.notice].title}</strong><p>{NOTICES[state.notice].body}</p></div>
-        : view ? <>
-          {photoDate && <BirthdayNewspaperPhoto key={photoDate} date={photoDate} status={photoState} onStatus={onPhotoStatus} />}
-          {view.empty && <div className={styles.paperEmpty}><strong>{view.empty.title}</strong><p>{view.empty.body}</p></div>}
-          {view.articles.length > 0 && <Headlines articles={view.articles} />}
+        : scene ? <>
+          {/* 목록이 있으면 제목이 먼저, 사진은 작게 그 아래다(frontLayout). 사진을 못 찾아 목록으로 대신하는 날의 안내는 목록을 읽기 전에 먼저 보인다.
+              목록이 없으면 지금처럼 큰 사진 → 안내 순서다. <img>가 다른 부모로 옮겨 다시 만들어지지 않도록 사진은 항상 이 한 자리에서 그린다. */}
+          {scene.layout.noticeFirst && scene.notice}
+          {scene.view.articles.length > 0 && <Headlines articles={scene.view.articles} compact />}
+          {photoDate && <BirthdayNewspaperPhoto key={photoDate} date={photoDate} status={photoState} size={scene.layout.photoSize} onStatus={onPhotoStatus} />}
+          {!scene.layout.noticeFirst && scene.notice}
         </>
         : state.status !== 'ok' ? null
         : state.data.kind === 'none' ? <div className={styles.paperEmpty}><strong>이 무렵 신문은 보관본에 없어요</strong><p>{`생일과 그 전 ${FRONT_LOOKBACK_DAYS}일 동안의 서울경제가 빅카인즈 보관본에 ${nb('없어요.')}`}</p></div>

@@ -65,10 +65,25 @@
 /* ② 그날 서울경제의 1면 사진(새 패턴) — 원본 비율 그대로, 자르지 않는다. 뜨기 전에는 5:7(축소본 표본 1.37~1.39배, 2026-11-03 e-Paper 1.405배)로 자리를 잡아 화면이 튀지 않게 한다.
    사진 아래 간격(버튼 12px) < 사진 덩어리와 기사 목록 사이(16px)로 관련 있는 것끼리 가깝게 둔다. */
 .photo { margin: 16px 0 0; }
-.photo > img { display: block; width: 100%; height: auto; border: 1px solid #d1d5db; background: #f3f4f6; }
-.photo[data-status='loading'] > img { aspect-ratio: 5 / 7; }
+.photo img { display: block; width: 100%; height: auto; border: 1px solid #d1d5db; background: #f3f4f6; }
+.photo[data-status='loading'] img { aspect-ratio: 5 / 7; }
+/* 사진을 감싼 버튼 — 눌러서 크게 보기를 연다. 버튼 기본 모양(테두리·배경·안쪽 여백)을 지우고 사진만 보이게 한다. 열 게 없는 동안(사진을 불러오는 중)은 disabled라 손가락 모양을 쓰지 않는다. */
+.photoButton { display: block; width: 100%; padding: 0; border: 0; background: none; cursor: zoom-in; }
+.photoButton:disabled { cursor: default; }
+.photoButton:focus-visible { outline: 2px solid #1d4ed8; outline-offset: 2px; }
 .photoActions { display: flex; margin: 12px 0 16px; }
 .photoActions > .sceneAction { margin-top: 0; }
+/* 기사 목록이 있는 날: 제목이 먼저고 사진은 작게 가운데에 둔다(폭 최대 220px = 4의 배수). 사진 위 간격이 제목 목록과의 구분이 된다. */
+.photo[data-size='compact'] { margin-top: 16px; }
+.photo[data-size='compact'] .photoButton { width: min(100%, 220px); margin: 0 auto; }
+.photoHint { margin: 8px 0 0 !important; font-size: 13px; line-height: 1.5; color: #4b5563; text-align: center; }
+/* 사진을 기다리는 동안 안내 문구·버튼 줄의 자리만 잡아 둔다(보이지 않고 눌리지 않는다). display:none 이 아니라 visibility 라서 높이는 그대로다. */
+.photoHint[data-held], .photoActions[data-held] { visibility: hidden; }
+.photo[data-size='compact'] .photoActions { margin: 12px 0 16px; }
+/* 신문 장면의 제목 목록(compact): 본문 요약 없이 제목만 둔다. 첫 제목은 지금의 32px 대신 24px(글자 크기 목록 안의 값)로 한 단계 낮춰 제목 4개와 사진이 한눈에 들어오게 한다.
+   기사 링크가 한 줄 44px 이상이라는 규칙(.headlines a)은 그대로 둔다. */
+.headlines[data-compact] li[data-lead] { font-size: 24px; line-height: 1.4; }
+.headlines[data-compact] li[data-lead] a, .headlines[data-compact] li[data-lead] > span { padding: 12px 0; }
 /* 1면 크게 보기 — 화면 전체를 쓰고, 위(제목·닫기) / 가운데(사진) / 아래(확대·원본 받기) 세 줄이다.
    사진은 가운데 영역에 통째로 맞춰 열려 잘리지 않고, 확대·이동은 스크롤이 아니라 BirthdayNewspaperViewer가 계산한 변환으로 한다.
    닫혀 있을 때의 display:none 은 브라우저 기본값이라, display 는 열렸을 때([open])만 지정한다. */

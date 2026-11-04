@@ -140,6 +140,16 @@ function sourceNote(p: Plan, photo: PhotoState) {
 }
 
 /**
+ * 지면 안의 배치. 기사 목록이 있으면 목록(제목만)이 먼저, 사진은 작게 그 아래에 둔다 — 제목 4개와 사진이 한눈에 들어오게 하려는 배치다.
+ * 목록이 없는 날(사진만 있는 날)은 사진이 읽는 용도라 지금처럼 크게 먼저 둔다.
+ * noticeFirst: 사진을 못 찾아 목록으로 대신하는 날의 안내("대신 그날 서울경제 기사를 보여 드려요")는 목록을 읽기 전에 먼저 보여야 한다.
+ */
+export function frontLayout(view: Pick<NewspaperView, 'articles' | 'empty'>) {
+  const listed = view.articles.length > 0;
+  return { photoSize: listed ? 'compact' : 'full', noticeFirst: listed && view.empty !== null } as const;
+}
+
+/**
  * 신문 장면 상태 → 화면에 그릴 것. 찾는 중·오류·안내(창간 전·발행 중단)처럼 사진을 시도하지 않는 상태는 null(화면이 기존 모양으로 그린다).
  * photo는 plan이 정한 날짜(newspaperPhotoDate)의 사진 상태다. '1면'이라는 말은 사진이 떴거나 1면 목록(네이버·빅카인즈 면 번호 시기)일 때만 쓴다.
  * own은 newspaperPhotoDate와 같은 값을 넘긴다(생일 당일 사진의 상태, 해당하지 않으면 null).
