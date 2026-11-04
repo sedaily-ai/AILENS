@@ -14,8 +14,10 @@ import { nb } from './lib/keepTogether';
 import styles from './birthdayStory.module.css';
 
 /**
- * 결과 — 한 장면에 숫자 하나. 순서: 도착 → 100만 원 → 그날 서울경제 → 최저시급 → 1억 원
- * → 그때 나는 몇 살 → 연금 달력 → 공유(생일 카드). 공유는 화면 폭과 관계없이 맨 아래에 둔다.
+ * 결과 — 한 장면에 숫자 하나. 순서: 도착 → 그날 서울경제 → 그때 나는 몇 살 → 최저시급 → 1억 원 → 100만 원 → 연금 달력 → 공유(생일 카드).
+ * 관련된 것끼리 묶었다. "그날"(신문, 그때 나는 몇 살) → "그때와 지금의 돈"(최저시급, 1억 원, 100만 원) → "앞으로"(연금) → 공유.
+ * 가장 보여 주고 싶은 신문을 두 번째 화면에 두려고 앞으로 올렸고, 가장 긴 100만 원 장면은 돈 묶음의 끝으로 보냈다.
+ * 최저시급 → 1억 원 순서는 영수증의 줄 순서와 같다. 공유는 화면 폭과 관계없이 맨 아래에 둔다.
  */
 export function BirthdayResults({ result, mode, onEdit }: { result: BirthdayResult; mode: ViewMode; onEdit: () => void }) {
   // 100만 원 칸 — 기준일 연도 파일과 latest.json만 받아 이 기기에서 계산한다(기준일이 1964-05-04보다 앞서면 요청하지 않는다).
@@ -42,11 +44,11 @@ export function BirthdayResults({ result, mode, onEdit }: { result: BirthdayResu
   return <div className={styles.story}>
     <div className={styles.scenes}>
       <ArrivalScene result={result} mode={mode} />
-      <AssetScene base={base} mode={mode} state={assetLoad.state} cells={cells} inflation={inflation} onRetry={assetLoad.retry} />
       <BirthdayFrontPage state={front.state} birthDate={result.birthDate} onRetry={front.retry} onUseBirthday={onEdit} onShare={shareFront} />
+      <AgesScene result={result} mode={mode} />
       <WageScene result={result} />
       <MoneyScene result={result} items={items} />
-      <AgesScene result={result} mode={mode} />
+      <AssetScene base={base} mode={mode} state={assetLoad.state} cells={cells} inflation={inflation} onRetry={assetLoad.retry} />
       <BirthdayPension result={result} mode={mode} />
       {/* 고지 세 가지(참고 정보·상담 아님·기준 시점)는 그대로 두고, '-이며'로 길게 잇던 첫 문장과 명사로 끝나던 출처 줄을 문장으로 풀었다.
           성격별로 세 줄(고지 / 기준 시점·오류 알리기 / 출처·확인일)로 끊는다(.notice > span). */}
