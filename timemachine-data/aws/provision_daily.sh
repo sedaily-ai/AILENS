@@ -1,14 +1,17 @@
 #!/usr/bin/env bash
 # 타임머신 신문 네이버 1면 목록 일일 수집·누락 목록·알림의 AWS 구성(2026-11-03).
 #   Lambda(daily) + EventBridge 매시간 + SNS 알림 토픽 + CloudWatch 알람 3개.
-# 이미지 수집 구성(provision.sh)은 건드리지 않는다. 이미 있는 리소스는 건너뛰므로 다시 실행해도 안전하다(역할 권한·알람은 매번 덮어써 최신으로 맞춘다).
+# 이미지 수집 구성(provision.sh)은 건드리지 않는다. 이미 있는 리소스는 새로 만들지 않지만, 다시 실행하면 아래는 매번 덮어써 최신으로 맞춘다.
+#   SNS 토픽 태그 / 로그 그룹 보관 기간(30일) / IAM 역할 권한(DailyAccess) / EventBridge 규칙(스케줄, 사용 상태 ENABLED) / 알람 설정(알람 상태는 그대로, 태그는 처음 만들 때만 붙는다).
+#   Lambda 함수의 코드와 환경 변수는 건드리지 않는다. 바꾸기 전에 무엇이 있는지만 보려면 CHECK_ONLY=1 로 사전 확인만 한다.
 #
 # 네이버 요청은 NAVER_DAILY=on 일 때만 한다. 이 스크립트는 기본값으로 '꺼진' 채 만든다. 켜는 것은 아래 "켜기" 안내를 따른다.
-# 비용태깅_규칙: 리소스를 만들기 전에 태그를 붙이고, 끝에서 다시 조회해 Service=lens 를 확인한다.
+# 비용태깅_규칙: 리소스는 만들 때 태그를 함께 붙이고, 끝에서 다시 조회해 Service=lens 를 확인한다.
 #
 # 사용: AWS 자격 증명이 있는 기기에서 저장소 어디서든
 #   bash timemachine-data/aws/provision_daily.sh                         # 알림 토픽만 만들고 이메일 구독은 만들지 않는다
 #   ALERT_EMAIL=name@example.com bash timemachine-data/aws/provision_daily.sh   # 이메일 구독도 만든다(받는 사람이 확인 메일의 링크를 눌러야 켜진다)
+#   CHECK_ONLY=1 bash timemachine-data/aws/provision_daily.sh            # 사전 확인만: 있는 리소스와 덮어쓸 항목을 보여 주고 아무것도 바꾸지 않은 채 멈춘다
 set -euo pipefail
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
 source "${ROOT}/config/resources.env"
@@ -25,6 +28,7 @@ NAMESPACE="Sedaily/LENS/TimemachineNewspaper"
 # 매시간 25분. 이미지 수집(매시간 10분)과 겹치지 않게 어긋나 있다.
 SCHEDULE="cron(25 * * * ? *)"
 ALERT_EMAIL="${ALERT_EMAIL:-}"
+CHECK_ONLY="${CHECK_ONLY:-}"
 
 # 태그 값은 한 곳(여기)에서만 정한다. 형식이 CLI마다 달라 변수를 나눴을 뿐 값은 같다.
 SERVICE_TAG="lens"
@@ -43,12 +47,47 @@ echo "버킷 있음: ${BUCKET}"
 aws lambda get-function --function-name "${CAPTURE_FUNCTION}" --region "${REGION}" >/dev/null
 echo "이미지 수집 함수 있음: ${CAPTURE_FUNCTION}"
 
+echo "--- 사전 확인: 이미 있는 리소스 (있으면 아래 단계가 어떻게 하는지 함께 적는다) ---"
+# 여기서는 조회만 한다. TOPIC_EXISTS 는 1단계가 만들지 태그만 맞출지 정하는 데 쓴다.
+TOPIC_ARN="arn:aws:sns:${REGION}:${ACCOUNT}:${TOPIC}"
+TOPIC_EXISTS=0
+aws sns get-topic-attributes --topic-arn "${TOPIC_ARN}" --region "${REGION}" >/dev/null 2>&1 && TOPIC_EXISTS=1
+LOG_COUNT="$(aws logs describe-log-groups --log-group-name-prefix "${LOG_GROUP}" --region "${REGION}" --query "length(logGroups[?logGroupName=='${LOG_GROUP}'])" --output text)"
+ROLE_PRESENT=0
+aws iam get-role --role-name "${ROLE}" >/dev/null 2>&1 && ROLE_PRESENT=1
+FUNCTION_PRESENT=0
+aws lambda get-function --function-name "${FUNCTION}" --region "${REGION}" >/dev/null 2>&1 && FUNCTION_PRESENT=1
+RULE_PRESENT=0
+aws events describe-rule --name "${RULE}" --region "${REGION}" >/dev/null 2>&1 && RULE_PRESENT=1
+report_exists() {   # 이름 / 있으면 1, 없으면 0 / 있을 때 이 스크립트가 하는 일
+  if [ "$2" = "1" ]; then echo "  $1: 있음 → $3"; else echo "  $1: 없음 → 새로 만들어요"; fi
+}
+report_exists "SNS 토픽 ${TOPIC}" "${TOPIC_EXISTS}" "태그를 다시 붙여요"
+report_exists "로그 그룹" "$([ "${LOG_COUNT}" != "0" ] && echo 1 || echo 0)" "보관 기간을 30일로 맞춰요"
+report_exists "IAM 역할 ${ROLE}" "${ROLE_PRESENT}" "권한(DailyAccess)을 덮어써요"
+report_exists "Lambda 함수 ${FUNCTION}" "${FUNCTION_PRESENT}" "코드와 환경 변수는 건드리지 않아요"
+report_exists "EventBridge 규칙 ${RULE}" "${RULE_PRESENT}" "스케줄을 덮어쓰고 사용 상태를 ENABLED 로 되돌려요"
+for alarm in "${FUNCTION}-errors" "${CAPTURE_FUNCTION}-errors" "${FUNCTION}-image-missing"; do
+  ALARM_COUNT="$(aws cloudwatch describe-alarms --alarm-names "${alarm}" --region "${REGION}" --query 'length(MetricAlarms)' --output text)"
+  report_exists "알람 ${alarm}" "$([ "${ALARM_COUNT}" != "0" ] && echo 1 || echo 0)" "설정을 덮어써요(알람 상태는 그대로, 태그는 바뀌지 않아요)"
+done
+if [ -n "${CHECK_ONLY}" ]; then
+  echo "CHECK_ONLY: 여기서 멈춰요. 아무것도 바꾸지 않았어요."
+  exit 0
+fi
+
 echo "=== 1/9 SNS 알림 토픽 ==="
-# create-topic 은 이미 있으면 같은 토픽을 돌려준다. 태그는 바로 이어서 붙이고, 8단계에서 다시 조회해 확인한다(태그 없이 지나가지 않는다).
-TOPIC_ARN="$(aws sns create-topic --name "${TOPIC}" --region "${REGION}" --query TopicArn --output text)"
-# shellcheck disable=SC2086
-aws sns tag-resource --resource-arn "${TOPIC_ARN}" --tags ${TAGS_KV} --region "${REGION}"
-echo "토픽 준비됨"
+# 비용태깅_규칙: 태그는 만들 때 함께 붙인다. 없을 때만 create-topic --tags 로 만든다.
+# 같은 이름이 이미 있는데 태그가 다르면 create-topic 이 오류를 내므로, 있으면 만들지 않고 tag-resource 로 태그만 맞춘다. 8단계에서 다시 조회해 확인한다.
+if [ "${TOPIC_EXISTS}" = "1" ]; then
+  # shellcheck disable=SC2086
+  aws sns tag-resource --resource-arn "${TOPIC_ARN}" --tags ${TAGS_KV} --region "${REGION}"
+  echo "토픽이 이미 있어 태그만 맞췄어요"
+else
+  # shellcheck disable=SC2086
+  TOPIC_ARN="$(aws sns create-topic --name "${TOPIC}" --tags ${TAGS_KV} --region "${REGION}" --query TopicArn --output text)"
+  echo "토픽을 태그와 함께 만들었어요"
+fi
 if [ -n "${ALERT_EMAIL}" ]; then
   aws sns subscribe --topic-arn "${TOPIC_ARN}" --protocol email --notification-endpoint "${ALERT_EMAIL}" --region "${REGION}" --query SubscriptionArn --output text >/dev/null
   echo "이메일 구독을 요청했어요. 받는 사람이 확인 메일의 링크를 눌러야 알림이 와요"
@@ -128,7 +167,9 @@ aws events put-targets --rule "${RULE}" --targets "Id=DailyLambda,Arn=${FN_ARN}"
   --query FailedEntryCount --output text
 
 echo "=== 7/9 CloudWatch 알람 3개 → SNS 토픽 ==="
-# 모두 '데이터가 없으면 이상 없음'(notBreaching)으로 본다. 알람 태그도 붙인다.
+# 모두 '데이터가 없으면 이상 없음'(notBreaching)으로 본다. 울릴 때(ALARM)와 풀릴 때(OK) 같은 토픽으로 알린다.
+# 새로 만든 알람은 첫 평가에서 OK 가 되며 OK 알림이 갈 수 있다. 이미 있는 알람은 상태가 그대로라 설정만 바뀌고 알림은 가지 않는다.
+# 태그는 알람을 처음 만들 때만 붙는다(이미 있는 알람에 --tags 를 줘도 CloudWatch 가 무시한다). 8단계가 다시 조회해 확인한다.
 # 인자 순서: 이름 설명 네임스페이스 지표 차원이름 차원값 주기(초) 통계 임계값 평가기간수 알림에필요한기간수  (임계값 이상이면 알람)
 put_alarm() {
   local name="$1" desc="$2" ns="$3" metric="$4" dim_name="$5" dim_value="$6" period="$7" stat="$8" threshold="$9" eval="${10}" datapoints="${11}"
@@ -139,7 +180,7 @@ put_alarm() {
   aws cloudwatch put-metric-alarm --alarm-name "${name}" --alarm-description "${desc}" --namespace "${ns}" --metric-name "${metric}" \
     ${dim[@]+"${dim[@]}"} --statistic "${stat}" --period "${period}" --threshold "${threshold}" --comparison-operator GreaterThanOrEqualToThreshold \
     --evaluation-periods "${eval}" --datapoints-to-alarm "${datapoints}" --treat-missing-data notBreaching \
-    --alarm-actions "${TOPIC_ARN}" --tags ${TAGS_KV} --region "${REGION}"
+    --alarm-actions "${TOPIC_ARN}" --ok-actions "${TOPIC_ARN}" --tags ${TAGS_KV} --region "${REGION}"
   echo "  ${name}"
 }
 # 1) 새 함수가 한 시간 안에 한 번이라도 오류로 끝났다(네이버가 막았거나 받기 실패가 이어졌다).
@@ -176,7 +217,7 @@ aws lambda get-function-configuration --function-name "${FUNCTION}" --region "${
   --query '{State:State,LastUpdateStatus:LastUpdateStatus,Runtime:Runtime,Timeout:Timeout,Memory:MemorySize,NaverDaily:Environment.Variables.NAVER_DAILY,CodeSha256:CodeSha256}' --output table
 aws events describe-rule --name "${RULE}" --region "${REGION}" --query '{State:State,Schedule:ScheduleExpression}' --output table
 aws cloudwatch describe-alarms --alarm-names "${FUNCTION}-errors" "${CAPTURE_FUNCTION}-errors" "${FUNCTION}-image-missing" --region "${REGION}" \
-  --query 'MetricAlarms[].{Alarm:AlarmName,State:StateValue,Actions:length(AlarmActions)}' --output table
+  --query 'MetricAlarms[].{Alarm:AlarmName,State:StateValue,AlarmActions:length(AlarmActions),OkActions:length(OKActions)}' --output table
 if [ "${FAIL}" != "0" ]; then
   echo "태그가 기대와 달라요. 확인이 필요해요."
   exit 1
@@ -187,7 +228,7 @@ cat <<EOF
 지금 한 번 실행해 누락 목록과 지표가 만들어지는지 보려면:
   aws lambda invoke --function-name ${FUNCTION} --region ${REGION} --cli-binary-format raw-in-base64-out --payload '{}' out.json && cat out.json
 
-켜기(네이버에 요청을 시작한다 — media.naver.com/robots.txt 가 전체 접근을 막고 있어 도연님이 알고 결정한 뒤에만):
+켜기(네이버에 요청을 시작한다 — media.naver.com/robots.txt 가 전체 접근을 막고 있어 허용 여부를 따로 정한 뒤에만):
   aws lambda update-function-configuration --function-name ${FUNCTION} --region ${REGION} \\
     --environment "Variables={NEWSPAPER_BUCKET=${BUCKET},NAVER_DAILY=on,NAVER_DAILY_FROM=<오늘 날짜 YYYY-MM-DD>}"
 끄기: 같은 명령에서 NAVER_DAILY=on 과 NAVER_DAILY_FROM 을 빼고 NEWSPAPER_BUCKET 만 남긴다.

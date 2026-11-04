@@ -91,7 +91,7 @@ class CompareKeepsExistingBehavior(unittest.TestCase):
 
 
 class CompareSeparatesAutomaticCaptures(unittest.TestCase):
-    """일일 수집(2026-11-03~)이 같은 경로에 올린 사진은 보유자 목록에 없는 것이 정상이다."""
+    """일일 수집(2026-11-03~)이 같은 경로에 올린 사진은 올리기 전 목록에 없는 것이 정상이다."""
 
     def test_captures_after_the_manifest_end_are_reported_but_not_counted(self):
         code, out = run_compare(['2026-10-30', '2026-11-02'], [obj('2026-10-30'), obj('2026-11-02'), obj('2026-11-03'), obj('2026-11-04')])
@@ -114,14 +114,14 @@ class CompareSeparatesAutomaticCaptures(unittest.TestCase):
         self.assertIn(key('2026-10-31'), out)
 
     def test_dates_before_the_capture_start_are_never_automatic(self):
-        # 목록이 10-30 에서 끝나도 11-01 은 자동 수집 시작(11-03) 전이라 보유자 쪽 사진이다 → 차이.
+        # 목록이 10-30 에서 끝나도 11-01 은 자동 수집 시작(11-03) 전이라 목록에 있어야 할 사진이다 → 차이.
         code, out = run_compare(['2026-10-28', '2026-10-30'], [obj('2026-10-28'), obj('2026-10-30'), obj('2026-11-01')])
         self.assertEqual(code, 1)
         self.assertIn('목록에 없는데 올라간 파일 1건', out)
         self.assertNotIn('자동 수집분', out)
 
     def test_the_device_clock_does_not_matter(self):
-        # 보유자 기기 시계가 틀려도 결과가 같아야 한다. 그래서 '오늘 이하'는 조건에 넣지 않는다 — 날짜가 아주 먼 뒤여도 자동분이다.
+        # 로컬 기기 시계가 틀려도 결과가 같아야 한다. 그래서 '오늘 이하'는 조건에 넣지 않는다 — 날짜가 아주 먼 뒤여도 자동분이다.
         code, out = run_compare(['2026-11-02'], [obj('2026-11-02'), obj('2030-01-01')])
         self.assertEqual(code, 0)
         self.assertIn('자동 수집분 1개 (2030-01-01 ~ 2030-01-01)', out)
@@ -133,7 +133,7 @@ class CompareSeparatesAutomaticCaptures(unittest.TestCase):
         self.assertIn('목록에 없는데 올라간 파일 2건', out)
 
     def test_a_date_present_in_the_manifest_is_compared_not_skipped(self):
-        # 보유자 목록이 11-03 까지 있으면 그 날은 자동 수집분이 아니라 일반 비교다(일일 수집이 올린 사진과 크기가 다르면 차이).
+        # 올리기 전 목록이 11-03 까지 있으면 그 날은 자동 수집분이 아니라 일반 비교다(일일 수집이 올린 사진과 크기가 다르면 차이).
         code, out = run_compare(['2026-11-02', '2026-11-03'], [obj('2026-11-02'), obj('2026-11-03', size=555)])
         self.assertEqual(code, 1)
         self.assertIn('크기가 다른 파일 1건', out)
