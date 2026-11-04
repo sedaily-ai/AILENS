@@ -1,0 +1,54 @@
+{
+  "Configuration": {
+    "FunctionName": "sedaily-mbti-briefing-dev",
+    "FunctionArn": "arn:aws:lambda:us-east-1:887078546492:function:sedaily-mbti-briefing-dev",
+    "Runtime": "python3.11",
+    "Role": "arn:aws:iam::887078546492:role/sedaily-mbti-lambda-execution-dev",
+    "Handler": "handlers.content.briefing.lambda_handler",
+    "CodeSize": 23599328,
+    "Description": "Generates daily MBTI-styled news briefings for the chatbot",
+    "Timeout": 300,
+    "MemorySize": 512,
+    "LastModified": "2026-10-19T10:26:35.000+0000",
+    "CodeSha256": "cyMk43eiGcY+1csBkjbDSodXklCB0YyvxeDh9SqxA68=",
+    "Version": "$LATEST",
+    "TracingConfig": {
+      "Mode": "PassThrough"
+    },
+    "RevisionId": "2dab5f7e-9f60-4db1-89bc-5a83496be150",
+    "State": "Active",
+    "LastUpdateStatus": "Successful",
+    "PackageType": "Zip",
+    "Architectures": [
+      "x86_64"
+    ],
+    "EphemeralStorage": {
+      "Size": 512
+    },
+    "SnapStart": {
+      "ApplyOn": "None",
+      "OptimizationStatus": "Off"
+    },
+    "RuntimeVersionConfig": {
+      "RuntimeVersionArn": "arn:aws:lambda:us-east-1::runtime:e49ac50086e0d865c78bd2e7c92cf0e492f61f39031b3572eb0d429affd59f50"
+    },
+    "LoggingConfig": {
+      "LogFormat": "Text",
+      "LogGroup": "/aws/lambda/sedaily-mbti-briefing-dev"
+    }
+  },
+  "Code": {
+    "RepositoryType": "S3",
+    "Location": "<<presigned URL 제거>>"
+  },
+  "Tags": {
+    "Project": "Sedaily-LENS",
+    "Owner": "one",
+    "ManagedBy": "claude-code",
+    "Phase": "phase-1",
+    "Subsystem": "briefing",
+    "Environment": "dev",
+    "Service": "atlas4",
+    "Component": "backend-v1"
+  }
+}

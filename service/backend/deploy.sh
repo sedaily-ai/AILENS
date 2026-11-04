@@ -110,15 +110,15 @@ API_FUNCTIONS=(
   "sedaily-mbti-s3-articles-dev"
   "sedaily-mbti-user-dev"
   "sedaily-mbti-archive-dev"
-  "sedaily-mbti-post-dev"
   "sedaily-mbti-question-dev"
   "sedaily-mbti-briefing-dev"
   "sedaily-mbti-ws-connect-dev"
   "sedaily-mbti-ws-disconnect-dev"
   "sedaily-mbti-ws-message-dev"
-  "sedaily-mbti-voice-stt-presign-dev"
-  "sedaily-mbti-voice-tts-dev"
 )
+# 2026-11-04: post·voice-tts·voice-stt-presign 은 삭제해 목록에서 뺐다(없는 함수는 [SKIP]→실패로 집계돼 배포가 실패로 끝난다).
+# article·chatbot·question·briefing·ws 3개·v2-posts·v2-quiz 는 차단(동시성 0) 중이고 2026-11-11 이후 삭제하면서 뺀다.
+# 경위와 복원 방법: infrastructure/decommission-2026-11-04/README.md
 # newsletter-subscribe Lambda 는 handlers/content/subscribe.py 로 통합되어 배포 대상에서 제외했다.
 # 배포된 Lambda 함수와 API Gateway 라우트(/api/newsletter/subscribe)는 별도 확인 후 삭제한다.
 
@@ -250,12 +250,12 @@ fi
 # Step 4: Health Check
 # ============================================
 # 모든 함수가 같은 zip 을 공유하므로 대표 함수 하나만 호출해 패키지 손상(의존성 누락 등)을 확인한다.
-# CMS 공개 조회는 인증 없이 호출할 수 있어 대표 함수로 사용한다.
-echo "Health check (sedaily-mbti-v2-posts-dev)..."
+# 2026-11-04: 대표 함수를 v2-posts(차단·삭제 예정, 503) → v2-health 로 바꿨다. 인증 없이 호출된다.
+echo "Health check (sedaily-mbti-v2-health-dev)..."
 sleep 2
 HTTP_CODE=$(curl -s -o /dev/null -w "%{http_code}" \
-  "https://chzwwtjtgk.execute-api.us-east-1.amazonaws.com/dev/api/v2/posts?channel=letters&limit=1")
-echo "  GET /api/v2/posts?channel=letters&limit=1 -> $HTTP_CODE"
+  "https://chzwwtjtgk.execute-api.us-east-1.amazonaws.com/dev/api/v2/health")
+echo "  GET /api/v2/health -> $HTTP_CODE"
 if [ "$HTTP_CODE" != "200" ]; then
   echo "  [WARN] 200이 아님 — CloudWatch 로그로 확인 필요 (배포된 21개 함수 중 하나가" >&2
   echo "         이 결과만으로 전부 정상/비정상이라 단정할 수는 없음)." >&2

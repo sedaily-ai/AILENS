@@ -1,0 +1,56 @@
+{
+  "Configuration": {
+    "FunctionName": "sedaily-mbti-newsletter-subscribe-dev",
+    "FunctionArn": "arn:aws:lambda:us-east-1:887078546492:function:sedaily-mbti-newsletter-subscribe-dev",
+    "Runtime": "python3.11",
+    "Role": "arn:aws:iam::887078546492:role/sedaily-mbti-lambda-execution-dev",
+    "Handler": "handlers.newsletter.subscribe.lambda_handler",
+    "CodeSize": 23247211,
+    "Description": "",
+    "Timeout": 10,
+    "MemorySize": 256,
+    "LastModified": "2026-09-03T05:59:02.000+0000",
+    "CodeSha256": "Hr0UHLXD/kcLP3VEDn8O8hUSVpl/QKb2BP95uzJP0/M=",
+    "Version": "$LATEST",
+    "Environment": {
+      "Variables": {
+        "NEWSLETTER_CONFIG_SET": "ailens-newsletter"
+      }
+    },
+    "TracingConfig": {
+      "Mode": "PassThrough"
+    },
+    "RevisionId": "6859f4fe-462a-4fcc-a78c-590b2ab12b15",
+    "State": "Active",
+    "LastUpdateStatus": "Successful",
+    "PackageType": "Zip",
+    "Architectures": [
+      "x86_64"
+    ],
+    "EphemeralStorage": {
+      "Size": 512
+    },
+    "SnapStart": {
+      "ApplyOn": "None",
+      "OptimizationStatus": "Off"
+    },
+    "RuntimeVersionConfig": {
+      "RuntimeVersionArn": "arn:aws:lambda:us-east-1::runtime:e49ac50086e0d865c78bd2e7c92cf0e492f61f39031b3572eb0d429affd59f50"
+    },
+    "LoggingConfig": {
+      "LogFormat": "Text",
+      "LogGroup": "/aws/lambda/sedaily-mbti-newsletter-subscribe-dev"
+    }
+  },
+  "Code": {
+    "RepositoryType": "S3",
+    "Location": "<<presigned URL 제거>>"
+  },
+  "Tags": {
+    "Project": "Sedaily-LENS",
+    "CostCenter": "sedaily-ai",
+    "Environment": "dev",
+    "Service": "atlas4",
+    "Workload": "newsletter"
+  }
+}

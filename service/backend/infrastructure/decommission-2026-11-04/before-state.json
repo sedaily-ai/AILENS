@@ -1,0 +1,87 @@
+{
+  "sedaily-mbti-voice-tts-dev": {
+    "reserved_before": null,
+    "redacted": [],
+    "zip_bytes": 0
+  },
+  "sedaily-mbti-voice-stt-presign-dev": {
+    "reserved_before": null,
+    "redacted": [],
+    "zip_bytes": 0
+  },
+  "sedaily-mbti-voice-stt-url-dev": {
+    "reserved_before": null,
+    "redacted": [],
+    "zip_bytes": 0
+  },
+  "sedaily-mbti-external-content-dev": {
+    "reserved_before": null,
+    "redacted": [],
+    "zip_bytes": 23812373
+  },
+  "sedaily-mbti-newsletter-subscribe-dev": {
+    "reserved_before": null,
+    "redacted": [],
+    "zip_bytes": 23247211
+  },
+  "sedaily-mbti-post-dev": {
+    "reserved_before": null,
+    "redacted": [
+      "LENS_CMS_API_TOKEN"
+    ],
+    "zip_bytes": 23599328
+  },
+  "sedaily-mbti-v2-posts-dev": {
+    "reserved_before": null,
+    "redacted": [
+      "LENS_PG_PASSWORD"
+    ],
+    "zip_bytes": 23599328
+  },
+  "sedaily-mbti-v2-quiz-dev": {
+    "reserved_before": null,
+    "redacted": [],
+    "zip_bytes": 22555220
+  },
+  "sedaily-mbti-article-dev": {
+    "reserved_before": null,
+    "redacted": [
+      "LENS_CMS_API_TOKEN"
+    ],
+    "zip_bytes": 23599328
+  },
+  "sedaily-mbti-chatbot-dev": {
+    "reserved_before": null,
+    "redacted": [
+      "LENS_CMS_API_TOKEN"
+    ],
+    "zip_bytes": 23599328
+  },
+  "sedaily-mbti-ws-connect-dev": {
+    "reserved_before": null,
+    "redacted": [],
+    "zip_bytes": 23599328
+  },
+  "sedaily-mbti-ws-disconnect-dev": {
+    "reserved_before": null,
+    "redacted": [],
+    "zip_bytes": 23599328
+  },
+  "sedaily-mbti-ws-message-dev": {
+    "reserved_before": null,
+    "redacted": [],
+    "zip_bytes": 23599328
+  },
+  "sedaily-mbti-question-dev": {
+    "reserved_before": null,
+    "redacted": [
+      "LENS_CMS_API_TOKEN"
+    ],
+    "zip_bytes": 23599328
+  },
+  "sedaily-mbti-briefing-dev": {
+    "reserved_before": null,
+    "redacted": [],
+    "zip_bytes": 23599328
+  }
+}

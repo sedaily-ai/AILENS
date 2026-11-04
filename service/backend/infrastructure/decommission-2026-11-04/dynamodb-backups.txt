@@ -1,0 +1,11 @@
+sedaily-mbti-cms-posts-dev	arn:aws:dynamodb:us-east-1:887078546492:table/sedaily-mbti-cms-posts-dev/backup/01793757969874-fbaab696
+sedaily-mbti-daily-letters-dev	arn:aws:dynamodb:us-east-1:887078546492:table/sedaily-mbti-daily-letters-dev/backup/01793757974527-b80bc7b8
+sedaily-mbti-engagement-dev	arn:aws:dynamodb:us-east-1:887078546492:table/sedaily-mbti-engagement-dev/backup/01793757977441-00ce1d39
+sedaily-mbti-external-content-dev	arn:aws:dynamodb:us-east-1:887078546492:table/sedaily-mbti-external-content-dev/backup/01793757979969-c99815f2
+sedaily-mbti-podcast-dev	arn:aws:dynamodb:us-east-1:887078546492:table/sedaily-mbti-podcast-dev/backup/01793757982604-fdd1b954
+sedaily-mbti-quiz-questions-dev	arn:aws:dynamodb:us-east-1:887078546492:table/sedaily-mbti-quiz-questions-dev/backup/01793757984776-a9961c2d
+sedaily-mbti-ws-connections-dev	arn:aws:dynamodb:us-east-1:887078546492:table/sedaily-mbti-ws-connections-dev/backup/01793757987306-3411a113
+sedaily-mbti-personal-dev	arn:aws:dynamodb:us-east-1:887078546492:table/sedaily-mbti-personal-dev/backup/01793757989327-919e8332
+sedaily-mbti-admin-config-dev	arn:aws:dynamodb:us-east-1:887078546492:table/sedaily-mbti-admin-config-dev/backup/01793757992053-12ab6066
+sedaily-mbti-newsletter-subscribers-dev	arn:aws:dynamodb:us-east-1:887078546492:table/sedaily-mbti-newsletter-subscribers-dev/backup/01793757996186-043fb2c6
+sedaily-lens-mustknow-seen-dev	arn:aws:dynamodb:us-east-1:887078546492:table/sedaily-lens-mustknow-seen-dev/backup/01793757998417-9b30f2f7

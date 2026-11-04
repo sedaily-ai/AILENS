@@ -1,0 +1,62 @@
+{
+  "Configuration": {
+    "FunctionName": "sedaily-mbti-chatbot-dev",
+    "FunctionArn": "arn:aws:lambda:us-east-1:887078546492:function:sedaily-mbti-chatbot-dev",
+    "Runtime": "python3.11",
+    "Role": "arn:aws:iam::887078546492:role/sedaily-mbti-lambda-execution-dev",
+    "Handler": "handlers.chat.chatbot.lambda_handler",
+    "CodeSize": 23599328,
+    "Description": "MBTI Chatbot API - AI assistant with MBTI-styled responses",
+    "Timeout": 60,
+    "MemorySize": 1024,
+    "LastModified": "2026-10-19T10:25:12.000+0000",
+    "CodeSha256": "cyMk43eiGcY+1csBkjbDSodXklCB0YyvxeDh9SqxA68=",
+    "Version": "$LATEST",
+    "Environment": {
+      "Variables": {
+        "OPENSEARCH_ENDPOINT": "https://search-sedaily-mbti-search-dev-gzdjx6llvzyx4pmjwasew5kj6i.us-east-1.es.amazonaws.com",
+        "ROTATION_AT": "1778051180",
+        "LENS_CMS_API_TOKEN": "<<REDACTED>>",
+        "OPENSEARCH_INDEX": "sedaily-articles"
+      }
+    },
+    "TracingConfig": {
+      "Mode": "PassThrough"
+    },
+    "RevisionId": "ab644a63-bdaa-47e9-9296-739c7f69dcc1",
+    "State": "Active",
+    "LastUpdateStatus": "Successful",
+    "PackageType": "Zip",
+    "Architectures": [
+      "x86_64"
+    ],
+    "EphemeralStorage": {
+      "Size": 512
+    },
+    "SnapStart": {
+      "ApplyOn": "None",
+      "OptimizationStatus": "Off"
+    },
+    "RuntimeVersionConfig": {
+      "RuntimeVersionArn": "arn:aws:lambda:us-east-1::runtime:e49ac50086e0d865c78bd2e7c92cf0e492f61f39031b3572eb0d429affd59f50"
+    },
+    "LoggingConfig": {
+      "LogFormat": "Text",
+      "LogGroup": "/aws/lambda/sedaily-mbti-chatbot-dev"
+    }
+  },
+  "Code": {
+    "RepositoryType": "S3",
+    "Location": "<<presigned URL 제거>>"
+  },
+  "Tags": {
+    "Project": "Sedaily-LENS",
+    "Owner": "one",
+    "ManagedBy": "claude-code",
+    "Phase": "phase-1",
+    "Subsystem": "chatbot",
+    "Environment": "dev",
+    "Service": "atlas4",
+    "Component": "backend-v1"
+  }
+}

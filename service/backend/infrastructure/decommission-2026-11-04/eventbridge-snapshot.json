@@ -1,0 +1,64 @@
+{
+  "sedaily-mbti-daily-briefing": {
+    "rule": {
+      "Name": "sedaily-mbti-daily-briefing",
+      "Arn": "arn:aws:events:us-east-1:887078546492:rule/sedaily-mbti-daily-briefing",
+      "ScheduleExpression": "cron(10 22 * * ? *)",
+      "State": "ENABLED",
+      "Description": "Daily news briefing generation at 07:10 KST",
+      "EventBusName": "default",
+      "CreatedBy": "887078546492"
+    },
+    "targets": [
+      {
+        "Id": "BriefingLambdaTarget",
+        "Arn": "arn:aws:lambda:us-east-1:887078546492:function:sedaily-mbti-briefing-dev"
+      }
+    ]
+  },
+  "sedaily-mbti-afternoon-briefing": {
+    "rule": {
+      "Name": "sedaily-mbti-afternoon-briefing",
+      "Arn": "arn:aws:events:us-east-1:887078546492:rule/sedaily-mbti-afternoon-briefing",
+      "ScheduleExpression": "cron(10 4 * * ? *)",
+      "State": "ENABLED",
+      "Description": "Afternoon briefing generation at 13:10 KST",
+      "EventBusName": "default",
+      "CreatedBy": "887078546492"
+    },
+    "targets": [
+      {
+        "Id": "briefing-lambda",
+        "Arn": "arn:aws:lambda:us-east-1:887078546492:function:sedaily-mbti-briefing-dev"
+      }
+    ]
+  },
+  "sedaily-mbti-lambda-warming": {
+    "rule": {
+      "Name": "sedaily-mbti-lambda-warming",
+      "Arn": "arn:aws:events:us-east-1:887078546492:rule/sedaily-mbti-lambda-warming",
+      "ScheduleExpression": "rate(5 minutes)",
+      "State": "ENABLED",
+      "Description": "Keep Lambda functions warm to prevent cold starts",
+      "EventBusName": "default",
+      "CreatedBy": "887078546492"
+    },
+    "targets": [
+      {
+        "Id": "sedaily-mbti-post-dev",
+        "Arn": "arn:aws:lambda:us-east-1:887078546492:function:sedaily-mbti-post-dev",
+        "Input": "{\"warmup\":true}"
+      },
+      {
+        "Id": "sedaily-mbti-search-dev",
+        "Arn": "arn:aws:lambda:us-east-1:887078546492:function:sedaily-mbti-search-dev",
+        "Input": "{\"warmup\":true}"
+      },
+      {
+        "Id": "sedaily-mbti-time-machine-dev",
+        "Arn": "arn:aws:lambda:us-east-1:887078546492:function:sedaily-mbti-time-machine-dev",
+        "Input": "{\"warmup\":true}"
+      }
+    ]
+  }
+}

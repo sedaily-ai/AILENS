@@ -1,0 +1,376 @@
+{
+  "chzwwtjtgk": {
+    "integrations": [
+      {
+        "ConnectionType": "INTERNET",
+        "IntegrationId": "1doq1gp",
+        "IntegrationMethod": "POST",
+        "IntegrationType": "AWS_PROXY",
+        "IntegrationUri": "arn:aws:lambda:us-east-1:887078546492:function:sedaily-mbti-voice-tts-dev",
+        "PayloadFormatVersion": "2.0",
+        "TimeoutInMillis": 30000
+      },
+      {
+        "ConnectionType": "INTERNET",
+        "IntegrationId": "859ovkn",
+        "IntegrationMethod": "POST",
+        "IntegrationType": "AWS_PROXY",
+        "IntegrationUri": "arn:aws:lambda:us-east-1:887078546492:function:sedaily-mbti-v2-quiz-dev",
+        "PayloadFormatVersion": "2.0",
+        "TimeoutInMillis": 15000
+      },
+      {
+        "ConnectionType": "INTERNET",
+        "IntegrationId": "et3ndqk",
+        "IntegrationMethod": "POST",
+        "IntegrationType": "AWS_PROXY",
+        "IntegrationUri": "arn:aws:apigateway:us-east-1:lambda:path/2015-03-31/functions/arn:aws:lambda:us-east-1:887078546492:function:sedaily-mbti-newsletter-subscribe-dev/invocations",
+        "PayloadFormatVersion": "2.0",
+        "TimeoutInMillis": 30000
+      },
+      {
+        "ConnectionType": "INTERNET",
+        "IntegrationId": "h97efbd",
+        "IntegrationMethod": "POST",
+        "IntegrationType": "AWS_PROXY",
+        "IntegrationUri": "arn:aws:lambda:us-east-1:887078546492:function:sedaily-mbti-article-dev",
+        "PayloadFormatVersion": "2.0",
+        "TimeoutInMillis": 30000
+      },
+      {
+        "ConnectionType": "INTERNET",
+        "IntegrationId": "lpflhfs",
+        "IntegrationMethod": "POST",
+        "IntegrationType": "AWS_PROXY",
+        "IntegrationUri": "arn:aws:lambda:us-east-1:887078546492:function:sedaily-mbti-v2-posts-dev",
+        "PayloadFormatVersion": "2.0",
+        "TimeoutInMillis": 30000
+      },
+      {
+        "ConnectionType": "INTERNET",
+        "IntegrationId": "lvl83b9",
+        "IntegrationMethod": "POST",
+        "IntegrationType": "AWS_PROXY",
+        "IntegrationUri": "arn:aws:lambda:us-east-1:887078546492:function:sedaily-mbti-chatbot-dev",
+        "PayloadFormatVersion": "2.0",
+        "TimeoutInMillis": 30000
+      },
+      {
+        "ConnectionType": "INTERNET",
+        "IntegrationId": "rtzxwiu",
+        "IntegrationMethod": "POST",
+        "IntegrationType": "AWS_PROXY",
+        "IntegrationUri": "arn:aws:lambda:us-east-1:887078546492:function:sedaily-mbti-voice-stt-url-dev",
+        "PayloadFormatVersion": "2.0",
+        "TimeoutInMillis": 30000
+      },
+      {
+        "ConnectionType": "INTERNET",
+        "IntegrationId": "wak84of",
+        "IntegrationMethod": "POST",
+        "IntegrationType": "AWS_PROXY",
+        "IntegrationUri": "arn:aws:lambda:us-east-1:887078546492:function:sedaily-mbti-external-content-dev",
+        "PayloadFormatVersion": "2.0",
+        "TimeoutInMillis": 15000
+      },
+      {
+        "ConnectionType": "INTERNET",
+        "IntegrationId": "x2q67pi",
+        "IntegrationMethod": "POST",
+        "IntegrationType": "AWS_PROXY",
+        "IntegrationUri": "arn:aws:apigateway:us-east-1:lambda:path/2015-03-31/functions/arn:aws:lambda:us-east-1:887078546492:function:sedaily-mbti-voice-stt-presign-dev/invocations",
+        "PayloadFormatVersion": "2.0",
+        "TimeoutInMillis": 30000
+      },
+      {
+        "ConnectionType": "INTERNET",
+        "IntegrationId": "xv21jf5",
+        "IntegrationMethod": "POST",
+        "IntegrationType": "AWS_PROXY",
+        "IntegrationUri": "arn:aws:apigateway:us-east-1:lambda:path/2015-03-31/functions/arn:aws:lambda:us-east-1:887078546492:function:sedaily-mbti-voice-tts-dev/invocations",
+        "PayloadFormatVersion": "2.0",
+        "TimeoutInMillis": 30000
+      },
+      {
+        "ConnectionType": "INTERNET",
+        "IntegrationId": "ycna2wj",
+        "IntegrationMethod": "POST",
+        "IntegrationType": "AWS_PROXY",
+        "IntegrationUri": "arn:aws:lambda:us-east-1:887078546492:function:sedaily-mbti-question-dev",
+        "PayloadFormatVersion": "2.0",
+        "TimeoutInMillis": 30000
+      },
+      {
+        "ConnectionType": "INTERNET",
+        "IntegrationId": "yoh595e",
+        "IntegrationMethod": "POST",
+        "IntegrationType": "AWS_PROXY",
+        "IntegrationUri": "arn:aws:lambda:us-east-1:887078546492:function:sedaily-mbti-post-dev",
+        "PayloadFormatVersion": "2.0",
+        "TimeoutInMillis": 30000
+      }
+    ],
+    "routes": [
+      {
+        "ApiKeyRequired": false,
+        "AuthorizationType": "NONE",
+        "RouteId": "00haeq3",
+        "RouteKey": "OPTIONS /api/articles",
+        "Target": "integrations/h97efbd"
+      },
+      {
+        "ApiKeyRequired": false,
+        "AuthorizationType": "NONE",
+        "RouteId": "0crh8c7",
+        "RouteKey": "POST /api/newsletter/subscribe",
+        "Target": "integrations/et3ndqk"
+      },
+      {
+        "ApiKeyRequired": false,
+        "AuthorizationType": "NONE",
+        "RouteId": "0v1vp67",
+        "RouteKey": "POST /api/voice/stt-presign",
+        "Target": "integrations/x2q67pi"
+      },
+      {
+        "ApiKeyRequired": false,
+        "AuthorizationType": "NONE",
+        "RouteId": "1o69s0a",
+        "RouteKey": "GET /api/article/{article_id}",
+        "Target": "integrations/h97efbd"
+      },
+      {
+        "ApiKeyRequired": false,
+        "AuthorizationType": "NONE",
+        "RouteId": "2xsbj7p",
+        "RouteKey": "OPTIONS /api/quiz/today",
+        "Target": "integrations/859ovkn"
+      },
+      {
+        "ApiKeyRequired": false,
+        "AuthorizationType": "NONE",
+        "RouteId": "430k179",
+        "RouteKey": "GET /api/v2/posts",
+        "Target": "integrations/lpflhfs"
+      },
+      {
+        "ApiKeyRequired": false,
+        "AuthorizationType": "NONE",
+        "RouteId": "5ijil9b",
+        "RouteKey": "OPTIONS /api/article/{article_id}",
+        "Target": "integrations/h97efbd"
+      },
+      {
+        "ApiKeyRequired": false,
+        "AuthorizationType": "NONE",
+        "RouteId": "803tyr2",
+        "RouteKey": "POST /api/questions",
+        "Target": "integrations/ycna2wj"
+      },
+      {
+        "ApiKeyRequired": false,
+        "AuthorizationType": "NONE",
+        "RouteId": "8chn4if",
+        "RouteKey": "POST /api/posts",
+        "Target": "integrations/yoh595e"
+      },
+      {
+        "ApiKeyRequired": false,
+        "AuthorizationType": "NONE",
+        "RouteId": "9ia676a",
+        "RouteKey": "GET /api/v2/posts/{slug}",
+        "Target": "integrations/lpflhfs"
+      },
+      {
+        "ApiKeyRequired": false,
+        "AuthorizationType": "NONE",
+        "RouteId": "btffxuo",
+        "RouteKey": "OPTIONS /api/quiz/attempt",
+        "Target": "integrations/859ovkn"
+      },
+      {
+        "ApiKeyRequired": false,
+        "AuthorizationType": "NONE",
+        "RouteId": "cf4yx19",
+        "RouteKey": "OPTIONS /api/chat",
+        "Target": "integrations/lvl83b9"
+      },
+      {
+        "ApiKeyRequired": false,
+        "AuthorizationType": "NONE",
+        "RouteId": "d09oual",
+        "RouteKey": "OPTIONS /api/posts/{post_id}",
+        "Target": "integrations/yoh595e"
+      },
+      {
+        "ApiKeyRequired": false,
+        "AuthorizationType": "NONE",
+        "RouteId": "eo74mjd",
+        "RouteKey": "DELETE /api/posts/{post_id}",
+        "Target": "integrations/yoh595e"
+      },
+      {
+        "ApiKeyRequired": false,
+        "AuthorizationType": "NONE",
+        "RouteId": "gy4f526",
+        "RouteKey": "POST /api/quiz/attempt",
+        "Target": "integrations/859ovkn"
+      },
+      {
+        "ApiKeyRequired": false,
+        "AuthorizationType": "NONE",
+        "RouteId": "ix11ugg",
+        "RouteKey": "GET /api/v2/external-content",
+        "Target": "integrations/wak84of"
+      },
+      {
+        "ApiKeyRequired": false,
+        "AuthorizationType": "NONE",
+        "RouteId": "jcnrq06",
+        "RouteKey": "OPTIONS /api/voice/stt-url",
+        "Target": "integrations/rtzxwiu"
+      },
+      {
+        "ApiKeyRequired": false,
+        "AuthorizationType": "NONE",
+        "RouteId": "kx5xfn0",
+        "RouteKey": "POST /api/chat",
+        "Target": "integrations/lvl83b9"
+      },
+      {
+        "ApiKeyRequired": false,
+        "AuthorizationType": "NONE",
+        "RouteId": "kz5wyjf",
+        "RouteKey": "GET /api/voice/stt-url",
+        "Target": "integrations/rtzxwiu"
+      },
+      {
+        "ApiKeyRequired": false,
+        "AuthorizationType": "NONE",
+        "RouteId": "l2w49lg",
+        "RouteKey": "OPTIONS /api/posts",
+        "Target": "integrations/yoh595e"
+      },
+      {
+        "ApiKeyRequired": false,
+        "AuthorizationType": "NONE",
+        "RouteId": "oxh7jvd",
+        "RouteKey": "POST /api/voice/tts",
+        "Target": "integrations/xv21jf5"
+      },
+      {
+        "ApiKeyRequired": false,
+        "AuthorizationType": "NONE",
+        "RouteId": "sbau9xp",
+        "RouteKey": "GET /api/posts",
+        "Target": "integrations/yoh595e"
+      },
+      {
+        "ApiKeyRequired": false,
+        "AuthorizationType": "NONE",
+        "RouteId": "t7llxsg",
+        "RouteKey": "GET /api/quiz/today",
+        "Target": "integrations/859ovkn"
+      },
+      {
+        "ApiKeyRequired": false,
+        "AuthorizationType": "NONE",
+        "RouteId": "tf164bo",
+        "RouteKey": "OPTIONS /api/questions",
+        "Target": "integrations/ycna2wj"
+      },
+      {
+        "ApiKeyRequired": false,
+        "AuthorizationType": "NONE",
+        "RouteId": "tq5qdcp",
+        "RouteKey": "GET /api/questions",
+        "Target": "integrations/ycna2wj"
+      },
+      {
+        "ApiKeyRequired": false,
+        "AuthorizationType": "NONE",
+        "RouteId": "u3jp343",
+        "RouteKey": "GET /api/v2/external-content/{id}",
+        "Target": "integrations/wak84of"
+      },
+      {
+        "ApiKeyRequired": false,
+        "AuthorizationType": "NONE",
+        "RouteId": "vdifvdf",
+        "RouteKey": "GET /api/articles",
+        "Target": "integrations/h97efbd"
+      },
+      {
+        "ApiKeyRequired": false,
+        "AuthorizationType": "NONE",
+        "RouteId": "vhzgvan",
+        "RouteKey": "OPTIONS /api/voice/tts",
+        "Target": "integrations/1doq1gp"
+      },
+      {
+        "ApiKeyRequired": false,
+        "AuthorizationType": "NONE",
+        "RouteId": "zdr0b81",
+        "RouteKey": "GET /api/posts/{post_id}",
+        "Target": "integrations/yoh595e"
+      }
+    ]
+  },
+  "8181gs7j41": {
+    "integrations": [
+      {
+        "ConnectionType": "INTERNET",
+        "IntegrationId": "3dtxvsq",
+        "IntegrationMethod": "POST",
+        "IntegrationType": "AWS_PROXY",
+        "IntegrationUri": "arn:aws:apigateway:us-east-1:lambda:path/2015-03-31/functions/arn:aws:lambda:us-east-1:887078546492:function:sedaily-mbti-ws-message-dev/invocations",
+        "PassthroughBehavior": "WHEN_NO_MATCH",
+        "PayloadFormatVersion": "1.0",
+        "TimeoutInMillis": 29000
+      },
+      {
+        "ConnectionType": "INTERNET",
+        "IntegrationId": "4dkksba",
+        "IntegrationMethod": "POST",
+        "IntegrationType": "AWS_PROXY",
+        "IntegrationUri": "arn:aws:apigateway:us-east-1:lambda:path/2015-03-31/functions/arn:aws:lambda:us-east-1:887078546492:function:sedaily-mbti-ws-disconnect-dev/invocations",
+        "PassthroughBehavior": "WHEN_NO_MATCH",
+        "PayloadFormatVersion": "1.0",
+        "TimeoutInMillis": 29000
+      },
+      {
+        "ConnectionType": "INTERNET",
+        "IntegrationId": "ye9g6ue",
+        "IntegrationMethod": "POST",
+        "IntegrationType": "AWS_PROXY",
+        "IntegrationUri": "arn:aws:apigateway:us-east-1:lambda:path/2015-03-31/functions/arn:aws:lambda:us-east-1:887078546492:function:sedaily-mbti-ws-connect-dev/invocations",
+        "PassthroughBehavior": "WHEN_NO_MATCH",
+        "PayloadFormatVersion": "1.0",
+        "TimeoutInMillis": 29000
+      }
+    ],
+    "routes": [
+      {
+        "ApiKeyRequired": false,
+        "AuthorizationType": "NONE",
+        "RouteId": "8lkv3nd",
+        "RouteKey": "sendMessage",
+        "Target": "integrations/3dtxvsq"
+      },
+      {
+        "ApiKeyRequired": false,
+        "AuthorizationType": "NONE",
+        "RouteId": "xd8v57t",
+        "RouteKey": "$connect",
+        "Target": "integrations/ye9g6ue"
+      },
+      {
+        "ApiKeyRequired": false,
+        "AuthorizationType": "NONE",
+        "RouteId": "yb1r80h",
+        "RouteKey": "$disconnect",
+        "Target": "integrations/4dkksba"
+      }
+    ]
+  }
+}
