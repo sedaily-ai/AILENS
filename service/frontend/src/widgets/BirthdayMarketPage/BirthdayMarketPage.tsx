@@ -1,18 +1,19 @@
-import { BirthdayMarket } from '@/features/news-feed';
+import { BirthdayArrival, BirthdayMarket } from '@/features/news-feed';
 import { ExitPill, GLOBAL_CSS } from '@/features/timeline';
 import { TimelineSketch } from '@/shared/ui/icons/VideoSketch';
 import { HandUnderline } from '@/shared/ui/effects/HandUnderline';
 import styles from './birthdayMarketPage.module.css';
 
 // 그날의 기사(/timeline) 화면들과 같은 몰입형 틀 — 공용 헤더 대신 왼쪽 위 ExitPill 하나로 나가고, 공용 푸터도 숨긴다(ConditionalFooter.tsx).
-export function BirthdayMarketPage() {
+// arrivalDate가 있으면 같은 틀 안에 도착 페이지(그날 신문 카드의 QR이 여는 /birthday-market/날짜)를 그린다.
+export function BirthdayMarketPage({ arrivalDate }: { arrivalDate?: string }) {
   return <div className={styles.page}>
     <style>{GLOBAL_CSS}</style>
     {/* 본문은 1200px 컨테이너(좌우 24px) — 알약을 제목 왼쪽 끝(1152px 폭)에 맞춘다. */}
     <ExitPill column={1152} />
     <main id="main-content" tabIndex={-1} className={styles.main}>
       <h1 className={styles.title}><TimelineSketch className="w-12 h-10" /><HandUnderline>내 생일 타임머신</HandUnderline></h1>
-      <section id="birthday-market" className={styles.panel} aria-label="내 생일 타임머신"><BirthdayMarket /></section>
+      <section id="birthday-market" className={styles.panel} aria-label={arrivalDate ? '그날 서울경제' : '내 생일 타임머신'}>{arrivalDate ? <BirthdayArrival date={arrivalDate} /> : <BirthdayMarket />}</section>
     </main>
   </div>;
 }

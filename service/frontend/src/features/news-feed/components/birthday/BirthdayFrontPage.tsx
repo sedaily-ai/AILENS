@@ -4,6 +4,7 @@ import { ExternalLink, Info } from 'lucide-react';
 import type { FrontPageData } from '@/shared/lib/api/timelineApi';
 import type { FrontNotice, FrontPageNotice, FrontPageState } from './lib/birthdayFrontPage';
 import { FRONT_LOOKBACK_DAYS, frontArticleHref, frontNotice, frontSourceNote, shareableFront, weekdayOf } from './lib/birthdayFrontPage';
+import { guestKicker } from './lib/birthdayArrival';
 import { dateLabel } from './lib/birthdayModel';
 import { NEWSPAPER_SCENE } from './lib/birthdayNewspaper';
 import { frontLayout, needsOwnPhotoProbe, newspaperPhotoDate, newspaperView, type PhotoState } from './lib/birthdayNewspaperView';
@@ -70,10 +71,14 @@ function Headlines({ articles, compact = false }: { articles: FrontPageData['art
   })}</ol>;
 }
 
-/** ② 그날 서울경제 — 이 페이지에서 유일하게 지면 모양으로 힘을 주는 장면. 생일에 신문이 없으면 서버가 고른 직전 발행일을 보여 준다. */
-export function BirthdayFrontPage({ state, birthDate, onRetry, onUseBirthday, onShare }: {
+/**
+ * ② 그날 서울경제 — 이 페이지에서 유일하게 지면 모양으로 힘을 주는 장면. 생일에 신문이 없으면 서버가 고른 직전 발행일을 보여 준다.
+ * guest는 QR로 들어온 도착 페이지용이다. 보는 사람이 생일 주인이 아니라서 장면 이름을 '그날 서울경제'로 쓴다.
+ * onUseBirthday·onShare는 결과 화면에서만 넘긴다. 넘기지 않으면 해당 버튼을 그리지 않는다.
+ */
+export function BirthdayFrontPage({ state, birthDate, onRetry, onUseBirthday, onShare, guest = false }: {
   state: FrontPageState | null; birthDate: string;
-  onRetry: () => void; onUseBirthday: () => void; onShare: () => void;
+  onRetry: () => void; onUseBirthday?: () => void; onShare?: () => void; guest?: boolean;
 }) {
   // 신문 장면(스위치가 켜졌을 때)은 사진 날짜와 사진 상태를 먼저 정한 뒤, 거기에 맞는 목록·안내·문구(view)를 받는다.
   // 꺼져 있으면 view가 null이라 아래는 지금과 같은 화면이다.
@@ -101,15 +106,16 @@ export function BirthdayFrontPage({ state, birthDate, onRetry, onUseBirthday, on
   const substituted = view ? view.substitute !== null : Boolean(data && data.kind !== 'none' && !sameDay);
   const spoken = state?.status === 'loading' ? '그날 신문을 찾고 있어요.'
     : substituted ? `생일 당일 신문이 없어 ${dateLabel(shown)}자 신문을 보여 줘요.` : '';
-  return <section id="birthday-front" className={styles.scene} aria-labelledby="birthday-front-title">
-    <p className={styles.kicker}>{view ? view.kicker : kicker(state)}</p>
+  const sceneName = view ? view.kicker : kicker(state);
+  return <section id="birthday-front" className={`${styles.scene} ${styles.narrowScene}`} aria-labelledby="birthday-front-title">
+    <p className={styles.kicker}>{guest ? guestKicker(sceneName) : sceneName}</p>
     <h3 id="birthday-front-title" className="sr-only">{view ? view.heading : '그날의 서울경제'}</h3>
     <p className="sr-only" role="status">{spoken}</p>
     {view ? <FrontNote note={view.substitute} /> : data && <FrontNote note={frontNotice(data)} />}
     <div className={styles.paper} aria-busy={state?.status === 'loading'}>
       {/* 제호 줄은 날짜·요일만. 면 번호는 붙이지 않는다(1면 사진은 아래에 따로 있다). */}
       <div className={styles.masthead}><strong>서울경제</strong>{state && <span>{masthead(shown)}</span>}</div>
-      {!state ? <div className={styles.paperEmpty}><strong>출생연도만 담긴 공유 링크예요</strong><p>내 생일을 넣으면 그날 신문을 볼 수 있어요.</p><button type="button" className={styles.sceneAction} onClick={onUseBirthday}>내 생일로 보기</button></div>
+      {!state ? <div className={styles.paperEmpty}><strong>출생연도만 담긴 공유 링크예요</strong><p>내 생일을 넣으면 그날 신문을 볼 수 있어요.</p>{onUseBirthday && <button type="button" className={styles.sceneAction} onClick={onUseBirthday}>내 생일로 보기</button>}</div>
         : state.status === 'loading' ? <div className={styles.skeleton} aria-hidden="true"><span /><span /><span /></div>
         // 실패 원인(네트워크·보관본 응답·형식)을 화면에서는 가릴 수 없어 단정하지 않는다.
         : state.status === 'error' ? <div className={styles.paperEmpty} role="alert"><strong>그날 신문을 불러오지 못했어요</strong><p>{`연결이 원활하지 않을 수 있어요. 잠시 뒤 다시 ${nb('불러와 주세요.')}`}</p><button type="button" className={styles.sceneAction} onClick={onRetry}>다시 불러오기</button></div>
@@ -130,7 +136,7 @@ export function BirthdayFrontPage({ state, birthDate, onRetry, onUseBirthday, on
     {data && data.kind !== 'none' && !view?.ownPhotoDay && <div className={styles.sceneActions}>
       <Link className={styles.sceneAction} href={paperHref(shown)} prefetch={false} data-fx="own">{sameDay ? '그날의 기사 모두 보기' : `${month}월 ${day}일의 기사 모두 보기`}</Link>
       {/* 공유 영역의 카드 종류 버튼('그날 신문 카드')과 같은 이름을 쓴다. */}
-      {canShare && <button type="button" className={styles.sceneAction} onClick={onShare}>그날 신문 카드 공유하기</button>}
+      {canShare && onShare && <button type="button" className={styles.sceneAction} onClick={onShare}>그날 신문 카드 공유하기</button>}
     </div>}
     {/* 서로 다른 사실(고른 자료·기준·날짜 전송)을 문장별로 나눈다. 기사를 고른 기준은 frontSourceNote가 정한다.
         '그날의 기사 모두 보기'도 주소에 날짜를 담아 서버에 묻기 때문에 '그날 신문을 찾을 때'로 쓴다. */}

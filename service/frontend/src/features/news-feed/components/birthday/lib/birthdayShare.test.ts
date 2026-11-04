@@ -9,7 +9,7 @@ import {
   receiptSourceLine, shareDayNotice, shareText, type ShareContent,
 } from './birthdayShare';
 import { nb } from './keepTogether';
-import { RECEIPT_QR_ROWS, RECEIPT_QR_URL } from '../data/birthdayQr';
+import { RECEIPT_QR_ROWS, RECEIPT_QR_URL, cardQrUrl, qrRows } from '../data/birthdayQr';
 import { BIRTHDAY_MARKET_PATH } from '../data/birthdayRoutes';
 import { SITE_URL } from '@/shared/constants/site';
 
@@ -82,22 +82,35 @@ test('그날 신문 카드에는 빅카인즈 보관본이라는 출처 한 줄�
   expect(FRONT_CARD_SOURCE).toBe('출처 빅카인즈 보관본');
 });
 
-/** drawShare가 쓰는 2D 문맥만 흉내 낸다 — 그린 글자(fillText)와 aria-label을 모은다. 글자 폭은 글자 수에 비례한다고 본다. */
+/** drawShare가 쓰는 2D 문맥만 흉내 낸다 — 그린 글자(fillText)·채운 사각형(fillRect)과 aria-label을 모은다. 글자 폭은 글자 수에 비례한다고 본다. */
 function fakeCanvas() {
   const texts: string[] = [];
+  /** 글자를 그린 순간의 글자색(같은 글자는 마지막 것). */
+  const colors: Record<string, unknown> = {};
+  const rects: number[][] = [];
+  const images: unknown[][] = [];
+  const clips: number[] = [];
+  const scales: number[][] = [];
   const attrs: Record<string, string> = {};
   const context = new Proxy({} as Record<string | symbol, unknown>, {
     get(target, prop) {
       if (prop in target) return target[prop];
       if (prop === 'measureText') return (value: string) => ({ width: value.length * 20 });
-      if (prop === 'fillText') return (value: string) => { texts.push(value); };
+      if (prop === 'fillText') return (value: string) => { texts.push(value); colors[value] = target.fillStyle; };
+      if (prop === 'fillRect') return (...box: number[]) => { rects.push(box); };
+      if (prop === 'drawImage') return (...args: unknown[]) => { images.push(args); };
+      if (prop === 'clip') return () => { clips.push(1); };
+      if (prop === 'scale') return (...factors: number[]) => { scales.push(factors); };
       return () => undefined;
     },
     set(target, prop, value) { target[prop] = value; return true; },
   });
   const canvas = { width: 0, height: 0, getContext: () => context, setAttribute: (name: string, value: string) => { attrs[name] = value; } };
-  return { canvas: canvas as unknown as HTMLCanvasElement, texts, attrs };
+  return { canvas: canvas as unknown as HTMLCanvasElement, texts, colors, rects, images, clips, scales, attrs };
 }
+/** QR 칸으로 그린 사각형 — 다른 사각형(바탕·지면·줄)은 한 변이 6px보다 훨씬 크다. 카드 위 QR 한 칸은 4~5px다. */
+const qrCells = (rects: number[][]) => rects.filter(([, , width, height]) => width <= 6 && height <= 6);
+const darkCount = (rows: readonly string[]) => rows.join('').split('1').length - 1;
 const headlines = ['첫 기사 제목', '둘째 기사 제목', '셋째 기사 제목'].map((title, index) => ({ news_id: String(index), title, content: '', byline: '', category: '', original_link: null }));
 const draw = (content: Partial<ShareContent>, result = calculate('1990-05-15', snapshot)) => {
   const fake = fakeCanvas();
@@ -146,7 +159,7 @@ test("공유 문구·카드 이미지 글·화면 낭독용 이름에 '1면'이 
   for (const variant of ['receipt', 'front'] as const) expect(shareText(result, variant)).not.toContain(FRONT_WORD);
   const card = draw({ variant: 'front' });
   expect(card.attrs['aria-label']).toBe('AI LENS 내 생일 타임머신 그날 신문 카드. 내 생일날 서울경제는? 1990년 5월 15일 · 내 생일 타임머신. 첫 기사 제목, 둘째 기사 제목, 셋째 기사 제목. 출처 빅카인즈 보관본');
-  expect(card.texts).toEqual(expect.arrayContaining(['5월 15일, 내가 태어난 날', '서울경제는', '1990년 5월 15일 화요일', '출처 빅카인즈 보관본', '내 생일 신문도 찾아보기']));
+  expect(card.texts).toEqual(expect.arrayContaining(['5월 15일, 내가 태어난 날', '서울경제는', '1990년 5월 15일 화요일', '출처 빅카인즈 보관본', '그날 서울경제 더 보기']));
   for (const fake of [card, draw({}), draw({ includeDay: false })]) {
     expect(fake.attrs['aria-label']).not.toContain(FRONT_WORD);
     expect(fake.attrs['aria-label']).not.toContain('면 번호');
@@ -186,6 +199,120 @@ test('영수증 QR은 결과 페이지 주소(영수증 유입 표시 포함)를
   expect(RECEIPT_QR_ROWS[0].slice(0, 7)).toBe('1111111');
   expect(RECEIPT_QR_ROWS[0].slice(-7)).toBe('1111111');
   expect(RECEIPT_QR_ROWS[36].slice(0, 7)).toBe('1111111');
+});
+
+test('그날 신문 카드는 카드에 찍힌 날짜의 도착 페이지 QR을, 영수증은 결과 페이지 QR을 그린다', () => {
+  const result = calculate('1990-05-15', snapshot);
+  const front = draw({ variant: 'front' }, result);
+  const receipt = draw({ variant: 'receipt' }, result);
+  // 검은 칸의 개수로 어느 무늬를 그렸는지 가린다. 두 무늬의 검은 칸 수가 같으면 이 시험이 아무것도 가리지 못하므로 먼저 다름을 확인한다.
+  const cardRows = qrRows(cardQrUrl('1990-05-15'));
+  expect(darkCount(cardRows)).not.toBe(darkCount(RECEIPT_QR_ROWS));
+  expect(qrCells(front.rects)).toHaveLength(darkCount(cardRows));
+  expect(qrCells(receipt.rects)).toHaveLength(darkCount(RECEIPT_QR_ROWS));
+});
+
+// 사진 속 크기만 필요하므로 naturalWidth·naturalHeight만 가진 가짜 사진을 쓴다.
+const photo = (width = 4416, height = 6200) => ({ naturalWidth: width, naturalHeight: height }) as unknown as HTMLImageElement;
+
+test('그날 신문 카드에 1면 사진이 있으면 지면 위쪽을 사진 윗부분으로 채우고 글자 제호는 그리지 않는다', () => {
+  const image = photo();
+  const card = draw({ variant: 'front', photo: image });
+  // 사진 가로는 통째로, 세로는 위에서부터 상자 비율(808:344)만큼 잘라 상자(136, 502, 808×344)에 그린다.
+  expect(card.images).toEqual([[image, 0, 0, 4416, Math.round(4416 * 344 / 808), 136, 502, 808, 344]]);
+  // 글자 제호(서울경제)는 사진이 대신하지만, 사진 속 날짜는 읽히지 않으므로 날짜는 맨 아래 출처 줄 오른쪽에 남는다.
+  expect(card.texts).not.toContain('서울경제');
+  const source = card.texts.indexOf('출처 빅카인즈 보관본');
+  expect(card.texts[source + 1]).toBe('1990년 5월 15일 화요일');
+  expect(card.texts.filter(text => text === '1990년 5월 15일 화요일')).toHaveLength(1);
+  expect(card.texts).toEqual(expect.arrayContaining(['5월 15일, 내가 태어난 날', '서울경제는', '1990년 5월 15일 화요일', '출처 빅카인즈 보관본', '그날 서울경제 더 보기']));
+});
+
+test('그날 신문 카드의 기사 제목은 사진이 있든 없든 어두운 글자색으로 그린다 — 흰 지면 위에 흰 글자가 되지 않는다', () => {
+  // 사진 모양은 제목 바로 위에서 글자색을 바꾸는 그리기(제호·겹줄)가 없어 한 번 이 문제가 있었다.
+  for (const content of [{ photo: photo() }, {}]) {
+    const card = draw({ variant: 'front', ...content });
+    for (const title of ['첫 기사 제목', '둘째 기사 제목', '셋째 기사 제목']) {
+      expect(card.texts, title).toContain(title);
+      expect(card.colors[title], title).toBe('#111827');
+    }
+  }
+});
+
+test('1면 사진이 없거나 못 불러왔으면 지금까지처럼 글자 제호로 그린다', () => {
+  for (const content of [{}, { photo: null }, { photo: photo(0, 0) }]) {
+    const card = draw({ variant: 'front', ...content });
+    expect(card.images).toEqual([]);
+    expect(card.texts).toContain('서울경제');
+  }
+});
+
+test('그날 신문 카드의 지면은 반듯한 사각형이 아니라 찢어 낸 모양이고, 사진은 아래 가장자리를 찢어 자른다', () => {
+  // 지면(폭 888)을 fillRect 한 번으로 칠하지 않는다 — 찢어 낸 둘레를 따라 칠한다.
+  expect(draw({ variant: 'front', photo: photo() }).rects.some(([, , width]) => width === 888)).toBe(false);
+  expect(draw({ variant: 'front' }).rects.some(([, , width]) => width === 888)).toBe(false);
+  // 사진은 찢어 낸 둘레로 잘라 그린다(clip 한 번). 사진이 없으면 자를 것이 없다.
+  expect(draw({ variant: 'front', photo: photo() }).clips).toHaveLength(1);
+  expect(draw({ variant: 'front' }).clips).toHaveLength(0);
+});
+
+test('영수증에는 번호·열 제목·합계·끝맺음 한 줄·발행 완료 도장이 들어가고, 웃음을 노린 말은 없다', () => {
+  const card = draw({ variant: 'receipt' });
+  expect(card.texts).toEqual(expect.arrayContaining(['내 생일 영수증  ·  NO. 19900515', '품목', '금액', '합계', '※ 태어난 날부터 오늘까지의 기록이에요', '완료']));
+  // 차분한 영수증: 결제수단·환불 같은 말장난은 쓰지 않는다
+  expect(card.texts.some(text => /결제수단|세월|환불|교환/.test(text))).toBe(false);
+  // 맨 아래 줄 이름은 '지나온 시간'이 아니라 '합계'다. 화면 낭독용 설명은 그대로 '지나온 시간'이라고 읽는다.
+  expect(card.texts).not.toContain('지나온 시간');
+  expect(card.attrs['aria-label']).toContain('지나온 시간');
+  // '발행'은 위쪽 줄 이름 하나와 도장 글자 하나
+  expect(card.texts.filter(text => text === '발행')).toHaveLength(2);
+  // 도장은 서비스 강조색(파랑)으로 그린다
+  expect(card.colors['완료']).toBe('#1d4ed8');
+});
+
+test('날짜를 가린 영수증과 연도 공유 영수증에는 생일이 드러나는 영수증 번호가 없다', () => {
+  const hidden = draw({ variant: 'receipt', includeDay: false });
+  const year = draw({ variant: 'receipt', mode: 'year', includeDay: false }, calculate('1990-01-01', snapshot, 'year'));
+  for (const card of [hidden, year]) {
+    expect(card.texts).toContain('내 생일 영수증');
+    expect(card.texts.some(text => text.includes('NO.') || /19900[15]\d{2}/.test(text))).toBe(false);
+    // 소품은 그대로 있다
+    expect(card.texts).toEqual(expect.arrayContaining(['품목', '합계', '완료']));
+  }
+});
+
+test('영수증 끝맺음 줄은 연도만 공유된 영수증에서는 해 단위로 말한다', () => {
+  const year = draw({ variant: 'receipt', mode: 'year', includeDay: false }, calculate('1990-01-01', snapshot, 'year'));
+  expect(year.texts).toContain('※ 태어난 해부터 올해까지의 기록이에요');
+  expect(year.texts).not.toContain('※ 태어난 날부터 오늘까지의 기록이에요');
+  // 날짜를 가렸어도 개인 영수증은 '태어난 날' 기준 합계다
+  expect(draw({ variant: 'receipt', includeDay: false }).texts).toContain('※ 태어난 날부터 오늘까지의 기록이에요');
+});
+
+test('영수증이 카드 높이에 안 들어가면 전체를 같은 비율로 줄이고, 들어가면 줄이지 않는다', () => {
+  // 가장 긴 경우: 본문 4줄 + 100만 원 4줄 + 그날 서울경제 제목 2줄
+  const longTitle = '아주 긴 기사 제목이 두 줄로 나뉘어서 영수증 안에서 가장 많은 자리를 차지하는 경우를 만든다 그래서 줄이 둘이다';
+  const cells = assetCells(base2010, { ...file2010, gold: [['2010-05', 70]] }, { ...latest, gold: ['2026-09', 280] });
+  const full = draw({ variant: 'receipt', front: [{ ...headlines[0], title: longTitle }], assets: cells, assetBase: base2010 }, calculate('1996-06-01', snapshot));
+  expect(full.scales).toHaveLength(1);
+  const [scale] = full.scales[0];
+  expect(scale).toBeLessThan(1);
+  // 너무 작아지면 글자가 읽히지 않는다
+  expect(scale).toBeGreaterThanOrEqual(0.85);
+  expect(full.scales[0][1]).toBe(scale);
+  // 줄이 적은 영수증은 줄이지 않는다
+  const short = draw({ variant: 'receipt', front: [], assets: [], assetBase: null, includeDay: false }, calculate('1940-01-01', snapshot));
+  expect(short.scales).toEqual([[1, 1]]);
+});
+
+test('영수증은 사진을 넘겨도 쓰지 않는다', () => {
+  expect(draw({ variant: 'receipt', photo: photo() }).images).toEqual([]);
+});
+
+test('그날 신문 카드의 QR은 날짜마다 다르다', () => {
+  const first = draw({ variant: 'front' }, calculate('1990-05-15', snapshot));
+  const second = draw({ variant: 'front' }, calculate('1990-05-16', snapshot));
+  expect(qrCells(first.rects).map(box => box.join(','))).not.toEqual(qrCells(second.rects).map(box => box.join(',')));
 });
 
 test('합계(지나온 시간)는 연도 공유면 연 단위로 쓴다', () => {

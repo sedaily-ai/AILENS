@@ -4,11 +4,29 @@ import type { BigKindsArticle } from '@/shared/lib/api/timelineApi';
 import type { BirthdayResult, ViewMode } from './data/birthdayTypes';
 import type { AssetBase, AssetCell } from './lib/birthdayAssets';
 import { shareUrl } from './lib/birthdayModel';
+import { newspaperImageUrl } from './lib/birthdayNewspaper';
 import { DAY_TOGGLE_LABEL, dayToggleShown, drawShare, INCLUDE_DAY_DEFAULT, shareDayNotice, shareText, type ShareVariant } from './lib/birthdayShare';
 import { nb } from './lib/keepTogether';
 import styles from './birthdayStory.module.css';
 
 const FONTS = ['800 60px Pretendard', '900 60px Pretendard', '900 64px "Noto Serif KR"', '700 36px "Noto Serif KR"'];
+
+/**
+ * 그날 신문 카드에 넣을 1면 사진 — date가 null이면(영수증·사진이 필요 없을 때) 요청하지 않는다. 장면에서 이미 받은 사진은 같은 주소라 브라우저 캐시를 쓴다.
+ * 못 불러오면 null이라 카드는 사진 없는 모양으로 그려지고, 불러오는 동안도 같다(도착하면 다시 그린다).
+ */
+function useFrontPhoto(date: string | null) {
+  const [loaded, setLoaded] = useState<{ date: string; image: HTMLImageElement } | null>(null);
+  useEffect(() => {
+    if (!date) return;
+    let cancelled = false;
+    const image = new Image();
+    image.onload = () => { if (!cancelled && image.naturalWidth > 0) setLoaded({ date, image }); };
+    image.src = newspaperImageUrl(date);
+    return () => { cancelled = true; image.onload = null; };
+  }, [date]);
+  return date && loaded?.date === date ? loaded.image : null;
+}
 
 /** ⑥ 공유 — 결과 맨 아래. 9:16 생일 영수증·그날 신문 카드. 휴대폰은 시스템 공유 창(카톡·인스타)으로 바로 보내고, 안 되면 이미지로 저장한다. */
 export function BirthdayShare({ result, mode, assets, assetBase, front, variant, onVariant, onTryFriend }: {
@@ -23,13 +41,15 @@ export function BirthdayShare({ result, mode, assets, assetBase, front, variant,
   const dayShown = includeDay && mode !== 'year';
   const dayNotice = shareDayNotice(current, mode, includeDay);
   const fileName = `lens-birthday-${result.date.year}${current === 'front' ? '-front' : ''}.png`;
+  // 그날 신문 카드일 때만 그날 1면 사진을 받는다(카드는 생일 당일 신문이 있을 때만 만들어진다).
+  const photo = useFrontPhoto(current === 'front' ? result.birthDate : null);
 
   useEffect(() => {
     let active = true;
     // 공유 창은 누른 순간에 열어야 해서(브라우저의 사용자 동작 제한) 그릴 때마다 이미지를 미리 만들어 둔다.
     const paint = () => {
       if (!active || !canvas.current) return;
-      drawShare(canvas.current, result, { variant: current, mode, includeDay: dayShown, front, assets, assetBase });
+      drawShare(canvas.current, result, { variant: current, mode, includeDay: dayShown, front, assets, assetBase, photo });
       canvas.current.toBlob(made => { if (active) blob.current = made; }, 'image/png');
     };
     paint();
@@ -37,7 +57,7 @@ export function BirthdayShare({ result, mode, assets, assetBase, front, variant,
     const titles = front.slice(0, 5).map(article => article.title).join('') || '서울경제';
     void Promise.all(FONTS.map(font => document.fonts.load(font, titles))).then(paint, paint);
     return () => { active = false; };
-  }, [result, current, mode, dayShown, front, assets, assetBase]);
+  }, [result, current, mode, dayShown, front, assets, assetBase, photo]);
 
   function save() {
     if (!blob.current) { setStatus('이미지를 만드는 중이에요. 잠시 뒤 다시 눌러 주세요.'); return; }

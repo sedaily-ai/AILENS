@@ -71,15 +71,12 @@
 .photoButton { display: block; width: 100%; padding: 0; border: 0; background: none; cursor: zoom-in; }
 .photoButton:disabled { cursor: default; }
 .photoButton:focus-visible { outline: 2px solid #1d4ed8; outline-offset: 2px; }
-.photoActions { display: flex; margin: 12px 0 16px; }
-.photoActions > .sceneAction { margin-top: 0; }
 /* 기사 목록이 있는 날: 제목이 먼저고 사진은 작게 가운데에 둔다(폭 최대 220px = 4의 배수). 사진 위 간격이 제목 목록과의 구분이 된다. */
 .photo[data-size='compact'] { margin-top: 16px; }
 .photo[data-size='compact'] .photoButton { width: min(100%, 220px); margin: 0 auto; }
-.photoHint { margin: 8px 0 0 !important; font-size: 13px; line-height: 1.5; color: #4b5563; text-align: center; }
+.photoHint { margin: 12px 0 16px !important; font-size: 16px; font-weight: 600; line-height: 1.5; color: #374151; text-align: center; }
 /* 사진을 기다리는 동안 안내 문구·버튼 줄의 자리만 잡아 둔다(보이지 않고 눌리지 않는다). display:none 이 아니라 visibility 라서 높이는 그대로다. */
-.photoHint[data-held], .photoActions[data-held] { visibility: hidden; }
-.photo[data-size='compact'] .photoActions { margin: 12px 0 16px; }
+.photoHint[data-held] { visibility: hidden; }
 /* 신문 장면의 제목 목록(compact): 본문 요약 없이 제목만 둔다. 첫 제목은 지금의 32px 대신 24px(글자 크기 목록 안의 값)로 한 단계 낮춰 제목 4개와 사진이 한눈에 들어오게 한다.
    기사 링크가 한 줄 44px 이상이라는 규칙(.headlines a)은 그대로 둔다. */
 .headlines[data-compact] li[data-lead] { font-size: 24px; line-height: 1.4; }
@@ -221,3 +218,14 @@
   .pension li + li { border-left: 0; border-top: 1px solid #e5e7eb; }
   .barRow { grid-template-columns: 80px minmax(0, 1fr) 64px; gap: 8px; }
 }
+/* 도착 페이지(그날 신문 카드의 QR로 들어온 사람) — 그날 신문 장면 아래에서 자기 생일로 이어 주는 질문과 버튼.
+   안쪽 여백은 결과 영역(.results, birthdayMarket.module.css)과 같은 값·같은 컨테이너 기준이고, 위 가로선만 뺐다(틀 맨 위라서).
+   버튼은 입력 화면의 주 버튼(.primary)을 그대로 쓰고 위 간격만 준다. */
+/* 그날 서울경제 장면(결과 화면·도착 페이지)은 기사 제목 몇 줄과 작은 사진뿐이라 560px 열 전체로 펼치면 가로로 헐렁해 보인다. 넓은 화면에서만 440px로 줄이고 열 가운데에 둔다
+   (왼쪽에 붙이면 화면 가운데보다 왼쪽으로 쏠려 보인다). 도착 페이지는 아래 질문·버튼도 같은 폭으로 맞춘다. */
+.narrowScene { max-width: 440px; margin-inline: auto; }
+.arrivalBody { padding: 8px 28px 28px; }
+@container (max-width: 680px) { .arrivalBody { padding: 8px 20px 20px; } }
+@container (max-width: 420px) { .arrivalBody { padding-left: 16px; padding-right: 16px; } }
+.arrivalQuestion { font-size: 24px; font-weight: 800; letter-spacing: -.03em; line-height: 1.4; color: #111827; }
+.arrivalAction { margin-top: 24px; }
