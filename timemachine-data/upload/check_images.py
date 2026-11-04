@@ -27,7 +27,7 @@ FOUNDED = date(1960, 8, 1)
 SUSPENDED = (date(1980, 11, 26), date(1988, 7, 31))
 # 이날부터 일요일자 신문이 없다 — 백엔드 time_machine.py SUNDAY_CLOSED_FROM 과 같은 값.
 SUNDAY_CLOSED_FROM = date(1996, 9, 29)
-# e-Paper 일일 수집(Lambda)이 같은 경로에 사진을 올리기 시작한 날 — collect/lambda_handler.py. 이 날부터의 사진은 보유자 목록에 없는 것이 정상이다.
+# e-Paper 일일 수집(Lambda)이 같은 경로에 사진을 올리기 시작한 날 — collect/lambda_handler.py. 이 날부터의 사진은 올리기 전에 만든 목록(newspaper_manifest.csv)에 없는 것이 정상이다.
 AUTO_CAPTURE_FROM = date(2026, 11, 3)
 S3_PREFIX = 'timemachine-newspaper/img/'
 NAME = re.compile(r'^(\d{4})/(\d{2})/(\d{4})(\d{2})(\d{2})\.jpg$')
@@ -185,7 +185,7 @@ def compare(manifest_path: Path, listing_path: Path) -> int:
 
     def automatic(key: str) -> bool:
         """일일 수집이 올린 사진: 목록의 마지막 날짜 뒤이고 자동 수집 시작일 이후의 날짜. 이름이 날짜가 아닌 파일은 아니다.
-        '오늘 이하'는 조건에 두지 않는다 — 이 대조는 보유자 기기에서 도는데, 기기 시계가 틀리면 정상 사진이 미래 날짜로 보여 차이로 남기 때문이다.
+        '오늘 이하'는 조건에 두지 않는다 — 이 대조는 로컬 기기에서 도는데, 기기 시계가 틀리면 정상 사진이 미래 날짜로 보여 차이로 남기 때문이다.
         (미래 날짜 파일은 올리기 전 점검이 이미 오류로 거른다.)"""
         day = key_date(key)
         return bool(last and day and day > last and day >= AUTO_CAPTURE_FROM)

@@ -65,7 +65,7 @@ cd build && python3 -m unittest test_build_year_files -v
 | 재시도 | 요청 안에서 3번(2초·4초 대기). 확인하지 못한 날은 `text_covers`에 넣지 않아 다음 실행이 다시 받는다(그동안 화면은 빅카인즈로 채운다). 403·429는 재시도 없이 그 실행을 멈추고 오류로 끝낸다. 요청 간 0.7초, User-Agent는 수집기라고 밝힌다 |
 | 누락 목록 | 실행마다 `ops/status/missing.json`에 쓴다(공개 경로 `timemachine-newspaper/` 밖). `naver`는 `NAVER_DAILY_FROM` 이후 확인하지 못한 날, `image`는 2026-11-03 이후 사진이 없는 발행 예상일(정오 이후 오늘 포함), 둘 다 **최근 것부터** 60개. `naver_backfill`은 시작일 이전 2011-07-09~의 미확인 일수로 정보만 적는다(알림에 쓰지 않는다) |
 | 날짜 지정 재처리 | 이벤트 `{"dates": ["2026-11-03"]}` 또는 `{"from": "...", "to": "..."}`(최대 31일, `"force": true`면 확인한 날도 다시 받음). 네이버 수집이 켜져 있을 때만 |
-| 알림 | CloudWatch 알람 3개 → SNS 토픽 `TIMEMACHINE_ALERT_TOPIC`: 새 함수 오류, **이미지 수집 함수 오류**(지금까지 알림이 없었다), 마감(정오) 뒤에도 사진이 없는 발행 예상일이 3시간 연속. 받는 곳은 `provision_daily.sh`에 `ALERT_EMAIL`을 주거나 나중에 `aws sns subscribe`로 토픽에 붙인다. **받는 곳이 없으면 토픽만 만들고, 알람 상태는 CloudWatch 콘솔에서만 보이며 아무에게도 가지 않는다** |
+| 알림 | CloudWatch 알람 3개 → SNS 토픽 `TIMEMACHINE_ALERT_TOPIC`: 새 함수 오류, **이미지 수집 함수 오류**(지금까지 알림이 없었다), 마감(정오) 뒤에도 사진이 없는 발행 예상일이 3시간 연속. 받는 곳은 슬랙 `#3_lens_alarm` 채널이다(Amazon Q Developer 채널 설정 `ailens-ops-alerts-slack`에 이 토픽을 추가해 연결, 2026-11-04, 시험 알림 통과). 이메일은 쓰지 않지만 `provision_daily.sh`에 `ALERT_EMAIL`을 주면 구독을 만들 수 있다. 알람이 풀릴 때(OK)도 같은 토픽으로 알린다(`provision_daily.sh` 기준이며, 이미 만들어진 알람은 스크립트를 다시 실행해야 바뀐다. 전에 `CHECK_ONLY=1`로 덮어쓸 항목을 확인할 수 있다). 슬랙 연결을 되돌리려면 채널 설정의 SNS 토픽 목록에서 이 토픽만 뺀다. **토픽에 연결된 곳이 없으면 알람 상태는 CloudWatch 콘솔에서만 보이고 아무에게도 가지 않는다** |
 
 환경 변수: `NEWSPAPER_BUCKET`(필수), `NAVER_DAILY`(`on`이 아니면 **네이버에 요청하지 않는다**, 기본 꺼짐), `NAVER_DAILY_FROM`(켤 때 필수, 일일 수집 시작일). 꺼져 있어도 이미지 누락 목록과 지표는 만든다.
 
