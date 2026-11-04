@@ -6,7 +6,7 @@ import type { FrontNotice, FrontPageNotice, FrontPageState } from './lib/birthda
 import { FRONT_LOOKBACK_DAYS, frontArticleHref, frontNotice, frontSourceNote, shareableFront, weekdayOf } from './lib/birthdayFrontPage';
 import { dateLabel } from './lib/birthdayModel';
 import { NEWSPAPER_SCENE } from './lib/birthdayNewspaper';
-import { newspaperPhotoDate, newspaperView, type PhotoState } from './lib/birthdayNewspaperView';
+import { needsOwnPhotoProbe, newspaperPhotoDate, newspaperView, type PhotoState } from './lib/birthdayNewspaperView';
 import { nb } from './lib/keepTogether';
 import { BirthdayNewspaperPhoto } from './BirthdayNewspaperPhoto';
 import styles from './birthdayStory.module.css';
@@ -73,13 +73,18 @@ export function BirthdayFrontPage({ state, birthDate, onRetry, onUseBirthday, on
 }) {
   // 신문 장면(스위치가 켜졌을 때)은 사진 날짜와 사진 상태를 먼저 정한 뒤, 거기에 맞는 목록·안내·문구(view)를 받는다.
   // 꺼져 있으면 view가 null이라 아래는 지금과 같은 화면이다.
-  const [photo, setPhoto] = useState<{ date: string; status: 'ok' | 'missing' } | null>(null);
-  const photoDate = NEWSPAPER_SCENE && state ? newspaperPhotoDate(state, birthDate) : null;
-  const photoState: PhotoState = photo && photo.date === photoDate ? photo.status : 'loading';
+  // 사진 상태는 날짜별로 따로 기억한다 — 서버가 물러난 날은 생일 당일 사진을 먼저 시도하고, 없으면 직전 발행일 사진으로 넘어가는데
+  // 그때 앞 날짜의 결과(missing)를 덮어쓰면 다시 생일 사진을 시도하는 반복이 생긴다.
+  const [photos, setPhotos] = useState<Record<string, 'ok' | 'missing'>>({});
+  const probeOwn = NEWSPAPER_SCENE && state ? needsOwnPhotoProbe(state, birthDate) : false;
+  const ownState: PhotoState | null = probeOwn ? (photos[birthDate] ?? 'loading') : null;
+  const photoDate = NEWSPAPER_SCENE && state ? newspaperPhotoDate(state, birthDate, ownState) : null;
+  const photoState: PhotoState = photoDate ? (photos[photoDate] ?? 'loading') : 'loading';
   const onPhotoStatus = useCallback((status: 'ok' | 'missing') => {
-    setPhoto(prev => prev && prev.date === photoDate && prev.status === status ? prev : { date: photoDate ?? '', status });
+    if (!photoDate) return;
+    setPhotos(prev => prev[photoDate] === status ? prev : { ...prev, [photoDate]: status });
   }, [photoDate]);
-  const view = NEWSPAPER_SCENE && state ? newspaperView(state, birthDate, photoState) : null;
+  const view = NEWSPAPER_SCENE && state ? newspaperView(state, birthDate, photoState, ownState) : null;
   const data = state?.status === 'ok' ? state.data : null;
   const shown = view?.shown ?? data?.shown_date ?? birthDate;
   const sameDay = shown === birthDate;
@@ -112,7 +117,8 @@ export function BirthdayFrontPage({ state, birthDate, onRetry, onUseBirthday, on
         : state.data.kind === 'none' ? <div className={styles.paperEmpty}><strong>이 무렵 신문은 보관본에 없어요</strong><p>{`생일과 그 전 ${FRONT_LOOKBACK_DAYS}일 동안의 서울경제가 빅카인즈 보관본에 ${nb('없어요.')}`}</p></div>
         : <Headlines articles={state.data.articles} />}
     </div>
-    {data && data.kind !== 'none' && <div className={styles.sceneActions}>
+    {/* 생일 당일 사진만 보여 주는 날은 그날 기사가 없어 '신문 전체 보기'가 빈 페이지로 가므로 보관본에 없는 날처럼 감춘다. */}
+    {data && data.kind !== 'none' && !view?.ownPhotoDay && <div className={styles.sceneActions}>
       <Link className={styles.sceneAction} href={paperHref(shown)} prefetch={false} data-fx="own">{sameDay ? '그날 신문 전체 보기' : `${month}월 ${day}일 신문 전체 보기`}</Link>
       {/* 공유 영역의 카드 종류 버튼('그날 신문 카드')과 같은 이름을 쓴다. */}
       {canShare && <button type="button" className={styles.sceneAction} onClick={onShare}>그날 신문 카드 공유하기</button>}

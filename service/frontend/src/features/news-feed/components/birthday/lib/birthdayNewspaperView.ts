@@ -17,6 +17,8 @@ export interface NewspaperView {
   shown: string;
   list: ListSource;
   articles: BigKindsArticle[];
+  /** 서버가 하루 이상 물러났지만 생일 당일 사진이 있어 그 사진을 보여 주는 중이다(기사 목록은 비어 있다). */
+  ownPhotoDay: boolean;
   /** 생일 당일이 아닌 날을 보여 줄 때 지면 위에 붙이는 안내. */
   substitute: FrontNotice | null;
   /** 사진이나 목록 자리를 대신하는 지면 안 안내. */
@@ -34,25 +36,45 @@ interface Plan {
   articles: BigKindsArticle[];
   /** 생일이 오늘인데 아직 보관본에 없는 경우. */
   today: boolean;
+  /** 서버가 다른 날로 물러났지만 생일 당일 사진이 있어 그 사진을 보여 주는 경우. */
+  ownPhotoDay?: boolean;
   data: FrontPageData | null;
 }
 
-/** 어느 날짜의 사진·목록을 보여 줄지. 사진을 시도하지 않는 상태(찾는 중·오류·안내)는 null. */
-function plan(state: FrontPageState, birthDate: string): Plan | null {
+/**
+ * 서버가 생일을 '신문 없음(no_paper)'이라며 다른 날로 물러났을 때 — 생일 당일 사진이 있는지 먼저 봐야 하는가.
+ * 서버는 빅카인즈 기사가 있는지로 신문 유무를 정하므로, 기사가 빠진 날(토요일에 많다)은 사진이 있어도 물러난다.
+ * 사진이 있다는 것이 그날 신문이 있었다는 가장 확실한 증거다. 일요일 대체·오늘·보관본에 없음은 해당하지 않는다.
+ */
+export function needsOwnPhotoProbe(state: FrontPageState, birthDate: string) {
+  if (state.status !== 'ok') return false;
+  const { data } = state;
+  return data.reason === 'no_paper' && data.kind !== 'none' && data.shown_date !== null && data.shown_date !== birthDate;
+}
+
+/**
+ * 어느 날짜의 사진·목록을 보여 줄지. 사진을 시도하지 않는 상태(찾는 중·오류·안내)는 null.
+ * own은 생일 당일 사진의 상태이고 needsOwnPhotoProbe가 참일 때만 의미가 있다: 불러오는 중이거나 떴으면 그 사진을 보여 주고(기사 목록은 비운다),
+ * 없으면(missing) 지금처럼 서버가 고른 직전 발행일을 보여 준다.
+ */
+function plan(state: FrontPageState, birthDate: string, own: PhotoState | null = null): Plan | null {
   if (state.status === 'image-only') return { shown: birthDate, list: 'none', articles: [], today: false, data: null };
   if (state.status !== 'ok') return null;
   const { data, naver } = state;
   // 오늘 신문은 대신 어제 신문을 보여 주지 않는다. 오늘 사진이 올라와 있으면 사진만 보여 준다.
   if (data.reason === 'not_yet') return { shown: birthDate, list: 'none', articles: [], today: true, data };
   if (data.kind === 'none' || !data.shown_date) return { shown: birthDate, list: 'none', articles: [], today: false, data };
+  if (own !== null && own !== 'missing' && needsOwnPhotoProbe(state, birthDate)) {
+    return { shown: birthDate, list: 'none', articles: [], today: false, ownPhotoDay: true, data };
+  }
   if (naver?.length) return { shown: data.shown_date, list: 'naver', articles: naverArticles(naver), today: false, data };
   if (!data.articles.length) return { shown: data.shown_date, list: 'none', articles: [], today: false, data };
   return { shown: data.shown_date, list: data.kind, articles: data.articles, today: false, data };
 }
 
-/** 사진을 불러올 날짜. null이면 사진 자리를 만들지 않는다. */
-export function newspaperPhotoDate(state: FrontPageState, birthDate: string) {
-  return plan(state, birthDate)?.shown ?? null;
+/** 사진을 불러올 날짜. null이면 사진 자리를 만들지 않는다. own은 생일 당일 사진의 상태(needsOwnPhotoProbe가 참일 때만, 아니면 null). */
+export function newspaperPhotoDate(state: FrontPageState, birthDate: string, own: PhotoState | null = null) {
+  return plan(state, birthDate, own)?.shown ?? null;
 }
 
 // 월·일만 쓰되 해가 다르면(12월 31일 → 1월 1일 등) 연도까지 쓴다. 날짜는 한 줄에 붙여 둔다.
@@ -75,6 +97,8 @@ function substituteNotice(birthDate: string, shown: string, oneFace: boolean): F
 
 const TODAY = { title: '오늘 1면은 아직 올라오지 않았어요', body: '오늘자 서울경제 1면이 올라오면 볼 수 있어요.' };
 const NO_LIST = { title: '이 시기는 1면 기사 목록이 없어요', body: '1면 사진을 크게 보면 기사를 읽을 수 있어요.' };
+// 시기 전체가 아니라 이 날 하루만 목록을 못 찾았을 때(서버가 신문 없음으로 물러났지만 사진은 있는 날).
+const NO_LIST_DAY = { title: '이 날은 기사 목록을 찾지 못했어요', body: '1면 사진을 크게 보면 기사를 읽을 수 있어요.' };
 const NO_PHOTO = { title: '이 날의 1면 사진을 찾지 못했어요', body: '대신 그날 서울경제 기사를 보여 드려요.' };
 
 function emptyNotice(p: Plan, photo: PhotoState, birthDate: string) {
@@ -88,7 +112,8 @@ function emptyNotice(p: Plan, photo: PhotoState, birthDate: string) {
       body: known ? `${nb('1978년 1월 1일')}부터 ${nb('1980년 11월 25일')}까지는 보관된 지면이 없어요.` : '서울경제는 발행됐지만 1면 사진과 기사를 구하지 못했어요.',
     };
   }
-  return photo === 'ok' && p.list === 'none' && !p.today ? NO_LIST : null;
+  if (photo === 'ok' && p.list === 'none' && !p.today) return p.ownPhotoDay ? NO_LIST_DAY : NO_LIST;
+  return null;
 }
 
 const PICTURE = '1면 사진은 서울경제 지면 이미지예요.';
@@ -117,15 +142,17 @@ function sourceNote(p: Plan, photo: PhotoState) {
 /**
  * 신문 장면 상태 → 화면에 그릴 것. 찾는 중·오류·안내(창간 전·발행 중단)처럼 사진을 시도하지 않는 상태는 null(화면이 기존 모양으로 그린다).
  * photo는 plan이 정한 날짜(newspaperPhotoDate)의 사진 상태다. '1면'이라는 말은 사진이 떴거나 1면 목록(네이버·빅카인즈 면 번호 시기)일 때만 쓴다.
+ * own은 newspaperPhotoDate와 같은 값을 넘긴다(생일 당일 사진의 상태, 해당하지 않으면 null).
  */
-export function newspaperView(state: FrontPageState, birthDate: string, photo: PhotoState): NewspaperView | null {
-  const p = plan(state, birthDate);
+export function newspaperView(state: FrontPageState, birthDate: string, photo: PhotoState, own: PhotoState | null = null): NewspaperView | null {
+  const p = plan(state, birthDate, own);
   if (!p) return null;
   const oneFace = photo === 'ok' || p.list === 'naver' || p.list === 'front';
   return {
     shown: p.shown,
     list: p.list,
     articles: p.articles,
+    ownPhotoDay: p.ownPhotoDay === true,
     substitute: p.shown !== birthDate ? substituteNotice(birthDate, p.shown, oneFace) : null,
     empty: emptyNotice(p, photo, birthDate),
     kicker: `${p.shown === birthDate ? '내가 태어난 날' : '내 생일 무렵'} 서울경제${oneFace ? ' 1면' : ''}`,
