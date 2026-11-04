@@ -117,14 +117,14 @@ export function BirthdayFrontPage({ state, birthDate, onRetry, onUseBirthday, on
         : state.data.kind === 'none' ? <div className={styles.paperEmpty}><strong>이 무렵 신문은 보관본에 없어요</strong><p>{`생일과 그 전 ${FRONT_LOOKBACK_DAYS}일 동안의 서울경제가 빅카인즈 보관본에 ${nb('없어요.')}`}</p></div>
         : <Headlines articles={state.data.articles} />}
     </div>
-    {/* 생일 당일 사진만 보여 주는 날은 그날 기사가 없어 '신문 전체 보기'가 빈 페이지로 가므로 보관본에 없는 날처럼 감춘다. */}
+    {/* 생일 당일 사진만 보여 주는 날은 그날 기사가 없어 '그날의 기사 모두 보기'가 빈 페이지로 가므로 보관본에 없는 날처럼 감춘다. */}
     {data && data.kind !== 'none' && !view?.ownPhotoDay && <div className={styles.sceneActions}>
-      <Link className={styles.sceneAction} href={paperHref(shown)} prefetch={false} data-fx="own">{sameDay ? '그날 신문 전체 보기' : `${month}월 ${day}일 신문 전체 보기`}</Link>
+      <Link className={styles.sceneAction} href={paperHref(shown)} prefetch={false} data-fx="own">{sameDay ? '그날의 기사 모두 보기' : `${month}월 ${day}일의 기사 모두 보기`}</Link>
       {/* 공유 영역의 카드 종류 버튼('그날 신문 카드')과 같은 이름을 쓴다. */}
       {canShare && <button type="button" className={styles.sceneAction} onClick={onShare}>그날 신문 카드 공유하기</button>}
     </div>}
     {/* 서로 다른 사실(고른 자료·기준·날짜 전송)을 문장별로 나눈다. 기사를 고른 기준은 frontSourceNote가 정한다.
-        '그날 신문 전체 보기'도 주소에 날짜를 담아 서버에 묻기 때문에 '그날 신문을 찾을 때'로 쓴다. */}
+        '그날의 기사 모두 보기'도 주소에 날짜를 담아 서버에 묻기 때문에 '그날 신문을 찾을 때'로 쓴다. */}
     <p className={styles.source}>{source && `${source} `}날짜는 {nb('그날 신문을')} {nb('찾을 때만')} 서버로 보내요.</p>
   </section>;
 }
