@@ -1,8 +1,13 @@
-// 생일 영수증·그날 신문 카드에 찍는 QR 코드. 스캔하면 결과 페이지(생일 입력)로 가고, 영수증 유입은 utm_source로 따로 집계된다
-// (app/providers.tsx 의 session_source 이벤트). 주소가 하나로 고정이라 무늬를 한 번 만들어 상수로 둔다(새 의존성 없음).
-// 주소를 바꾸면 아래 명령으로 다시 만들어 RECEIPT_QR_ROWS를 바꾼다. birthdayShare.test.ts 가 주소와 무늬 크기를 확인한다.
-//   uv run --no-project --with qrcode==8.2 python -c "import qrcode; q=qrcode.QRCode(error_correction=qrcode.constants.ERROR_CORRECT_M, border=0); q.add_data('<주소>'); q.make(fit=True); print('\n'.join(''.join('1' if c else '0' for c in r) for r in q.get_matrix()))"
-// 오류 복구 M(약 15%), 버전 5(37×37). 주변에 4칸 이상 흰 여백이 있어야 읽힌다.
+// 생일 영수증·그날 신문 카드에 찍는 QR 코드. 두 카드는 서로 다른 곳으로 열리고, 유입은 utm_source로 따로 집계된다(app/providers.tsx 의 session_source 이벤트).
+//  - 영수증: 결과 페이지(생일 입력, 날짜 없음). 주소가 하나로 고정이라 무늬를 한 번 만들어 상수로 둔다.
+//    주소를 바꾸면 아래 명령으로 다시 만들어 RECEIPT_QR_ROWS를 바꾼다. birthdayQr.test.ts 가 주소·무늬 크기와, 같은 주소를 qrRows로 만든 결과가 이 상수와 같은지 확인한다.
+//      uv run --no-project --with qrcode==8.2 python -c "import qrcode; q=qrcode.QRCode(error_correction=qrcode.constants.ERROR_CORRECT_M, border=0); q.add_data('<주소>'); q.make(fit=True); print('\n'.join(''.join('1' if c else '0' for c in r) for r in q.get_matrix()))"
+//  - 그날 신문 카드: 카드에 찍힌 날짜의 도착 페이지(/birthday-market/YYYY-MM-DD). 날짜마다 주소가 달라서 카드를 그릴 때 qrRows로 만든다(qrcode-generator).
+// 오류 복구 M(약 15%). 주소가 84바이트 이하면 버전 5(37×37)다. 주변에 4칸 이상 흰 여백이 있어야 읽힌다.
+import qrcode from 'qrcode-generator';
+import { SITE_URL } from '@/shared/constants/site';
+import { BIRTHDAY_MARKET_PATH } from './birthdayRoutes';
+
 export const RECEIPT_QR_URL = 'https://ailens.sedaily.ai/birthday-market?utm_source=birthday_receipt';
 
 export const RECEIPT_QR_ROWS: readonly string[] = [
@@ -44,3 +49,20 @@ export const RECEIPT_QR_ROWS: readonly string[] = [
   '1000001000100101110111100011010010110',
   '1111111010001010010001101001000101111',
 ];
+
+/** 그날 신문 카드 QR의 유입 이름. 영수증(birthday_receipt)과 따로 집계한다. */
+export const CARD_QR_SOURCE = 'birthday_card';
+
+/** 그날 신문 카드 QR이 여는 주소 — 카드에 찍힌 날짜(YYYY-MM-DD)의 도착 페이지. 생일 날짜는 카드에 이미 찍혀 있는 것만 담는다. */
+export function cardQrUrl(date: string) {
+  return `${SITE_URL}${BIRTHDAY_MARKET_PATH}/${date}?utm_source=${CARD_QR_SOURCE}`;
+}
+
+/** 주소를 QR 무늬 줄로 만든다('1' = 검은 칸). 오류 복구 M, 크기는 주소 길이에 맞춰 정해진다. */
+export function qrRows(url: string): string[] {
+  const code = qrcode(0, 'M');
+  code.addData(url);
+  code.make();
+  const count = code.getModuleCount();
+  return Array.from({ length: count }, (_, row) => Array.from({ length: count }, (_, column) => (code.isDark(row, column) ? '1' : '0')).join(''));
+}

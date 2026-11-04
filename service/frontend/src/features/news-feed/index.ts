@@ -10,3 +10,6 @@ export { LensPreviewSection } from './components/sections/LensPreviewSection';
 
 export { default as BirthdayMarket } from './components/birthday/BirthdayMarket';
 export { BIRTHDAY_MARKET_PATH } from './components/birthday/data/birthdayRoutes';
+// 그날 신문 카드의 QR이 여는 도착 페이지(/birthday-market/날짜). 주소 검증·제목은 서버 라우트도 쓰므로 훅이 없는 파일에서만 내보낸다.
+export { BirthdayArrival } from './components/birthday/BirthdayArrival';
+export { ARRIVAL_DESCRIPTION, arrivalTitle, parseArrivalDate } from './components/birthday/lib/birthdayArrival';

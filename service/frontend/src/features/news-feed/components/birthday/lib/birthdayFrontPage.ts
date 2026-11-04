@@ -95,6 +95,17 @@ export function shareableFront(state: FrontPageState | null): BigKindsArticle[] 
 }
 
 /**
+ * 도착 페이지(QR로 들어온 사람)가 그날 신문 장면을 그대로 보여 줄 상태인가.
+ * 찾는 중·오류·안내(창간 전 등)·1990년 전 사진 시기는 장면이 알아서 그린다. 서버가 답했을 때는 그 날짜의 기사가 있어야 한다 —
+ * 서버가 다른 날을 대신 골랐거나 아무것도 못 찾으면 장면의 안내 문구가 '생일'을 말하므로 쓰지 않고 도착 페이지의 안내를 보여 준다.
+ */
+export function arrivalShowsPaper(state: FrontPageState | null) {
+  if (!state) return false;
+  if (state.status !== 'ok') return true;
+  return shareableFront(state).length > 0;
+}
+
+/**
  * 기사 제목에 걸 링크 — 서울경제 원문이 살아 있으면 원문, 옛 sednews.com 주소면 빅카인즈 상세.
  * features/timeline/lib/articleLinks.ts 와 같은 규칙이며, 기능 간 import 금지(FSD) 때문에 이 기능 안에 둔다.
  */
