@@ -2,7 +2,7 @@ import { expect, test } from 'vitest';
 import type { FrontPageData } from '@/shared/lib/api/timelineApi';
 import { frontSourceNote, type FrontPageState } from './birthdayFrontPage';
 import type { NaverRow } from './birthdayNewspaper';
-import { needsOwnPhotoProbe, newspaperPhotoDate, newspaperView, type PhotoState } from './birthdayNewspaperView';
+import { frontLayout, needsOwnPhotoProbe, newspaperPhotoDate, newspaperView, type PhotoState } from './birthdayNewspaperView';
 
 // 문구 정본: timemachine-data/261103_타임머신_신문장면_표시규칙.md 4절. nb()가 붙인 줄바꿈 없는 공백은 보통 공백으로 바꿔 비교한다.
 const plain = (text: string) => text.replaceAll('\u00a0', ' ');
@@ -273,4 +273,43 @@ test('해당하지 않는 날은 own을 주어도 규칙이 바뀌지 않는다'
   // 일요일 대체도 그대로다.
   const sunday = ok({ date: '2004-02-08', shown_date: '2004-02-09', date_kind: 'day', kind: 'day', reason: 'sunday' });
   expect(newspaperPhotoDate(sunday, '2004-02-08', 'ok')).toBe('2004-02-09');
+});
+
+// ── 지면 안의 배치(frontLayout) ────────────────────────────────────────────────────────────────────────────────────
+// 목록이 있으면 제목 → 작은 사진 → 버튼, 목록이 없으면 지금처럼 큰 사진 → 안내.
+test('배치: 사진과 기사 목록이 모두 있으면 제목이 먼저, 사진은 작게', () => {
+  const v = view(ok({ date: '2015-01-02', shown_date: '2015-01-02' }, naver), '2015-01-02', 'ok');
+  expect(frontLayout(v)).toEqual({ photoSize: 'compact', noticeFirst: false });
+});
+
+test('배치: 사진을 기다리는 동안에도 목록이 있으면 같은 자리를 잡는다(뜨고 나서 순서가 바뀌지 않는다)', () => {
+  const v = view(ok({ date: '2015-01-02', shown_date: '2015-01-02' }, naver), '2015-01-02', 'loading');
+  expect(frontLayout(v)).toEqual({ photoSize: 'compact', noticeFirst: false });
+});
+
+test('배치: 사진을 못 찾아 목록으로 대신하면 안내를 목록보다 먼저 보여 준다', () => {
+  const v = view(ok({ date: '2015-01-02', shown_date: '2015-01-02' }, naver), '2015-01-02', 'missing');
+  expect(v.empty).not.toBeNull();
+  expect(frontLayout(v)).toEqual({ photoSize: 'compact', noticeFirst: true });
+});
+
+test('배치: 목록이 없는 날은 사진을 크게 먼저 두고 안내는 사진 뒤에 둔다', () => {
+  // 1989-07-07처럼 1990년 이전은 사진만 있다.
+  const v = newspaperView({ status: 'image-only', date: '1989-07-07' }, '1989-07-07', 'ok');
+  if (!v) throw new Error('view is null');
+  expect(v.articles).toHaveLength(0);
+  expect(v.empty).not.toBeNull();
+  expect(frontLayout(v)).toEqual({ photoSize: 'full', noticeFirst: false });
+});
+
+test('배치: 서버가 물러났지만 생일 당일 사진이 있는 날(목록 없음)도 사진을 크게 먼저 둔다', () => {
+  const v = viewOwn(stepped(), '2009-07-04', 'ok', 'ok');
+  expect(v.ownPhotoDay).toBe(true);
+  expect(frontLayout(v)).toEqual({ photoSize: 'full', noticeFirst: false });
+});
+
+test('배치: 일요일을 월요일로 대체해도 목록이 있으면 같은 규칙을 따른다', () => {
+  const v = view(ok({ date: '2004-02-08', shown_date: '2004-02-09', reason: 'sunday' }), '2004-02-08', 'ok');
+  expect(v.substitute).not.toBeNull();
+  expect(frontLayout(v)).toEqual({ photoSize: 'compact', noticeFirst: false });
 });
