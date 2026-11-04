@@ -2,7 +2,7 @@ import { expect, test } from 'vitest';
 import type { FrontPageData } from '@/shared/lib/api/timelineApi';
 import { frontSourceNote, type FrontPageState } from './birthdayFrontPage';
 import type { NaverRow } from './birthdayNewspaper';
-import { newspaperPhotoDate, newspaperView, type PhotoState } from './birthdayNewspaperView';
+import { needsOwnPhotoProbe, newspaperPhotoDate, newspaperView, type PhotoState } from './birthdayNewspaperView';
 
 // 문구 정본: timemachine-data/261103_타임머신_신문장면_표시규칙.md 4절. nb()가 붙인 줄바꿈 없는 공백은 보통 공백으로 바꿔 비교한다.
 const plain = (text: string) => text.replaceAll('\u00a0', ' ');
@@ -187,4 +187,90 @@ test("'1면'은 사진·네이버 목록·면 번호 시기 목록이 없으면 
     expect(v.source).not.toContain('1면 기사');
     expect(v.source).not.toContain('1면 사진');
   }
+});
+
+// ── 서버가 신문 없음(no_paper)으로 물러났지만 생일 당일 사진이 있는 날 ──────────────────────────────────────────────
+// 서버는 빅카인즈 기사 유무로 신문이 있는지 정한다. 기사가 빠진 날(토요일)은 사진이 있어도 하루 전으로 물러난다.
+// 2009-07-04(토): 서버는 2009-07-03(금)을 보여 주려 했지만 그날 사진이 있다.
+const stepped = () => ok({ date: '2009-07-04', shown_date: '2009-07-03', date_kind: 'day', kind: 'day', reason: 'no_paper', basis: 'no_ranking', articles: [article(), article()] });
+const viewOwn = (state: FrontPageState, birthDate: string, photo: PhotoState, own: PhotoState | null) => {
+  const result = newspaperView(state, birthDate, photo, own);
+  if (!result) throw new Error('view is null');
+  return result;
+};
+
+test('생일 사진을 먼저 확인해야 하는 경우: 서버가 no_paper로 다른 날로 물러났을 때만', () => {
+  expect(needsOwnPhotoProbe(stepped(), '2009-07-04')).toBe(true);
+  // 서버가 생일 그대로 답했다.
+  expect(needsOwnPhotoProbe(ok({ date: '2009-07-04', shown_date: '2009-07-04', date_kind: 'day', kind: 'day' }), '2009-07-04')).toBe(false);
+  // 일요일 대체는 화면이 reason을 sunday로 맞춘다 — 월요일 요청이라 해당하지 않는다.
+  expect(needsOwnPhotoProbe(ok({ date: '2009-07-05', shown_date: '2009-07-04', date_kind: 'day', kind: 'day', reason: 'sunday' }), '2009-07-05')).toBe(false);
+  // 오늘 신문은 어제 신문을 대신 보여 주지 않는다(별도 규칙).
+  expect(needsOwnPhotoProbe(ok({ date: '2026-11-04', shown_date: '2026-11-03', reason: 'not_yet' }), '2026-11-04')).toBe(false);
+  // 서버가 보관본에 없다고 한 날은 화면이 이미 생일 사진을 보여 준다.
+  expect(needsOwnPhotoProbe(ok({ date: '1998-07-15', kind: 'none', shown_date: null, reason: 'archive_missing', articles: [] }), '1998-07-15')).toBe(false);
+  // 찾는 중·오류·안내·1990년 이전(사진만)은 해당하지 않는다.
+  expect(needsOwnPhotoProbe({ status: 'loading', date: '2009-07-04' }, '2009-07-04')).toBe(false);
+  expect(needsOwnPhotoProbe({ status: 'error', date: '2009-07-04' }, '2009-07-04')).toBe(false);
+  expect(needsOwnPhotoProbe({ status: 'image-only', date: '1985-03-02' }, '1985-03-02')).toBe(false);
+});
+
+test('생일 사진을 확인하는 중이거나 떴으면 생일 날짜의 사진을 보여 준다', () => {
+  for (const own of ['loading', 'ok'] as const) {
+    expect(newspaperPhotoDate(stepped(), '2009-07-04', own)).toBe('2009-07-04');
+  }
+  // 없으면 지금처럼 서버가 고른 직전 발행일.
+  expect(newspaperPhotoDate(stepped(), '2009-07-04', 'missing')).toBe('2009-07-03');
+  // own을 주지 않으면(해당하지 않는 날) 규칙은 그대로다.
+  expect(newspaperPhotoDate(stepped(), '2009-07-04')).toBe('2009-07-03');
+});
+
+test('생일 사진이 떴으면 생일 날짜로 보여 주고 기사 목록은 비우며 새 안내를 쓴다', () => {
+  const v = viewOwn(stepped(), '2009-07-04', 'ok', 'ok');
+  expect(v.shown).toBe('2009-07-04');
+  expect(v.ownPhotoDay).toBe(true);
+  expect(v.list).toBe('none');
+  expect(v.articles).toEqual([]);
+  expect(v.substitute).toBeNull();
+  expect(v.empty).toEqual({ title: '이 날은 기사 목록을 찾지 못했어요', body: '1면 사진을 크게 보면 기사를 읽을 수 있어요.' });
+  expect(v.kicker).toBe('내가 태어난 날 서울경제 1면');
+  expect(v.heading).toBe('그날의 서울경제 1면');
+  expect(plain(v.source)).toBe('1면 사진은 서울경제 지면 이미지예요.');
+});
+
+test('생일 사진을 확인하는 동안에는 하루 전 신문의 안내·기사를 보여 주지 않는다', () => {
+  const v = viewOwn(stepped(), '2009-07-04', 'loading', 'loading');
+  expect(v.shown).toBe('2009-07-04');
+  expect(v.substitute).toBeNull();
+  expect(v.articles).toEqual([]);
+  expect(v.empty).toBeNull();
+  expect(v.kicker).toBe('내가 태어난 날 서울경제');
+});
+
+test('생일 사진이 없으면 지금처럼 직전 발행일 신문과 안내를 보여 준다', () => {
+  const v = viewOwn(stepped(), '2009-07-04', 'ok', 'missing');
+  expect(v.shown).toBe('2009-07-03');
+  expect(v.ownPhotoDay).toBe(false);
+  expect(v.articles).toHaveLength(2);
+  expect(v.substitute?.title).toBe('그날 1면을 찾지 못했어요');
+  expect(v.substitute?.lines.map(plain)).toEqual(['명절 등으로 쉬었거나 보관본에서 빠진 날이에요.', '대신 가장 가까운 지난 신문인 7월 3일 금요일자 서울경제 1면을 보여 줘요.']);
+});
+
+test('생일 사진이 떠도 서버가 고른 날의 네이버 목록은 붙이지 않는다', () => {
+  const state = ok({ date: '2014-07-05', shown_date: '2014-07-04', date_kind: 'day', kind: 'day', reason: 'no_paper', basis: 'no_ranking' }, naver);
+  const v = viewOwn(state, '2014-07-05', 'ok', 'ok');
+  expect(v.list).toBe('none');
+  expect(v.articles).toEqual([]);
+  expect(v.ownPhotoDay).toBe(true);
+});
+
+test('해당하지 않는 날은 own을 주어도 규칙이 바뀌지 않는다', () => {
+  // 서버가 생일 그대로 답한 날: own이 ok여도 서버의 답을 그대로 쓴다.
+  const same = ok({ date: '2015-01-02', shown_date: '2015-01-02' }, naver);
+  const v = viewOwn(same, '2015-01-02', 'ok', 'ok');
+  expect(v.list).toBe('naver');
+  expect(v.ownPhotoDay).toBe(false);
+  // 일요일 대체도 그대로다.
+  const sunday = ok({ date: '2004-02-08', shown_date: '2004-02-09', date_kind: 'day', kind: 'day', reason: 'sunday' });
+  expect(newspaperPhotoDate(sunday, '2004-02-08', 'ok')).toBe('2004-02-09');
 });
