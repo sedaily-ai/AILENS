@@ -9,10 +9,10 @@ RULE_NAME="sedaily-mbti-lambda-warming"
 SCHEDULE="rate(5 minutes)"
 
 # Lambda functions to keep warm (most critical for user experience)
+# 2026-11-04: post-dev 삭제, article-dev 차단(삭제 예정)으로 목록에서 뺐다 — 실제 규칙 대상과 같다.
+# 경위: infrastructure/decommission-2026-11-04/README.md
 LAMBDA_FUNCTIONS=(
   "sedaily-mbti-search-dev"
-  "sedaily-mbti-article-dev"
-  "sedaily-mbti-post-dev"
   "sedaily-mbti-time-machine-dev"
 )
 

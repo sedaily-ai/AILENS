@@ -1,0 +1,51 @@
+{
+  "Configuration": {
+    "FunctionName": "sedaily-mbti-voice-stt-url-dev",
+    "FunctionArn": "arn:aws:lambda:us-east-1:887078546492:function:sedaily-mbti-voice-stt-url-dev",
+    "Runtime": "python3.11",
+    "Role": "arn:aws:iam::887078546492:role/sedaily-mbti-lambda-execution-dev",
+    "Handler": "handlers.voice.stt_url.lambda_handler",
+    "CodeSize": 23213541,
+    "Description": "",
+    "Timeout": 10,
+    "MemorySize": 256,
+    "LastModified": "2026-08-24T07:48:57.994+0000",
+    "CodeSha256": "941/PZtpjSsRPOIkTktymFQiiN/2nvvM1xgkFMffCIM=",
+    "Version": "$LATEST",
+    "TracingConfig": {
+      "Mode": "PassThrough"
+    },
+    "RevisionId": "35a4509e-1278-4e22-9234-c700d10d5d75",
+    "State": "Active",
+    "LastUpdateStatus": "Successful",
+    "PackageType": "Zip",
+    "Architectures": [
+      "x86_64"
+    ],
+    "EphemeralStorage": {
+      "Size": 512
+    },
+    "SnapStart": {
+      "ApplyOn": "None",
+      "OptimizationStatus": "Off"
+    },
+    "RuntimeVersionConfig": {
+      "RuntimeVersionArn": "arn:aws:lambda:us-east-1::runtime:e49ac50086e0d865c78bd2e7c92cf0e492f61f39031b3572eb0d429affd59f50"
+    },
+    "LoggingConfig": {
+      "LogFormat": "Text",
+      "LogGroup": "/aws/lambda/sedaily-mbti-voice-stt-url-dev"
+    }
+  },
+  "Code": {
+    "RepositoryType": "S3",
+    "Location": "<<presigned URL 제거>>"
+  },
+  "Tags": {
+    "Project": "Sedaily-LENS",
+    "CostCenter": "sedaily-ai",
+    "Environment": "dev",
+    "Service": "atlas4",
+    "Workload": "chatbot"
+  }
+}

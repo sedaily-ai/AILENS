@@ -1,0 +1,20 @@
+{
+  "Version": "2012-10-17",
+  "Id": "default",
+  "Statement": [
+    {
+      "Sid": "apigateway-invoke-chatbot",
+      "Effect": "Allow",
+      "Principal": {
+        "Service": "apigateway.amazonaws.com"
+      },
+      "Action": "lambda:InvokeFunction",
+      "Resource": "arn:aws:lambda:us-east-1:887078546492:function:sedaily-mbti-chatbot-dev",
+      "Condition": {
+        "ArnLike": {
+          "AWS:SourceArn": "arn:aws:execute-api:us-east-1:887078546492:chzwwtjtgk/*/*/api/chat"
+        }
+      }
+    }
+  ]
+}

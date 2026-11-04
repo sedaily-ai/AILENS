@@ -1,0 +1,60 @@
+{
+  "Configuration": {
+    "FunctionName": "sedaily-mbti-question-dev",
+    "FunctionArn": "arn:aws:lambda:us-east-1:887078546492:function:sedaily-mbti-question-dev",
+    "Runtime": "python3.11",
+    "Role": "arn:aws:iam::887078546492:role/sedaily-mbti-lambda-execution-dev",
+    "Handler": "handlers.user.question.lambda_handler",
+    "CodeSize": 23599328,
+    "Description": "",
+    "Timeout": 60,
+    "MemorySize": 256,
+    "LastModified": "2026-10-19T10:26:25.000+0000",
+    "CodeSha256": "cyMk43eiGcY+1csBkjbDSodXklCB0YyvxeDh9SqxA68=",
+    "Version": "$LATEST",
+    "Environment": {
+      "Variables": {
+        "ROTATION_AT": "1778032841",
+        "LENS_CMS_API_TOKEN": "<<REDACTED>>"
+      }
+    },
+    "TracingConfig": {
+      "Mode": "PassThrough"
+    },
+    "RevisionId": "55b5b23d-3bfa-45f0-ad00-06d6a9927a72",
+    "State": "Active",
+    "LastUpdateStatus": "Successful",
+    "PackageType": "Zip",
+    "Architectures": [
+      "x86_64"
+    ],
+    "EphemeralStorage": {
+      "Size": 512
+    },
+    "SnapStart": {
+      "ApplyOn": "None",
+      "OptimizationStatus": "Off"
+    },
+    "RuntimeVersionConfig": {
+      "RuntimeVersionArn": "arn:aws:lambda:us-east-1::runtime:e49ac50086e0d865c78bd2e7c92cf0e492f61f39031b3572eb0d429affd59f50"
+    },
+    "LoggingConfig": {
+      "LogFormat": "Text",
+      "LogGroup": "/aws/lambda/sedaily-mbti-question-dev"
+    }
+  },
+  "Code": {
+    "RepositoryType": "S3",
+    "Location": "<<presigned URL 제거>>"
+  },
+  "Tags": {
+    "Project": "Sedaily-LENS",
+    "Owner": "one",
+    "ManagedBy": "claude-code",
+    "Phase": "phase-1",
+    "Subsystem": "question",
+    "Environment": "dev",
+    "Service": "atlas4",
+    "Component": "backend-v1"
+  }
+}

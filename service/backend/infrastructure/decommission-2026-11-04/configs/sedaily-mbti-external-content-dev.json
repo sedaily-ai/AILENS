@@ -1,0 +1,48 @@
+{
+  "Configuration": {
+    "FunctionName": "sedaily-mbti-external-content-dev",
+    "FunctionArn": "arn:aws:lambda:us-east-1:887078546492:function:sedaily-mbti-external-content-dev",
+    "Runtime": "python3.11",
+    "Role": "arn:aws:iam::887078546492:role/sedaily-mbti-lambda-execution-dev",
+    "Handler": "handlers.external_content.lambda_handler",
+    "CodeSize": 23812373,
+    "Description": "외부 콘텐츠(edragon 경제용어/이슈) 공개 조회 — 2026-08-06 신설",
+    "Timeout": 15,
+    "MemorySize": 256,
+    "LastModified": "2026-10-28T11:26:04.888+0000",
+    "CodeSha256": "VliIDhvgAonmUh5jaJlMXtvYru2/RU0OrYwdtk98hUY=",
+    "Version": "$LATEST",
+    "TracingConfig": {
+      "Mode": "PassThrough"
+    },
+    "RevisionId": "65e96fc5-3bde-4d16-8471-e41156fa39e5",
+    "State": "Active",
+    "LastUpdateStatus": "Successful",
+    "PackageType": "Zip",
+    "Architectures": [
+      "x86_64"
+    ],
+    "EphemeralStorage": {
+      "Size": 512
+    },
+    "SnapStart": {
+      "ApplyOn": "None",
+      "OptimizationStatus": "Off"
+    },
+    "RuntimeVersionConfig": {
+      "RuntimeVersionArn": "arn:aws:lambda:us-east-1::runtime:e49ac50086e0d865c78bd2e7c92cf0e492f61f39031b3572eb0d429affd59f50"
+    },
+    "LoggingConfig": {
+      "LogFormat": "Text",
+      "LogGroup": "/aws/lambda/sedaily-mbti-external-content-dev"
+    }
+  },
+  "Code": {
+    "RepositoryType": "S3",
+    "Location": "<<presigned URL 제거>>"
+  },
+  "Tags": {
+    "Service": "atlas4",
+    "CostTagSweep": "2026-10-28"
+  }
+}
