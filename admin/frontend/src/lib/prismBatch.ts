@@ -117,6 +117,16 @@ export interface PrismBatchItem {
   /** 채널 연결(시크릿)이 있을 때만 — pipelines/video/youtube_upload.py */
   youtube_url?: string | null;
   youtube_error?: string | null;
+  /** 2026-11-05 — pipelines/video/dailymotion_upload.py */
+  dailymotion_url?: string | null;
+  dailymotion_error?: string | null;
+}
+
+/** 내려받을 영상 파일 이름 — 마케팅팀 기사 파일과 같은 `MMDD_항목명.mp4`(예: 1106_부동산.mp4). */
+export function videoFileName(item: Pick<PrismBatchItem, "type" | "recording_date" | "group">): string {
+  const keyword = PRISM_GROUPS.find((g) => g.code === item.type)?.keyword ?? (item.group || item.type);
+  const mmdd = item.recording_date.slice(5, 7) + item.recording_date.slice(8, 10);
+  return `${mmdd}_${keyword}.mp4`;
 }
 
 export interface PrismBatchDetail {

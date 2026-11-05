@@ -34,6 +34,7 @@ import json
 import logging
 import re
 import urllib.error
+import urllib.parse
 import urllib.request
 
 from shared import response
@@ -43,14 +44,24 @@ logger = logging.getLogger(__name__)
 
 _TIMEOUT_SECONDS = 5
 _DOWNLOAD_URL_TTL_SECONDS = 600
-_SAFE_FILENAME = re.compile(r"[^A-Za-z0-9._-]+")
+# 2026-11-05 — 한글 파일명 허용(PRISM 전체 내려받기 "1106_부동산.mp4"). \w는 한글을 포함한다.
+_SAFE_FILENAME = re.compile(r"[^\w.-]+")
+_ASCII_FILENAME = re.compile(r"[^A-Za-z0-9._-]+")
 
 
 def _download_filename(query_params: dict, job_id: str) -> str:
-    """?filename= 값을 헤더에 안전한 ASCII 파일명으로 줄인다(없으면 job_id.mp4)."""
+    """?filename= 값을 헤더에 안전한 파일명으로 줄인다(없으면 job_id.mp4). 한글은 남긴다."""
     raw = (query_params or {}).get("filename") or job_id
     name = _SAFE_FILENAME.sub("_", raw).strip("._")[:100] or "video"
     return name if name.lower().endswith(".mp4") else f"{name}.mp4"
+
+
+def _content_disposition(filename: str) -> str:
+    """HTTP 헤더는 ASCII만 되므로 한글 이름은 RFC 6266/5987 filename*로 싣고, 옛 브라우저용 ASCII 이름을 같이 둔다."""
+    fallback = _ASCII_FILENAME.sub("_", filename).strip("._") or "video.mp4"
+    if fallback == filename:
+        return f'attachment; filename="{filename}"'
+    return f"attachment; filename=\"{fallback}\"; filename*=UTF-8''{urllib.parse.quote(filename)}"
 
 
 def _download_url(bucket: str, job_id: str, filename: str) -> str | None:
@@ -60,7 +71,7 @@ def _download_url(bucket: str, job_id: str, filename: str) -> str | None:
             Params={
                 "Bucket": bucket,
                 "Key": f"media/video-lab/{job_id}.mp4",
-                "ResponseContentDisposition": f'attachment; filename="{filename}"',
+                "ResponseContentDisposition": _content_disposition(filename),
             },
             ExpiresIn=_DOWNLOAD_URL_TTL_SECONDS,
         )
