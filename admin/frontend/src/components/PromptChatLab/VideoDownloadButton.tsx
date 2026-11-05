@@ -15,7 +15,8 @@ function stamp(): string {
   return `${d.getFullYear()}${p(d.getMonth() + 1)}${p(d.getDate())}-${p(d.getHours())}${p(d.getMinutes())}`;
 }
 
-export function VideoDownloadButton({ jobId, filePrefix }: { jobId: string; filePrefix: string }) {
+/** fileName을 주면 그 이름 그대로(PRISM 제작 — "1106_부동산.mp4", 2026-11-05), 없으면 filePrefix_시각.mp4. */
+export function VideoDownloadButton({ jobId, filePrefix, fileName }: { jobId: string; filePrefix: string; fileName?: string }) {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -23,7 +24,7 @@ export function VideoDownloadButton({ jobId, filePrefix }: { jobId: string; file
     setBusy(true);
     setError(null);
     try {
-      const r = await adminApi.pollVideoLab(jobId, `${filePrefix}_${stamp()}.mp4`);
+      const r = await adminApi.pollVideoLab(jobId, fileName ?? `${filePrefix}_${stamp()}.mp4`);
       if (r.status !== "done" || !r.download_url) throw new Error("내려받기 주소를 받지 못했습니다");
       window.location.href = r.download_url;
     } catch (err) {
