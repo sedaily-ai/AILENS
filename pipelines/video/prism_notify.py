@@ -57,11 +57,20 @@ def build_message(batch_id: str, rows: list[tuple[dict, dict]]) -> dict:
     lines = []
     for item, s in rows:
         group = item.get("group") or item.get("type")
-        if s.get("stage") == "done" and s.get("youtube_url"):
-            lines.append(f"✅ {group} — <{s['youtube_url']}|유튜브>")
-        elif s.get("stage") == "done":
-            reason = f" ({_one_line(s['youtube_error'], 80)})" if s.get("youtube_error") else ""
-            lines.append(f"⚠️ {group} — 영상 완료, 유튜브 미업로드{reason}")
+        if s.get("stage") == "done":
+            # 2026-11-05 데일리모션 추가 — 올라간 곳은 링크, 못 올린 곳은 이유. 둘 다 올라가면 ✅.
+            links, problems = [], []
+            for key, name in (("youtube", "유튜브"), ("dailymotion", "데일리모션")):
+                if s.get(f"{key}_url"):
+                    links.append(f"<{s[f'{key}_url']}|{name}>")
+                elif s.get(f"{key}_error"):
+                    problems.append(f"{name} 미업로드({_one_line(s[f'{key}_error'], 60)})")
+            if not s.get("youtube_url") and not problems:
+                problems = ["유튜브 미업로드"]  # 시크릿이 없어 시도조차 안 한 경우
+            if problems:
+                lines.append(f"⚠️ {group} — 영상 완료, {' · '.join(links + problems)}")
+            else:
+                lines.append(f"✅ {group} — {' · '.join(links)}")
         else:
             lines.append(f"❌ {group} — {_one_line(s.get('message') or '실패', 100)}")
     lines.append(f"<{CMS_URL}/prism-batch?batch={batch_id}|CMS에서 보기>")
