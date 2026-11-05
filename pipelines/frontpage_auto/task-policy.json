@@ -44,7 +44,8 @@
         "arn:aws:secretsmanager:us-east-1:887078546492:secret:sedaily-mbti/openai-api-key-*",
         "arn:aws:secretsmanager:us-east-1:887078546492:secret:ai-labs/elevenlabs-MjRuuL",
         "arn:aws:secretsmanager:us-east-1:887078546492:secret:ai-labs/google-tts-2V0vyG",
-        "arn:aws:secretsmanager:us-east-1:887078546492:secret:ai-labs/prism-youtube-rtTf27"
+        "arn:aws:secretsmanager:us-east-1:887078546492:secret:ai-labs/prism-youtube-rtTf27",
+        "arn:aws:secretsmanager:us-east-1:887078546492:secret:ai-labs/prism-dailymotion-S6EDrr"
       ]
     },
     {

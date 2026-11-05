@@ -8,7 +8,7 @@ render_from_script.py가 --prism-article-s3-key를 받으면 이 모듈의 run()
 - 지침은 [TYPE]·[RECORDING DATE]·[WEEKDAY]가 없으면 생성 대신 되묻는다(지침 "TYPE 미지정 → 상위 3개 유형 제시",
   "누락 시 한 줄만 질문"). 사람이 없는 일괄 제작이라 코드가 파일 이름에서 정한 값으로 이 머리줄을 붙인다.
   요일도 AI가 아니라 여기서 계산한다(지침 "Claude 임의 계산 금지").
-- 렌더 뒤 채널 연결 정보가 있으면 유튜브에 올린다(youtube_upload.py). 없으면 영상까지만 만든다.
+- 렌더 뒤 채널 연결 정보가 있으면 유튜브(youtube_upload.py)·데일리모션(dailymotion_upload.py)에 올린다. 없으면 영상까지만 만든다.
 - 묶음의 마지막 편이 끝나면 슬랙에 요약을 한 번 보낸다(prism_notify.py, Amazon Q Developer 경유).
 - 진행 상황은 media/prism-batch/{batch_id}/{item_id}.status.json에 덮어쓴다. 렌더 단계 진행률·mp4·실패는
   CMS 영상 랩과 같은 media/video-lab/{job_id}.* 를 쓴다(render_from_script.render_and_upload) — 화면은 기존
@@ -34,6 +34,7 @@ from render_from_script import _extract_render_script, _fill_missing_top_level, 
 import video_settings  # noqa: E402
 import prism_notify  # noqa: E402
 import youtube_upload  # noqa: E402
+import dailymotion_upload  # noqa: E402
 
 # 지침(대본 작성 프롬프트)의 "12개 카테고리 개요" 표와 같은 코드·이름. 화면(PrismBatchPage)과 서버 라우트도 같은 표를 쓴다.
 GROUPS = {
@@ -197,17 +198,29 @@ def _run(s3, work_dir: Path, *, batch_id: str, item_id: str, job_id: str, articl
 
     # 유튜브 자동 공개 — 채널 연결 정보(시크릿)가 있을 때만. 업로드가 실패해도 영상은 이미 만들어졌으므로
     # 편 자체는 완료로 두고 화면에 실패 이유를 보여준다(내려받아 직접 올리면 된다). 다시 시도하면 중복 업로드가 된다.
+    meta = youtube_upload.metadata_from_script(script_text, title or script.get("title") or display_name)
     creds = youtube_upload.load_credentials()
     if creds:
         report("upload")
         try:
-            meta = youtube_upload.metadata_from_script(script_text, title or script.get("title") or display_name)
             video_id = youtube_upload.upload(work_dir / "video.mp4", meta, creds)
             status["youtube_url"] = f"https://www.youtube.com/watch?v={video_id}"
             print(f"[prism-batch] {item_id} — 유튜브 업로드 {status['youtube_url']}")
         except Exception as e:  # noqa: BLE001
             print(f"[prism-batch] 유튜브 업로드 실패: {e}")
             status["youtube_error"] = str(e)[:500]
+
+    # 데일리모션 자동 공개(2026-11-05) — 유튜브와 같은 제목·설명·태그. 유튜브와 같이 실패해도 편은 완료로 둔다.
+    dm_creds = dailymotion_upload.load_credentials()
+    if dm_creds:
+        report("upload")
+        try:
+            dm = dailymotion_upload.upload(work_dir / "video.mp4", meta, dm_creds)
+            status["dailymotion_url"] = dm["url"]
+            print(f"[prism-batch] {item_id} — 데일리모션 업로드 {dm['url']}")
+        except Exception as e:  # noqa: BLE001
+            print(f"[prism-batch] 데일리모션 업로드 실패: {e}")
+            status["dailymotion_error"] = str(e)[:500]
 
     report("done")
     print(f"[prism-batch] {item_id} — 완료")
