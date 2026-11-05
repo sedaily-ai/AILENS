@@ -203,6 +203,32 @@ def fix_script(
     return script, applied
 
 
+def _stat_incomplete(data) -> bool:
+    """validate_script()의 stat 검사와 같은 기준 — 값·단위·설명이 빠졌거나 값이 범위/비수치 문자열이면 True."""
+    if not data or data.get("value") is None or not data.get("unit") or not data.get("label"):
+        return True
+    if isinstance(data.get("value"), str):
+        cleaned = re.sub(r"[,\s]", "", data["value"])
+        m = re.match(r"^-?\d+(?:\.\d+)?", cleaned)
+        return not (m and not re.search(r"\d", cleaned[m.end():]))
+    return False
+
+
+def demote_incomplete_stats(script: dict) -> list[str]:
+    """수치가 빈 stat 컷을 highlight(글자 컷)로 바꾼다 → 적용 로그. narration·caption은 그대로, 수치는 채우지 않는다.
+
+    PRISM 일괄 제작(prism_batch.py)이 장면 변환 재요청까지 실패했고 남은 문제가 이것뿐일 때만 쓰는 마지막 단계다
+    (2026-11-05 — 기사 1건만 다룬 대본에서 모델이 수치 없는 stat 컷을 두 번 연속 만들어 편 전체가 실패했다).
+    LENS 자동 발행은 쓰지 않는다 — 거기는 실패하면 영상만 빼고 needs_video로 사후 보충하는 흐름이다."""
+    applied = []
+    for i, cut in enumerate(script.get("cuts", [])):
+        if cut.get("type") == "stat" and _stat_incomplete(cut.get("data")):
+            cut["type"] = "highlight"
+            cut["data"] = {}
+            applied.append(f"cut[{i}](stat): 수치 없음 → highlight로 바꿈(수치를 지어내지 않음)")
+    return applied
+
+
 def validate_script(script: dict) -> list[str]:
     """자동으로 못 고치는(=사실 정보가 빠진) 문제만 에러로 남긴다.
 

@@ -15,6 +15,7 @@ import {
   groupName,
   parseFileName,
   sha256,
+  videoFileName,
   type PrismBatchDetail,
   type PrismBatchItem,
   type PrismBatchSummary,
@@ -49,7 +50,7 @@ const STAGE_LABEL: Record<string, string> = {
   script: "대본 작성 중",
   scene: "장면 나누는 중",
   render: "렌더링",
-  upload: "유튜브 올리는 중",
+  upload: "유튜브·데일리모션 올리는 중",
   done: "완료",
   error: "실패",
 };
@@ -288,7 +289,60 @@ function ItemStatus({ item }: { item: PrismBatchItem }) {
       {stage === "done" && item.youtube_error && (
         <p className="mt-0.5 max-w-[360px] text-[11.5px] text-[var(--danger)]">유튜브 업로드 실패 — 내려받아 직접 올려 주세요 ({item.youtube_error})</p>
       )}
+      {stage === "done" && item.dailymotion_error && (
+        <p className="mt-0.5 max-w-[360px] text-[11.5px] text-[var(--danger)]">데일리모션 업로드 실패 — 내려받아 직접 올려 주세요 ({item.dailymotion_error})</p>
+      )}
     </div>
+  );
+}
+
+const DOWNLOAD_GAP_MS = 1500;
+
+/* 전체 내려받기(2026-11-05) — 사용자 요청: "영상 한꺼번에 다운받는 버튼". 마케팅팀은 이 영상을 받아 스포티파이에만
+   직접 올린다(유튜브·데일리모션은 자동). 편마다 VideoDownloadButton과 같은 서명 URL(Content-Disposition: attachment,
+   이름 "1106_부동산.mp4")을 받아 숨은 링크로 차례로 연다 — 출처가 달라도 첨부 응답이라 페이지 이동 없이 저장된다.
+   브라우저가 처음 한 번 "여러 파일 다운로드 허용"을 물을 수 있다. 서명 URL을 못 받은 편은 새 탭으로 연다. */
+function DownloadAllButton({ items }: { items: PrismBatchItem[] }) {
+  const toast = useToast();
+  const [progress, setProgress] = useState<string | null>(null);
+  const ready = items.filter((it) => it.stage === "done" && it.video_url);
+  if (ready.length === 0) return null;
+
+  const run = async () => {
+    const failed: string[] = [];
+    for (const [n, it] of ready.entries()) {
+      const name = videoFileName(it);
+      setProgress(`${n + 1}/${ready.length}`);
+      try {
+        const r = await adminApi.pollVideoLab(it.job_id, name);
+        if (r.status !== "done" || !r.download_url) throw new Error("내려받기 주소 없음");
+        const a = document.createElement("a");
+        a.href = r.download_url;
+        a.download = name;
+        document.body.appendChild(a);
+        a.click();
+        a.remove();
+      } catch (err) {
+        console.error(`전체 내려받기 실패(${name})`, err);
+        failed.push(name);
+        if (it.video_url) window.open(it.video_url, "_blank", "noreferrer");
+      }
+      if (n < ready.length - 1) await new Promise((resolve) => setTimeout(resolve, DOWNLOAD_GAP_MS));
+    }
+    setProgress(null);
+    if (failed.length) toast.show(`${failed.length}편은 새 탭으로 열었습니다: ${failed.join(", ")}`, "error");
+    else toast.show(`${ready.length}편 내려받기를 시작했습니다`, "success");
+  };
+
+  return (
+    <button
+      type="button"
+      onClick={() => void run()}
+      disabled={progress !== null}
+      className="ui-btn ui-btn-primary rounded-lg px-3 py-1.5 text-[12px] font-semibold disabled:opacity-60"
+    >
+      {progress ? `내려받는 중 ${progress}` : `전체 내려받기 (${ready.length}편)`}
+    </button>
   );
 }
 
@@ -340,9 +394,12 @@ function BatchPanel({ batchId }: { batchId: string }) {
     <div className="ui-card space-y-3 rounded-xl p-4">
       <div className="flex flex-wrap items-baseline justify-between gap-2">
         <h2 className="text-[15px] font-bold text-[var(--text-primary)]">제작 {batch.batch_id}</h2>
-        <span className="text-[12.5px] text-[var(--text-muted)]">
-          {done}/{batch.items.length}편 완료{running ? " · 5초마다 새로고침" : ""}
-        </span>
+        <div className="flex flex-wrap items-center gap-3">
+          <span className="text-[12.5px] text-[var(--text-muted)]">
+            {done}/{batch.items.length}편 완료{running ? " · 5초마다 새로고침" : ""}
+          </span>
+          <DownloadAllButton items={batch.items} />
+        </div>
       </div>
       <div className="overflow-x-auto">
         <table className="w-full text-[13px]">
@@ -380,12 +437,21 @@ function BatchPanel({ batchId }: { batchId: string }) {
                         유튜브
                       </a>
                     )}
+                    {it.stage === "done" && it.dailymotion_url && (
+                      <a href={it.dailymotion_url} target="_blank" rel="noreferrer" className="text-[11.5px] font-semibold text-[var(--ok)] hover:underline">
+                        데일리모션
+                      </a>
+                    )}
                     {it.stage === "done" && it.video_url && (
                       <>
                         <a href={it.video_url} target="_blank" rel="noreferrer" className="text-[11.5px] font-semibold text-[var(--accent)] hover:underline">
                           영상 보기
                         </a>
-                        <VideoDownloadButton jobId={it.job_id} filePrefix={`ai_prism_${slug(it.group || groupName(it.type))}_EN`} />
+                        <VideoDownloadButton
+                          jobId={it.job_id}
+                          filePrefix={`ai_prism_${slug(it.group || groupName(it.type))}_EN`}
+                          fileName={videoFileName(it)}
+                        />
                       </>
                     )}
                     {it.stage === "error" && (

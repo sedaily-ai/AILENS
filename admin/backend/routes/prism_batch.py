@@ -231,7 +231,8 @@ def handle_get(body: dict, path_params: dict, query_params: dict) -> dict:
     for item in manifest.get("items", []):
         status = _read_json(f"{_PREFIX}/{batch_id}/{item['item_id']}.status.json") or {"stage": "queued"}
         row = {**item, "stage": status.get("stage"), "message": status.get("message"), "title": status.get("title"),
-               "youtube_url": status.get("youtube_url"), "youtube_error": status.get("youtube_error")}
+               "youtube_url": status.get("youtube_url"), "youtube_error": status.get("youtube_error"),
+               "dailymotion_url": status.get("dailymotion_url"), "dailymotion_error": status.get("dailymotion_error")}
         if row["stage"] in ("scene", "render", "done"):  # 대본은 장면 단계에 들어갈 때 저장된다
             row["script_url"] = f"{base}/{_PREFIX}/{batch_id}/{item['item_id']}.script.txt"
         if status.get("job_id") and status.get("job_id") != item.get("job_id"):

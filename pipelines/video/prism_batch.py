@@ -29,7 +29,13 @@ import ddb_prompt  # noqa: E402
 from bedrock_client import call_text  # noqa: E402
 from bedrock_models import profile_arn  # noqa: E402
 
-from generate_script import date_issues, fix_script, number_issues, validate_script  # noqa: E402
+from generate_script import (  # noqa: E402
+    date_issues,
+    demote_incomplete_stats,
+    fix_script,
+    number_issues,
+    validate_script,
+)
 from render_from_script import _extract_render_script, _fill_missing_top_level, render_and_upload  # noqa: E402
 import video_settings  # noqa: E402
 import prism_notify  # noqa: E402
@@ -167,6 +173,7 @@ def _run(s3, work_dir: Path, *, batch_id: str, item_id: str, job_id: str, articl
         scene_message = f"[입력 기사]\n{script_text}"
         problem = ""
         script: dict | None = None
+        last_candidate: dict | None = None
         for attempt in (1, 2):
             raw = call_text(scene_guide, scene_message + problem, model=_SCENE_MODEL, max_tokens=_MAX_TOKENS)
             try:
@@ -184,8 +191,17 @@ def _run(s3, work_dir: Path, *, batch_id: str, item_id: str, job_id: str, articl
             if not errors:
                 script = candidate
                 break
+            last_candidate = candidate
             print(f"[prism-batch] 장면 검증 실패 {len(errors)}건(시도 {attempt})")
             problem = "\n\n(직전 JSON의 문제 — 고쳐서 JSON 하나만 다시 출력하세요:\n" + "\n".join(f"- {x}" for x in errors) + ")"
+        # 재요청까지 실패했고 남은 문제가 "수치 빈 stat 컷"뿐이면 그 컷만 글자 컷으로 바꿔 계속 만든다(2026-11-05,
+        # 자동 제작은 실패하면 사람이 [다시 시도]를 눌러야 한다). 다른 문제가 남으면 지금처럼 실패.
+        if script is None and last_candidate is not None:
+            demoted = demote_incomplete_stats(last_candidate)
+            if demoted and not validate_script(last_candidate):
+                for line in demoted:
+                    print(f"[자동수정] {line}")
+                script = last_candidate
         if script is None:
             return fail("장면 변환 결과가 두 번 모두 검증을 통과하지 못했습니다" + (f": {problem.strip()[:500]}" if problem else ""))
     except Exception as e:  # noqa: BLE001
