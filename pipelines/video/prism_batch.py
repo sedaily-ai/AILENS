@@ -29,7 +29,13 @@ import ddb_prompt  # noqa: E402
 from bedrock_client import call_text  # noqa: E402
 from bedrock_models import profile_arn  # noqa: E402
 
-from generate_script import demote_incomplete_stats, fix_script, validate_script  # noqa: E402
+from generate_script import (  # noqa: E402
+    date_issues,
+    demote_incomplete_stats,
+    fix_script,
+    number_issues,
+    validate_script,
+)
 from render_from_script import _extract_render_script, _fill_missing_top_level, render_and_upload  # noqa: E402
 import video_settings  # noqa: E402
 import prism_notify  # noqa: E402
@@ -201,7 +207,18 @@ def _run(s3, work_dir: Path, *, batch_id: str, item_id: str, job_id: str, articl
     except Exception as e:  # noqa: BLE001
         return fail(f"장면 나누기 실패: {e}")
 
-    report("render", cuts=len(script["cuts"]))
+    # 날짜·숫자 검수(2026-11-05) — 녹화일/원문과 어긋나는 날짜·금액을 로그·상태에 남긴다. 렌더를 막지는 않는다
+    # (PRISM은 바로 공개라, 확실한 오류는 슬랙·로그로 사람이 보고, 영상 자체는 나간다).
+    date_flags = date_issues(script, article, recording_date=recording_date)
+    number_flags = number_issues(script, article)
+    for line in date_flags + number_flags:
+        print(f"[prism-batch] [검수] {line}")
+    if date_flags:
+        status["date_flags"] = date_flags[:20]
+    if number_flags:
+        status["number_flags"] = number_flags[:20]
+
+    report("render", cuts=len(script["cuts"]), date_flags=len(date_flags), number_flags=len(number_flags))
     print(f"[prism-batch] {item_id} — 렌더 ({len(script['cuts'])}컷)")
     if not render_and_upload(s3, job_id, script, work_dir, _voice_override(type_code)):
         return fail("렌더 실패 — 자세한 내용은 영상 진행 상태를 확인하세요")

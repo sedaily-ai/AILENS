@@ -6,7 +6,9 @@ fix_script()는 장식성 필드(아이콘, 빈 data, 커넥터 variant, stat �
 stat/diagram/chart 컷의 data가 비었거나 chart.points가 2개 미만이면 채우지 않고 에러로 멈춘다.
 임의로 채우면 없는 통계를 지어내는 셈이기 때문이다.
 """
+import datetime as dt
 import json
+import math
 import re
 import sys
 import urllib.request
@@ -370,6 +372,166 @@ def style_issues(script: dict, article: str = "") -> list[str]:
     for i in range(len(types) - 2):
         if types[i] == types[i + 1] == types[i + 2]:
             issues.append(f"같은 종류({types[i]})가 컷{i + 1}~{i + 3} 3연속 — 다른 종류로 바꿀 것")
+    return issues
+
+
+# 영어 월 이름(앞 3글자) → 월 번호. 대본은 "November 5"처럼 풀어 쓴다.
+_MONTHS = {
+    m[:3]: i
+    for i, m in enumerate(
+        ["january", "february", "march", "april", "may", "june",
+         "july", "august", "september", "october", "november", "december"],
+        1,
+    )
+}
+_WEEKDAYS = ["monday", "tuesday", "wednesday", "thursday", "friday", "saturday", "sunday"]
+_MON_RE = r"(jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec)[a-z]*"
+# 특정 과거/미래를 가리키는 상대 날짜만 — 원문 시점과 어긋나기 쉬운 표현.
+# "this year/this month"처럼 현재 시점은 대개 맞고 거의 모든 편에 나와(노이즈) 뺀다.
+_RELATIVE_DATE_RE = r"\b(yesterday|last week|last month|last year|earlier this (?:week|month|year)|next week)\b"
+
+
+def _collect_article_dates(article: str) -> tuple[set[tuple[int, int]], set[int]]:
+    """원문(한국어 기사)에서 (월, 일) 쌍과, 일 없는 '○월'의 월 집합을 모은다.
+
+    대본의 영어 날짜가 원문에 실제로 근거가 있는지 대조하는 용도다. 'M월 D일'·'YYYY-MM-DD'는
+    (월, 일)로, 일 없는 'M월'은 월만 모은다(원문이 "9월 말"처럼 날짜 없이 월만 언급하는 경우가 많다)."""
+    md: set[tuple[int, int]] = set()
+    months: set[int] = set()
+    for mm, dd in re.findall(r"(\d{1,2})월\s*(\d{1,2})일", article):
+        md.add((int(mm), int(dd)))
+    for mm in re.findall(r"(\d{1,2})월", article):
+        months.add(int(mm))
+    for mm, dd in re.findall(r"20\d\d[-./](\d{1,2})[-./](\d{1,2})", article):
+        md.add((int(mm), int(dd)))
+    return md, months
+
+
+def date_issues(script: dict, article: str = "", *, recording_date: str | None = None) -> list[str]:
+    """각본의 날짜 표현이 녹화일·원문과 맞는지 센다 — style_issues와 같은 '형식 검사'.
+
+    두 단계로 나눈다:
+      [오류] 코드가 진실을 아는 것 — 녹화일(recording_date)과 어긋나는 방송 날짜·요일.
+             style_issues 위반처럼 1회 재요청으로 고치게 한다.
+      [확인] 원문 해석이 필요한 것 — 원문에 근거 없는 절대 날짜, 특정 과거를 가리키는 상대 날짜.
+             막지 않고 로그·알림에만 남긴다(없는 날짜를 지어내게 하지 않는다 — validate_script와 같은 원칙).
+
+    recording_date는 'YYYY-MM-DD'. 없으면 녹화일 기준 검사(방송 날짜·요일)는 건너뛴다.
+    """
+    issues: list[str] = []
+    cuts = script.get("cuts", [])
+    rec = None
+    if recording_date:
+        try:
+            rec = dt.date.fromisoformat(recording_date)
+        except (TypeError, ValueError):
+            rec = None
+    md, months = _collect_article_dates(article)
+
+    for i, c in enumerate(cuts, 1):
+        text = ((c.get("narration") or "") + " " + _caption_text(c.get("caption"))).strip()
+        if not text:
+            continue
+
+        # [오류] 요일+날짜 짝이 실제 달력과 맞는가 ("Thursday, November 5").
+        for wd, mn, dd in re.findall(
+            rf"(monday|tuesday|wednesday|thursday|friday|saturday|sunday),?\s+{_MON_RE}\s+(\d{{1,2}})",
+            text, re.I,
+        ):
+            m, d = _MONTHS[mn.lower()[:3]], int(dd)
+            year = rec.year if rec else dt.date.today().year
+            try:
+                actual = _WEEKDAYS[dt.date(year, m, d).weekday()]
+            except ValueError:
+                continue
+            if actual != wd.lower():
+                issues.append(f"[컷{i}] 요일 불일치 '{wd}, {mn} {dd}' — 실제는 {actual.capitalize()}")
+
+        # 월+일 하나하나 — 방송 날짜(녹화일)인지, 원문 근거가 있는지.
+        for mn, dd in re.findall(rf"{_MON_RE}\s+(\d{{1,2}})", text, re.I):
+            m, d = _MONTHS[mn.lower()[:3]], int(dd)
+            is_broadcast = bool(re.search(rf"(it'?s|today is)[^.]*{mn}[a-z]*\s+{dd}\b", text, re.I))
+            if rec and is_broadcast:
+                # [오류] 방송 날짜가 녹화일과 다르면 틀린 것.
+                if (m, d) != (rec.month, rec.day):
+                    issues.append(f"[컷{i}] 방송 날짜 '{mn} {dd}'이 녹화일 {rec.isoformat()}과 다름")
+                continue
+            # 녹화일과 같은 날짜는 방송일이라 원문에 없어도 정상.
+            if rec and (m, d) == (rec.month, rec.day):
+                continue
+            # [확인] 원문에 그 날짜(또는 그 달)가 전혀 없으면 사람이 확인.
+            if (m, d) not in md and m not in months:
+                issues.append(f"[컷{i}] 날짜 '{mn} {dd}'이 원문에 없음 — 확인 필요")
+
+        # [확인] 특정 과거/미래 상대 날짜.
+        for rel in sorted(set(x.lower() for x in re.findall(_RELATIVE_DATE_RE, text, re.I))):
+            issues.append(f"[컷{i}] 상대 날짜 '{rel}' — 원문 시점과 맞는지 확인 필요")
+
+    return issues
+
+
+# 영어 금액 단위 → 곱수. 대본은 "1.5 trillion won"처럼 원 단위 금액을 영어 단위로 풀어 쓴다.
+_MONEY_MULT = {"trillion": 10**12, "billion": 10**9, "million": 10**6, "thousand": 10**3}
+
+
+def _korean_amounts(article: str) -> set[float]:
+    """원문(한국어 기사)의 한글 단위 금액을 원 단위 float 집합으로.
+
+    '○조 ○억'·'○억'·'○만'을 각각 환산한다. 대본의 'N billion won' 같은 변환값이 원문 어느 금액에도
+    근거가 없으면(= 단위/배율 실수) 잡기 위한 대조용이다. 원문이 콤마로 자리수를 끊어도('4조 5082억')
+    단위 글자 기준으로 끊으므로 콤마의 영향을 받지 않는다."""
+    vals: set[float] = set()
+    for m in re.finditer(r"([\d,]+)\s*조\s*([\d,]+)?\s*억?", article):
+        jo = int(m.group(1).replace(",", ""))
+        eok = int((m.group(2) or "0").replace(",", "")) if m.group(2) else 0
+        vals.add(float(jo * 10**12 + eok * 10**8))
+    for m in re.finditer(r"([\d,]+)\s*억", article):
+        vals.add(float(int(m.group(1).replace(",", "")) * 10**8))
+    for m in re.finditer(r"([\d,]+)\s*만", article):
+        vals.add(float(int(m.group(1).replace(",", "")) * 10**4))
+    return vals
+
+
+def _amount_hint(value: float, amounts: set[float]) -> str:
+    """각본 금액이 원문 어느 금액과도 안 맞을 때, 가장 가까운(로그비 최소) 원문 금액을 참고로 붙인다.
+    배율이 10의 거듭제곱에 가까우면 '단위 변환 실수 의심'이라고 덧붙이되, 어느 항목과 대응하는지는
+    코드가 단정하지 않는다(기사에 금액이 여럿이면 틀린 항목과 매칭될 수 있다 — 판정이 아니라 힌트)."""
+    if not amounts:
+        return ""
+    positive = [k for k in amounts if k > 0]
+    if not positive:
+        return ""
+    nearest = min(positive, key=lambda k: abs(math.log10(value / k)))
+    ratio = value / nearest
+    power = round(math.log10(ratio)) if ratio > 0 else 0
+    if power != 0 and abs(ratio - 10**power) <= 10**power * 0.15:
+        return f" — 원문 {nearest:,.0f}원의 약 {10**power:g}배(단위 변환 실수 의심)"
+    return f" — 가장 가까운 원문 금액 {nearest:,.0f}원과 불일치"
+
+
+def number_issues(script: dict, article: str = "") -> list[str]:
+    """각본의 원화 금액이 원문에 근거가 있는지 센다 — style_issues·date_issues와 같은 '형식 검사'.
+
+    대본의 'N trillion/billion/million won'을 원 단위로 환산해, 원문 한글 금액(조/억/만) 중
+    ±5% 안에 드는 게 하나도 없으면 [확인]으로 플래그한다. style_issues의 숫자 대조는 콤마·한글 단위를
+    못 읽어 '4조 5082억'도 '2159억'도 원문에서 못 찾아 노이즈만 냈는데, 여기서는 단위를 환산해 대조한다.
+
+    배율이 몇 배 틀렸는지는 '힌트'로만 붙이고 [오류]로 단정하지 않는다 — 각본 금액이 원문의 어느 항목과
+    대응하는지는 코드가 알 수 없어(기사에 금액이 여럿) 틀린 매칭으로 재요청하면 오히려 값을 망칠 수 있다.
+    없는 사실을 지어내게 하지 않는다는 validate_script·date_issues와 같은 원칙이다.
+    """
+    issues: list[str] = []
+    amounts = _korean_amounts(article)
+    for i, c in enumerate(script.get("cuts", []), 1):
+        text = ((c.get("narration") or "") + " " + _caption_text(c.get("caption"))).strip()
+        for m in re.finditer(r"([\d,.]+)\s*(trillion|billion|million|thousand)\s*won", text, re.I):
+            try:
+                value = float(m.group(1).replace(",", "")) * _MONEY_MULT[m.group(2).lower()]
+            except ValueError:
+                continue
+            if any(abs(value - k) <= max(k, value) * 0.05 for k in amounts):
+                continue  # 원문에 근거 있는 정상 변환
+            issues.append(f"[컷{i}] 금액 '{m.group(0).strip()}'{_amount_hint(value, amounts)}")
     return issues
 
 

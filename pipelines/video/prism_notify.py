@@ -55,8 +55,14 @@ def build_message(batch_id: str, rows: list[tuple[dict, dict]]) -> dict:
     date = rows[0][0].get("recording_date", "")
     mm_dd = f"{int(date[5:7])}/{int(date[8:10])}" if len(date) == 10 else date
     lines = []
+    flagged: list[tuple[str, list[str]]] = []  # (그룹, 검수 플래그 목록) — 아래 상세 블록용
     for item, s in rows:
         group = item.get("group") or item.get("type")
+        # 날짜·숫자 검수 플래그(prism_batch가 status에 기록). 완료/실패와 무관하게 모은다.
+        checks = (s.get("date_flags") or []) + (s.get("number_flags") or [])
+        if checks:
+            flagged.append((group, checks))
+        check_tag = f" 🔎검수 {len(checks)}건" if checks else ""
         if s.get("stage") == "done":
             # 2026-11-05 데일리모션 추가 — 올라간 곳은 링크, 못 올린 곳은 이유. 둘 다 올라가면 ✅.
             links, problems = [], []
@@ -68,11 +74,20 @@ def build_message(batch_id: str, rows: list[tuple[dict, dict]]) -> dict:
             if not s.get("youtube_url") and not problems:
                 problems = ["유튜브 미업로드"]  # 시크릿이 없어 시도조차 안 한 경우
             if problems:
-                lines.append(f"⚠️ {group} — 영상 완료, {' · '.join(links + problems)}")
+                lines.append(f"⚠️ {group} — 영상 완료, {' · '.join(links + problems)}{check_tag}")
             else:
-                lines.append(f"✅ {group} — {' · '.join(links)}")
+                lines.append(f"✅ {group} — {' · '.join(links)}{check_tag}")
         else:
             lines.append(f"❌ {group} — {_one_line(s.get('message') or '실패', 100)}")
+    # 날짜·숫자 검수 플래그 상세 — 사람이 영상 공개 전후로 확인할 수치/날짜. 너무 길지 않게 편당 3건까지.
+    if flagged:
+        lines.append("")
+        lines.append("🔎 검수 확인 필요 (영상은 이미 공개됨):")
+        for group, checks in flagged:
+            for c in checks[:3]:
+                lines.append(f"  • {group}: {_one_line(c, 110)}")
+            if len(checks) > 3:
+                lines.append(f"  • {group}: 외 {len(checks) - 3}건")
     lines.append(f"<{CMS_URL}/prism-batch?batch={batch_id}|CMS에서 보기>")
     return {"version": "1.0", "source": "custom", "content": {
         "textType": "client-markdown",
