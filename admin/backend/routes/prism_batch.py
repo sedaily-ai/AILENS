@@ -19,6 +19,7 @@ import datetime as dt
 import json
 import logging
 import re
+import time
 import uuid
 
 from shared import response
@@ -67,7 +68,7 @@ def _write_json(key: str, body: dict) -> None:
     )
 
 
-def _run_item(batch_id: str, item: dict) -> None:
+def _run_item(batch_id: str, item: dict, container_env: list[dict] | None = None) -> None:
     command = [
         "--job-id", item["job_id"],
         "--prism-article-s3-key", item["input_key"],
@@ -76,6 +77,9 @@ def _run_item(batch_id: str, item: dict) -> None:
         "--prism-type", item["type"],
         "--prism-recording-date", item["recording_date"],
     ]
+    override = {"name": _VIDEO_LAB_CONTAINER, "command": command}
+    if container_env:  # 자동 제작 시험 모드 — 유튜브·슬랙 끄기(routes/prism_schedule.py)
+        override["environment"] = container_env
     _ecs().run_task(
         cluster=_VIDEO_LAB_CLUSTER,
         taskDefinition=_VIDEO_LAB_TASK_DEFINITION,
@@ -87,20 +91,27 @@ def _run_item(batch_id: str, item: dict) -> None:
                 "assignPublicIp": "ENABLED",
             }
         },
-        overrides={"containerOverrides": [{"name": _VIDEO_LAB_CONTAINER, "command": command}]},
+        overrides={"containerOverrides": [override]},
     )
     _write_json(f"{_PREFIX}/{batch_id}/{item['item_id']}.status.json", {"stage": "queued", "job_id": item["job_id"]})
+
+
+def new_batch_id() -> str:
+    return f"{dt.datetime.now(_KST):%Y%m%d-%H%M}-{uuid.uuid4().hex[:6]}"
+
+
+def input_key(batch_id: str, n: int) -> str:
+    return f"{_PREFIX}/{batch_id}/input/{n:02d}.txt"
 
 
 def _upload_urls(body: dict) -> dict:
     count = body.get("count")
     if not isinstance(count, int) or not 1 <= count <= _MAX_FILES:
         return response.err(f"파일은 1~{_MAX_FILES}개까지 올릴 수 있습니다", 400)
-    now = dt.datetime.now(_KST)
-    batch_id = f"{now:%Y%m%d-%H%M}-{uuid.uuid4().hex[:6]}"
+    batch_id = new_batch_id()
     uploads = []
     for i in range(count):
-        key = f"{_PREFIX}/{batch_id}/input/{i + 1:02d}.txt"
+        key = input_key(batch_id, i + 1)
         url = webtoon_jobs.s3().generate_presigned_url(
             "put_object",
             Params={"Bucket": webtoon_jobs.bucket(), "Key": key, "ContentType": "text/plain; charset=utf-8"},
@@ -119,41 +130,54 @@ def _start(body: dict) -> dict:
     for i, raw in enumerate(raw_items, start=1):
         type_code = raw.get("type")
         recording_date = raw.get("recording_date") or ""
-        input_key = raw.get("input_key") or ""
+        key = raw.get("input_key") or ""
         if type_code not in GROUPS:
             return response.err(f"{raw.get('file_name')}: 그룹을 골라 주세요", 400)
         try:
             dt.date.fromisoformat(recording_date)
         except ValueError:
             return response.err(f"{raw.get('file_name')}: 날짜가 올바르지 않습니다", 400)
-        if not input_key.startswith(f"{_PREFIX}/{batch_id}/input/"):
+        if not key.startswith(f"{_PREFIX}/{batch_id}/input/"):
             return response.err("업로드 경로가 올바르지 않습니다", 400)
         item_id = f"{i:02d}"
         items.append({
             "item_id": item_id, "file_name": str(raw.get("file_name") or "")[:120], "type": type_code,
-            "group": GROUPS[type_code], "recording_date": recording_date, "input_key": input_key,
+            "group": GROUPS[type_code], "recording_date": recording_date, "input_key": key,
             "job_id": f"prism-{batch_id}-{item_id}",
         })
+    failed = start_batch(batch_id, items)
+    return response.ok({"batch_id": batch_id, "started": len(items) - len(failed), "failed": failed})
+
+
+def start_batch(batch_id: str, items: list[dict], *, gap_seconds: float = 0,
+                container_env: list[dict] | None = None) -> list[str]:
+    """manifest·지난 제작 목록을 쓰고 편마다 video-lab 태스크를 켠다. 시작 못 한 편의 file_name 목록을 돌려준다.
+    화면의 [제작 시작](_start)과 매일 자동 제작(routes/prism_schedule.py)이 같이 쓴다.
+
+    gap_seconds: 편 사이 간격. 8편을 한꺼번에 켜면 성우(Polly) 합성이 같은 때 몰려 "Rate exceeded"로 렌더가
+    실패한다(2026-11-05 시험 8편 중 5편) — 자동 제작은 90초 간격으로 켠다."""
     created_at = dt.datetime.now(_KST).isoformat(timespec="seconds")
     manifest = {"batch_id": batch_id, "created_at": created_at, "items": items}
     _write_json(f"{_PREFIX}/{batch_id}/manifest.json", manifest)
-
-    failed: list[str] = []
-    for item in items:
-        try:
-            _run_item(batch_id, item)
-        except Exception as e:  # noqa: BLE001 — 한 편의 시작 실패가 나머지를 막지 않게
-            logger.exception(f"PRISM 일괄 제작 RunTask 실패({item['file_name']})")
-            failed.append(item["file_name"])
-            _write_json(f"{_PREFIX}/{batch_id}/{item['item_id']}.status.json",
-                        {"stage": "error", "job_id": item["job_id"], "message": f"작업 시작 실패: {e}"[:500]})
-
+    # 간격을 두면 다 켜는 데 10분 넘게 걸린다 — 목록에는 먼저 올려 화면에서 바로 보이게 한다.
     index = _read_json(f"{_PREFIX}/index.json") or {"batches": []}
     entry = {"batch_id": batch_id, "created_at": created_at, "count": len(items),
              "groups": [item["group"] for item in items]}
     index["batches"] = [entry, *[b for b in index.get("batches", []) if b.get("batch_id") != batch_id]][:_INDEX_KEEP]
     _write_json(f"{_PREFIX}/index.json", index)
-    return response.ok({"batch_id": batch_id, "started": len(items) - len(failed), "failed": failed})
+
+    failed: list[str] = []
+    for n, item in enumerate(items):
+        if n and gap_seconds:
+            time.sleep(gap_seconds)
+        try:
+            _run_item(batch_id, item, container_env)
+        except Exception as e:  # noqa: BLE001 — 한 편의 시작 실패가 나머지를 막지 않게
+            logger.exception(f"PRISM 일괄 제작 RunTask 실패({item['file_name']})")
+            failed.append(item["file_name"])
+            _write_json(f"{_PREFIX}/{batch_id}/{item['item_id']}.status.json",
+                        {"stage": "error", "job_id": item["job_id"], "message": f"작업 시작 실패: {e}"[:500]})
+    return failed
 
 
 def _retry(body: dict) -> dict:

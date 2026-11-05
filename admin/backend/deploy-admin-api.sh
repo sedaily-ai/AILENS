@@ -87,6 +87,11 @@ ELEVENLABS_TTS_MODULE="$SCRIPT_DIR/../../pipelines/common/elevenlabs_tts.py"
 VIDEO_SETTINGS_MODULE="$SCRIPT_DIR/../../pipelines/common/video_settings.py"
 # pipelines/common/google_tts.py — 영상·PRISM 탭 Google 성우 미리듣기(2026-10-22). 위와 같은 이유로 zip 루트에 복사.
 GOOGLE_TTS_MODULE="$SCRIPT_DIR/../../pipelines/common/google_tts.py"
+# 2026-11-05 — PRISM 매일 자동 제작(routes/prism_schedule.py)이 쓰는 기사 txt 만들기(pipelines/video/prism_auto.py)와
+# 그 파일이 불러오는 XML 파서(pipelines/discovery/pipeline.py → zip 루트 discovery_pipeline.py). prism_schedule이
+# 호출 안에서만 import하므로 빠져도 CMS API 전체가 죽지는 않지만 자동 제작은 멈춘다.
+PRISM_AUTO_MODULE="$SCRIPT_DIR/../../pipelines/video/prism_auto.py"
+DISCOVERY_MODULE="$SCRIPT_DIR/../../pipelines/discovery/pipeline.py"
 
 FUNCTION_NAME="sedaily-mbti-admin-api-dev"
 PYTHON_VERSION="3.11"          # Lambda 런타임과 반드시 일치시킬 것
@@ -116,6 +121,8 @@ cp "$SCRIPT_DIR/../../pipelines/common/webtoon_contract.py" "$BUILD_DIR/"
 cp "$SCRIPT_DIR/../../pipelines/common/webtoon_image_prompt.py" "$SCRIPT_DIR/../../pipelines/common/bedrock_models.py" "$BUILD_DIR/"   # webtoon_image.py·bedrock_client.py 가 flat import 하는 모듈(2026-10-12 분리)
 cp "$JSON_EXTRACT_MODULE" "$BUILD_DIR/"    # pipelines/common/json_extract.py (위 주석 참고)
 cp "$BEDROCK_CLIENT_MODULE" "$COMPOSE_TEXT_MODULE" "$REKOGNITION_PEOPLE_MODULE" "$DDB_PROMPT_MODULE" "$WEBTOON_PROMPTS_MODULE" "$PODCAST_VOICE_MODULE" "$ELEVENLABS_TTS_MODULE" "$VIDEO_SETTINGS_MODULE" "$GOOGLE_TTS_MODULE" "$BUILD_DIR/"
+cp "$PRISM_AUTO_MODULE" "$BUILD_DIR/"
+cp "$DISCOVERY_MODULE" "$BUILD_DIR/discovery_pipeline.py"
 mkdir -p "$BUILD_DIR/assets"
 cp "$FONT_ASSET" "$FONT_ASSET_REGULAR" "$BUILD_DIR/assets/"
 [ -d repo ] && cp -r repo "$BUILD_DIR/"

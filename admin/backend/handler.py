@@ -228,6 +228,16 @@ def lambda_handler(event: dict, context) -> dict:
     # 2026-09-14 — 프롬프트 실험 채팅(PromptChatLab.tsx) 실시간 스트리밍용
     # self-invoke 마커. 위 둘과 같은 이유(routes/chat_ws.py 모듈 docstring
     # 참고) — 마커 키만 다르다.
+    # 2026-11-05 — PRISM 매일 자동 제작. EventBridge 규칙이 9:00~12:55(KST) 5분마다 {"_prism_auto": {}}로 부른다
+    # (routes/prism_schedule.py docstring). 위 둘과 같이 HTTP 모양이 아니라 라우팅보다 먼저 걸러낸다.
+    # 예외를 삼켜 Lambda 비동기 재시도(같은 편 두 번 시작)를 막는다 — 다음 5분 호출이 다시 본다.
+    if "_prism_auto" in event:
+        from routes import prism_schedule
+        try:
+            return prism_schedule.handle_event(event.get("_prism_auto") or {})
+        except Exception as e:  # noqa: BLE001
+            logger.exception(f"prism auto error: {type(e).__name__}: {e}")
+            return {"result": "error", "error": f"{type(e).__name__}: {e}"[:300]}
     if event.get("_async_ws_job"):
         from routes import chat_ws
         try:
