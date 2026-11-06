@@ -71,6 +71,11 @@ def build_message(batch_id: str, rows: list[tuple[dict, dict]], notes: list[str]
                     links.append(f"<{s[f'{key}_url']}|{name}>")
                 elif s.get(f"{key}_error"):
                     problems.append(f"{name} 미업로드({_one_line(s[f'{key}_error'], 60)})")
+            # 유튜브 쇼츠(세로) — 업로드를 시도한 편(url 또는 error가 있는 편)만 표시한다. 기본(꺼짐)이면 아무것도 안 붙는다.
+            if s.get("youtube_shorts_url"):
+                links.append(f"<{s['youtube_shorts_url']}|쇼츠>")
+            elif s.get("youtube_shorts_error"):
+                problems.append(f"쇼츠 미업로드({_one_line(s['youtube_shorts_error'], 60)})")
             if not s.get("youtube_url") and not problems:
                 problems = ["유튜브 미업로드"]  # 시크릿이 없어 시도조차 안 한 경우
             if problems:

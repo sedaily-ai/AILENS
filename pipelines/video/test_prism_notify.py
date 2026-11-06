@@ -29,3 +29,24 @@ def test_status_keeps_flag_lists_through_report():
     """prism_batch의 report()가 건수로 목록을 덮어쓰면 알림이 TypeError로 죽고 그 묶음 알림이 영영 안 온다."""
     source = (Path(__file__).parent / "prism_batch.py").read_text(encoding="utf-8")
     assert "date_flags=len(" not in source and "number_flags=len(" not in source
+
+
+def test_shorts_link_shown_only_when_uploaded():
+    base = {"stage": "done", "youtube_url": "y", "dailymotion_url": "d"}
+    assert "쇼츠" not in _desc(base)  # 기본(세로 업로드 꺼짐)이면 알림이 그대로다
+    text = _desc({**base, "youtube_shorts_url": "https://www.youtube.com/shorts/abc"})
+    assert "|쇼츠>" in text and text.startswith("✅")
+
+
+def test_shorts_error_marks_warning_but_keeps_horizontal_links():
+    text = _desc({"stage": "done", "youtube_url": "y", "dailymotion_url": "d", "youtube_shorts_error": "403 quota"})
+    assert text.startswith("⚠️") and "쇼츠 미업로드(403 quota)" in text and "|유튜브>" in text
+
+
+def test_shorts_metadata_adds_tag_within_limits():
+    import youtube_upload
+    meta = {"title": "T" * 150, "description": "desc", "tags": ["a"]}
+    out = youtube_upload.shorts_metadata(meta)
+    assert out["title"].endswith("#Shorts") and len(out["title"]) <= 100
+    assert out["description"].startswith("#Shorts") and out["tags"] == ["a"]
+    assert meta["title"] == "T" * 150  # 원본은 바뀌지 않는다
