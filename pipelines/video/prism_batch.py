@@ -40,6 +40,7 @@ from render_from_script import _extract_render_script, _fill_missing_top_level, 
 import video_settings  # noqa: E402
 import prism_notify  # noqa: E402
 import youtube_upload  # noqa: E402
+from youtube_upload import shorts_metadata  # noqa: E402
 import dailymotion_upload  # noqa: E402
 
 # 지침(대본 작성 프롬프트)의 "12개 카테고리 개요" 표와 같은 코드·이름. 화면(PrismBatchPage)과 서버 라우트도 같은 표를 쓴다.
@@ -224,6 +225,23 @@ def _run(s3, work_dir: Path, *, batch_id: str, item_id: str, job_id: str, articl
     if not render_and_upload(s3, job_id, script, work_dir, _voice_override(type_code)):
         return fail("렌더 실패 — 자세한 내용은 영상 진행 상태를 확인하세요")
 
+    # 세로(9:16) 숏폼 렌더 — 가로와 같은 각본·성우로 AiPrismVertical 컴포지션을 한 번 더 렌더해
+    # media/video-lab/{job_id}_vertical.mp4 로 올린다. 아직 장면 좌표가 가로 기준이라 세로는 오른쪽이
+    # 잘린 상태이고(디자인 세로 대응은 다음 단계), 그래서 여기서는 "만들어 두기"만 한다 — 유튜브 쇼츠
+    # 공개는 PRISM_UPLOAD_VERTICAL 플래그로 따로 켠다(1-d). 렌더 비용이 2배라 PRISM_RENDER_VERTICAL=0으로 끌 수 있다.
+    if os.environ.get("PRISM_RENDER_VERTICAL", "1") != "0":
+        report("render_vertical")
+        print(f"[prism-batch] {item_id} — 세로 숏폼 렌더")
+        vertical_override = {**(_voice_override(type_code) or {}), "format": "vertical"}
+        if render_and_upload(s3, job_id, script, work_dir, vertical_override,
+                             output_basename="video_vertical", s3_suffix="_vertical"):
+            status["vertical_key"] = f"media/video-lab/{job_id}_vertical.mp4"
+            print(f"[prism-batch] {item_id} — 세로 숏폼 완료 {status['vertical_key']}")
+        else:
+            # 세로 렌더가 실패해도 가로 영상은 이미 나왔으므로 편 자체는 계속 진행한다(완료로 둔다).
+            status["vertical_error"] = "세로 렌더 실패(가로는 정상)"
+            print(f"[prism-batch] {item_id} — 세로 숏폼 렌더 실패(무시, 가로는 정상)")
+
     # 유튜브 자동 공개 — 채널 연결 정보(시크릿)가 있을 때만. 업로드가 실패해도 영상은 이미 만들어졌으므로
     # 편 자체는 완료로 두고 화면에 실패 이유를 보여준다(내려받아 직접 올리면 된다). 다시 시도하면 중복 업로드가 된다.
     meta = youtube_upload.metadata_from_script(script_text, title or script.get("title") or display_name)
@@ -249,6 +267,23 @@ def _run(s3, work_dir: Path, *, batch_id: str, item_id: str, job_id: str, articl
         except Exception as e:  # noqa: BLE001
             print(f"[prism-batch] 데일리모션 업로드 실패: {e}")
             status["dailymotion_error"] = str(e)[:500]
+
+    # 유튜브 쇼츠 공개(세로 mp4) — PRISM_UPLOAD_VERTICAL=1일 때만. 기본은 꺼짐: 지금 세로는 장면 좌표가 가로
+    # 기준이라 오른쪽이 잘려 있어 공개하면 안 된다(세로 디자인 대응이 끝난 뒤 켠다). 세로 렌더가 성공해
+    # 파일이 있을 때만 시도하고, 실패해도 가로 업로드·편 완료에는 영향이 없다. 쇼츠는 세로 영상에
+    # #Shorts를 붙여 일반 업로드하면 유튜브가 쇼츠로 분류한다(별도 API 없음).
+    vertical_path = work_dir / "video_vertical.mp4"
+    if (os.environ.get("PRISM_UPLOAD_VERTICAL", "0") == "1" and creds
+            and status.get("vertical_key") and vertical_path.exists()):
+        report("upload")
+        try:
+            shorts_meta = shorts_metadata(meta)
+            video_id = youtube_upload.upload(vertical_path, shorts_meta, creds)
+            status["youtube_shorts_url"] = f"https://www.youtube.com/shorts/{video_id}"
+            print(f"[prism-batch] {item_id} — 유튜브 쇼츠 업로드 {status['youtube_shorts_url']}")
+        except Exception as e:  # noqa: BLE001
+            print(f"[prism-batch] 유튜브 쇼츠 업로드 실패: {e}")
+            status["youtube_shorts_error"] = str(e)[:500]
 
     report("done")
     print(f"[prism-batch] {item_id} — 완료")

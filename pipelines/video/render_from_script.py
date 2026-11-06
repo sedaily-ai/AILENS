@@ -276,16 +276,21 @@ def main() -> None:
         sys.exit(1)
 
 
-def render_and_upload(s3, job_id: str, script: dict, work_dir: Path, settings_override: dict | None = None) -> bool:
-    """검증을 마친 각본을 렌더해 media/video-lab/{job_id}.mp4·.jpg로 올린다. 실패하면 .error.json을 올리고 False.
-    CMS 영상 랩(main)과 PRISM 일괄 제작(prism_batch.run)이 같이 쓴다."""
+def render_and_upload(s3, job_id: str, script: dict, work_dir: Path, settings_override: dict | None = None,
+                      *, output_basename: str = "video", s3_suffix: str = "") -> bool:
+    """검증을 마친 각본을 렌더해 media/video-lab/{job_id}{s3_suffix}.mp4·.jpg로 올린다. 실패하면 .error.json을 올리고 False.
+    CMS 영상 랩(main)과 PRISM 일괄 제작(prism_batch.run)이 같이 쓴다.
+
+    output_basename / s3_suffix: 한 편을 여러 포맷(가로·세로)으로 렌더할 때 파일이 서로 안 덮어쓰게 분리한다.
+    기본값(가로)은 video.mp4 / media/video-lab/{job_id}.mp4 로, 기존 동작과 완전히 같다. 세로는
+    settings_override={"format": "vertical"} + output_basename="video_vertical" + s3_suffix="_vertical"로 호출한다."""
     script_path = work_dir / "script.json"
     script_path.write_text(json.dumps(script, ensure_ascii=False), encoding="utf-8")
 
     # PRISM 디자인 각본은 PRISM 음성 설정(prism-settings, 영어 성우)을, 그 밖은 LENS 영상 설정을 읽는다.
     settings_category = video_settings.settings_category_for(script)
     settings = video_settings.get_render_settings(settings_override, settings_category)  # admin CMS에서 fresh 조회(캐시 없음), --settings-override가 있으면 그 위에 덮어씀
-    mp4_path = work_dir / "video.mp4"
+    mp4_path = work_dir / f"{output_basename}.mp4"
     print(
         f"렌더 시작... (settings={settings_category}, provider={settings['provider']}, voice={settings['voice']}, "
         f"engine={settings['engine']}, language={settings['language']}, format={settings['format']})"
@@ -313,16 +318,16 @@ def render_and_upload(s3, job_id: str, script: dict, work_dir: Path, settings_ov
         _upload_error(s3, job_id, f"렌더 실패(returncode={returncode}): {output[-1000:]}")
         return False
 
-    thumb_path = work_dir / "thumb.jpg"
+    thumb_path = work_dir / f"{output_basename}.jpg"
     subprocess.run(
         ["ffmpeg", "-y", "-ss", "2", "-i", str(mp4_path), "-frames:v", "1", str(thumb_path)],
         capture_output=True,
     )
 
-    s3.upload_file(str(mp4_path), CMS_MEDIA_BUCKET, f"media/video-lab/{job_id}.mp4", ExtraArgs={"ContentType": "video/mp4"})
+    s3.upload_file(str(mp4_path), CMS_MEDIA_BUCKET, f"media/video-lab/{job_id}{s3_suffix}.mp4", ExtraArgs={"ContentType": "video/mp4"})
     if thumb_path.exists():
-        s3.upload_file(str(thumb_path), CMS_MEDIA_BUCKET, f"media/video-lab/{job_id}.jpg", ExtraArgs={"ContentType": "image/jpeg"})
-    print(f"완료 — media/video-lab/{job_id}.mp4")
+        s3.upload_file(str(thumb_path), CMS_MEDIA_BUCKET, f"media/video-lab/{job_id}{s3_suffix}.jpg", ExtraArgs={"ContentType": "image/jpeg"})
+    print(f"완료 — media/video-lab/{job_id}{s3_suffix}.mp4")
     return True
 
 

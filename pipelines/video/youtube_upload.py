@@ -70,6 +70,18 @@ def metadata_from_script(script_text: str, fallback_title: str) -> dict:
     return {"title": title or fallback_title[:_TITLE_MAX], "description": description, "tags": tags}
 
 
+_SHORTS_TAG = "#Shorts"
+
+
+def shorts_metadata(meta: dict) -> dict:
+    """가로 영상 메타를 쇼츠용으로 — 제목 끝과 설명 맨 앞에 #Shorts(유튜브가 세로 영상을 쇼츠로 분류하는 신호).
+    제목은 상한 안에서 본문을 줄여 #Shorts가 잘리지 않게 한다. 원본 meta는 바꾸지 않는다."""
+    suffix = f" {_SHORTS_TAG}"
+    title = meta["title"][: _TITLE_MAX - len(suffix)].rstrip() + suffix
+    description = f"{_SHORTS_TAG}\n\n{meta['description']}"[:_DESCRIPTION_MAX]
+    return {**meta, "title": title, "description": description}
+
+
 def _access_token(creds: dict) -> str:
     data = urllib.parse.urlencode({
         "client_id": creds["client_id"], "client_secret": creds["client_secret"],
