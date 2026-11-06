@@ -228,8 +228,9 @@ def _run(s3, work_dir: Path, *, batch_id: str, item_id: str, job_id: str, articl
     # 세로(9:16) 숏폼 렌더 — 가로와 같은 각본·성우로 AiPrismVertical 컴포지션을 한 번 더 렌더해
     # media/video-lab/{job_id}_vertical.mp4 로 올린다. 아직 장면 좌표가 가로 기준이라 세로는 오른쪽이
     # 잘린 상태이고(디자인 세로 대응은 다음 단계), 그래서 여기서는 "만들어 두기"만 한다 — 유튜브 쇼츠
-    # 공개는 PRISM_UPLOAD_VERTICAL 플래그로 따로 켠다(1-d). 렌더 비용이 2배라 PRISM_RENDER_VERTICAL=0으로 끌 수 있다.
-    if os.environ.get("PRISM_RENDER_VERTICAL", "1") != "0":
+    # 공개는 PRISM_UPLOAD_VERTICAL 플래그로 따로 켠다(1-d). 렌더 비용이 2배고 가로 공개가 그만큼 늦어져서
+    # 기본은 꺼짐이다 — 세로 디자인 대응이 끝나면 PRISM_RENDER_VERTICAL=1로 켠다.
+    if os.environ.get("PRISM_RENDER_VERTICAL", "0") == "1":
         report("render_vertical")
         print(f"[prism-batch] {item_id} — 세로 숏폼 렌더")
         vertical_override = {**(_voice_override(type_code) or {}), "format": "vertical"}
