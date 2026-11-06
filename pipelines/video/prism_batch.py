@@ -218,7 +218,8 @@ def _run(s3, work_dir: Path, *, batch_id: str, item_id: str, job_id: str, articl
     if number_flags:
         status["number_flags"] = number_flags[:20]
 
-    report("render", cuts=len(script["cuts"]), date_flags=len(date_flags), number_flags=len(number_flags))
+    # 건수를 같은 이름으로 넘기면 위 목록을 덮어써 완료 알림이 죽는다(int + list). 목록은 status에 이미 있다.
+    report("render", cuts=len(script["cuts"]))
     print(f"[prism-batch] {item_id} — 렌더 ({len(script['cuts'])}컷)")
     if not render_and_upload(s3, job_id, script, work_dir, _voice_override(type_code)):
         return fail("렌더 실패 — 자세한 내용은 영상 진행 상태를 확인하세요")
