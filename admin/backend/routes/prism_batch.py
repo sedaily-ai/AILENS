@@ -68,7 +68,8 @@ def _write_json(key: str, body: dict) -> None:
     )
 
 
-def _run_item(batch_id: str, item: dict, container_env: list[dict] | None = None) -> None:
+def _run_item(batch_id: str, item: dict, container_env: list[dict] | None = None) -> str:
+    """video-lab 태스크를 켜고 태스크 ARN을 돌려준다. 자리 부족 등으로 못 켜면 예외."""
     command = [
         "--job-id", item["job_id"],
         "--prism-article-s3-key", item["input_key"],
@@ -80,7 +81,7 @@ def _run_item(batch_id: str, item: dict, container_env: list[dict] | None = None
     override = {"name": _VIDEO_LAB_CONTAINER, "command": command}
     if container_env:  # 자동 제작 시험 모드 — 유튜브·슬랙 끄기(routes/prism_schedule.py)
         override["environment"] = container_env
-    _ecs().run_task(
+    res = _ecs().run_task(
         cluster=_VIDEO_LAB_CLUSTER,
         taskDefinition=_VIDEO_LAB_TASK_DEFINITION,
         launchType="FARGATE",
@@ -93,7 +94,11 @@ def _run_item(batch_id: str, item: dict, container_env: list[dict] | None = None
         },
         overrides={"containerOverrides": [override]},
     )
+    # RunTask는 못 켜도 예외 없이 failures로 돌려준다 — 안 보면 화면에 "대기 중"으로 남는다.
+    if res.get("failures") or not res.get("tasks"):
+        raise RuntimeError(f"RunTask 실패: {res.get('failures')}"[:300])
     _write_json(f"{_PREFIX}/{batch_id}/{item['item_id']}.status.json", {"stage": "queued", "job_id": item["job_id"]})
+    return res["tasks"][0]["taskArn"]
 
 
 def new_batch_id() -> str:
@@ -152,32 +157,44 @@ def _start(body: dict) -> dict:
 def start_batch(batch_id: str, items: list[dict], *, gap_seconds: float = 0,
                 container_env: list[dict] | None = None) -> list[str]:
     """manifest·지난 제작 목록을 쓰고 편마다 video-lab 태스크를 켠다. 시작 못 한 편의 file_name 목록을 돌려준다.
-    화면의 [제작 시작](_start)과 매일 자동 제작(routes/prism_schedule.py)이 같이 쓴다.
+    화면의 [제작 시작](_start)이 쓴다. 자동 제작은 나눠서 켜므로 create_batch + start_item을 직접 부른다.
 
     gap_seconds: 편 사이 간격. 8편을 한꺼번에 켜면 성우(Polly) 합성이 같은 때 몰려 "Rate exceeded"로 렌더가
-    실패한다(2026-11-05 시험 8편 중 5편) — 자동 제작은 90초 간격으로 켠다."""
+    실패한다(2026-11-05 시험 8편 중 5편)."""
+    create_batch(batch_id, items)
+    failed: list[str] = []
+    for n, item in enumerate(items):
+        if n and gap_seconds:
+            time.sleep(gap_seconds)
+        if start_item(batch_id, item, container_env) is None:
+            failed.append(item["file_name"])
+    return failed
+
+
+def create_batch(batch_id: str, items: list[dict], notes: list[str] | None = None) -> None:
+    """manifest를 쓰고 지난 제작 목록에 올린다. notes는 완료 알림 끝 "📌 참고"에 붙는다(prism_notify.py)."""
     created_at = dt.datetime.now(_KST).isoformat(timespec="seconds")
     manifest = {"batch_id": batch_id, "created_at": created_at, "items": items}
+    if notes:
+        manifest["notes"] = notes
     _write_json(f"{_PREFIX}/{batch_id}/manifest.json", manifest)
-    # 간격을 두면 다 켜는 데 10분 넘게 걸린다 — 목록에는 먼저 올려 화면에서 바로 보이게 한다.
+    # 간격을 두면 다 켜는 데 시간이 걸린다 — 목록에는 먼저 올려 화면에서 바로 보이게 한다.
     index = _read_json(f"{_PREFIX}/index.json") or {"batches": []}
     entry = {"batch_id": batch_id, "created_at": created_at, "count": len(items),
              "groups": [item["group"] for item in items]}
     index["batches"] = [entry, *[b for b in index.get("batches", []) if b.get("batch_id") != batch_id]][:_INDEX_KEEP]
     _write_json(f"{_PREFIX}/index.json", index)
 
-    failed: list[str] = []
-    for n, item in enumerate(items):
-        if n and gap_seconds:
-            time.sleep(gap_seconds)
-        try:
-            _run_item(batch_id, item, container_env)
-        except Exception as e:  # noqa: BLE001 — 한 편의 시작 실패가 나머지를 막지 않게
-            logger.exception(f"PRISM 일괄 제작 RunTask 실패({item['file_name']})")
-            failed.append(item["file_name"])
-            _write_json(f"{_PREFIX}/{batch_id}/{item['item_id']}.status.json",
-                        {"stage": "error", "job_id": item["job_id"], "message": f"작업 시작 실패: {e}"[:500]})
-    return failed
+
+def start_item(batch_id: str, item: dict, container_env: list[dict] | None = None) -> str | None:
+    """한 편을 켠다 → 태스크 ARN. 못 켜면 상태를 error로 쓰고 None(한 편의 실패가 나머지를 막지 않게)."""
+    try:
+        return _run_item(batch_id, item, container_env)
+    except Exception as e:  # noqa: BLE001
+        logger.exception(f"PRISM 일괄 제작 RunTask 실패({item['file_name']})")
+        _write_json(f"{_PREFIX}/{batch_id}/{item['item_id']}.status.json",
+                    {"stage": "error", "job_id": item["job_id"], "message": f"작업 시작 실패: {e}"[:500]})
+        return None
 
 
 def _retry(body: dict) -> dict:
