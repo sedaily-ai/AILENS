@@ -123,6 +123,8 @@ cp "$JSON_EXTRACT_MODULE" "$BUILD_DIR/"    # pipelines/common/json_extract.py (�
 cp "$BEDROCK_CLIENT_MODULE" "$COMPOSE_TEXT_MODULE" "$REKOGNITION_PEOPLE_MODULE" "$DDB_PROMPT_MODULE" "$WEBTOON_PROMPTS_MODULE" "$PODCAST_VOICE_MODULE" "$ELEVENLABS_TTS_MODULE" "$VIDEO_SETTINGS_MODULE" "$GOOGLE_TTS_MODULE" "$BUILD_DIR/"
 cp "$PRISM_AUTO_MODULE" "$BUILD_DIR/"
 cp "$DISCOVERY_MODULE" "$BUILD_DIR/discovery_pipeline.py"
+# 2026-11-06 — 태스크가 못 보낸 완료 알림을 자동 제작이 대신 보낸다(prism_schedule._notify_if_batch_done).
+cp "$SCRIPT_DIR/../../pipelines/video/prism_notify.py" "$SCRIPT_DIR/../../pipelines/common/config.py" "$BUILD_DIR/"
 mkdir -p "$BUILD_DIR/assets"
 cp "$FONT_ASSET" "$FONT_ASSET_REGULAR" "$BUILD_DIR/assets/"
 [ -d repo ] && cp -r repo "$BUILD_DIR/"

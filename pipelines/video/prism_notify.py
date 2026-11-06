@@ -50,7 +50,7 @@ def _one_line(text: str, limit: int) -> str:
     return text if len(text) <= limit else text[: limit - 1] + "…"
 
 
-def build_message(batch_id: str, rows: list[tuple[dict, dict]]) -> dict:
+def build_message(batch_id: str, rows: list[tuple[dict, dict]], notes: list[str] | None = None) -> dict:
     ok = sum(1 for _, s in rows if s.get("stage") == "done")
     date = rows[0][0].get("recording_date", "")
     mm_dd = f"{int(date[5:7])}/{int(date[8:10])}" if len(date) == 10 else date
@@ -79,6 +79,11 @@ def build_message(batch_id: str, rows: list[tuple[dict, dict]]) -> dict:
                 lines.append(f"✅ {group} — {' · '.join(links)}{check_tag}")
         else:
             lines.append(f"❌ {group} — {_one_line(s.get('message') or '실패', 100)}")
+    lines.append(f"<{CMS_URL}/prism-batch?batch={batch_id}|CMS에서 보기>")
+    # 자동 제작이 남긴 참고 사항(routes/prism_schedule.py — 빠진 그룹·같은 그룹 2건 등). 사용자 요청(2026-11-06):
+    # 따로 보내지 말고 완료 알림 끝에, "확인 필요"는 자극적이니 "참고"로.
+    if notes:
+        lines += ["", "📌 참고", *[f"· {_one_line(n, 160)}" for n in notes]]
     # 날짜·숫자 검수 플래그 상세 — 사람이 영상 공개 전후로 확인할 수치/날짜. 너무 길지 않게 편당 3건까지.
     if flagged:
         lines.append("")
@@ -88,7 +93,6 @@ def build_message(batch_id: str, rows: list[tuple[dict, dict]]) -> dict:
                 lines.append(f"  • {group}: {_one_line(c, 110)}")
             if len(checks) > 3:
                 lines.append(f"  • {group}: 외 {len(checks) - 3}건")
-    lines.append(f"<{CMS_URL}/prism-batch?batch={batch_id}|CMS에서 보기>")
     return {"version": "1.0", "source": "custom", "content": {
         "textType": "client-markdown",
         "title": f"🎬 AI PRISM 제작 완료 ({mm_dd}, {len(rows)}편 중 {ok}편 성공)",
@@ -110,7 +114,7 @@ def notify_if_batch_done(s3, batch_id: str) -> None:
         rows.append((item, status))
     if not rows or not _claim(s3, batch_id):
         return
-    msg = build_message(batch_id, rows)
+    msg = build_message(batch_id, rows, manifest.get("notes"))
     boto3.client("sns", region_name=TOPIC_ARN.split(":")[3]).publish(
         TopicArn=TOPIC_ARN, Message=json.dumps(msg, ensure_ascii=False))
     print(f"[prism-notify] 묶음 요약 전송 ({batch_id}, {len(rows)}편)")
