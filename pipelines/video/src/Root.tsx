@@ -53,23 +53,11 @@ export const RemotionRoot: React.FC = () => {
         })}
       />
       <Composition
-        id={PRISM_COMPOSITION_ID.horizontal}
+        id={PRISM_COMPOSITION_ID}
         component={PrismVideo}
         fps={FPS}
         width={FORMAT_DIMENSIONS.horizontal.width}
         height={FORMAT_DIMENSIONS.horizontal.height}
-        durationInFrames={prismDurationInFrames(sampleScript, FPS)}
-        defaultProps={{ script: { ...sampleScript, design: { theme: 'prism' as const } } }}
-        calculateMetadata={async ({ props }) => ({
-          durationInFrames: prismDurationInFrames(props.script, FPS),
-        })}
-      />
-      <Composition
-        id={PRISM_COMPOSITION_ID.vertical}
-        component={PrismVideo}
-        fps={FPS}
-        width={FORMAT_DIMENSIONS.vertical.width}
-        height={FORMAT_DIMENSIONS.vertical.height}
         durationInFrames={prismDurationInFrames(sampleScript, FPS)}
         defaultProps={{ script: { ...sampleScript, design: { theme: 'prism' as const } } }}
         calculateMetadata={async ({ props }) => ({

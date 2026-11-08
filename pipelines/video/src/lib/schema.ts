@@ -313,13 +313,8 @@ export const COMPOSITION_ID: Record<Format, string> = {
 // 종이 질감 테마는 가로형(1920×1080)만 있다. 세로형 설정이어도 이 컴포지션으로 렌더한다.
 export const PAPER_COMPOSITION_ID = 'NewsVideo-Paper';
 
-// AI PRISM(서울경제 영문 데일리 팟캐스트) 영상 — 가로형(1920×1080)과 세로형(1080×1920, 쇼츠용).
-// 세로형은 같은 PrismVideo 컴포넌트를 세로 캔버스에 렌더한다. 장면 좌표가 아직 가로 기준이라
-// 세로 디자인 대응 전에는 오른쪽이 잘릴 수 있다(자동화 뼈대 먼저, 디자인은 다음 단계).
-export const PRISM_COMPOSITION_ID: Record<Format, string> = {
-  horizontal: 'AiPrismHorizontal',
-  vertical: 'AiPrismVertical',
-};
+// AI PRISM(서울경제 영문 데일리 팟캐스트) 영상 — 가로형(1920×1080)만 있다(src/prism).
+export const PRISM_COMPOSITION_ID = 'AiPrismHorizontal';
 
 export const isPaperTheme = (script: NewsScript): boolean => script.design?.theme === 'paper';
 export const isPrismTheme = (script: NewsScript): boolean => script.design?.theme === 'prism';
@@ -327,7 +322,7 @@ export const isPrismTheme = (script: NewsScript): boolean => script.design?.them
 // 렌더 스크립트(render.ts, render-lambda.ts)가 쓰는 컴포지션 선택.
 export const compositionFor = (script: NewsScript, format: Format): { id: string; width: number; height: number } =>
   isPrismTheme(script)
-    ? { id: PRISM_COMPOSITION_ID[format], ...FORMAT_DIMENSIONS[format] }
+    ? { id: PRISM_COMPOSITION_ID, ...FORMAT_DIMENSIONS.horizontal }
     : isPaperTheme(script)
       ? { id: PAPER_COMPOSITION_ID, ...FORMAT_DIMENSIONS.horizontal }
       : { id: COMPOSITION_ID[format], ...FORMAT_DIMENSIONS[format] };

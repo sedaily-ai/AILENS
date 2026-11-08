@@ -52,14 +52,13 @@ def test_shorts_metadata_adds_tag_within_limits():
     assert meta["title"] == "T" * 150  # 원본은 바뀌지 않는다
 
 
-def test_vertical_render_runs_after_horizontal_uploads_and_is_off_by_default():
-    """세로 렌더가 가로 유튜브·데일리모션 업로드보다 앞에 오면 가로 공개가 세로 렌더 시간만큼 늦어진다.
-    기본이 켜짐이면 쓸 수 없는 세로에 렌더 비용이 2배로 든다."""
+def test_shorts_run_after_horizontal_uploads_and_are_off_by_default():
+    """쇼츠 합성·업로드가 가로 유튜브·데일리모션 업로드보다 앞에 오면 가로 공개가 늦어진다.
+    기본이 켜짐이면 완성 모습을 확인하기 전에 쇼츠가 공개된다."""
     source = (Path(__file__).parent / "prism_batch.py").read_text(encoding="utf-8")
     youtube = source.index("youtube_upload.upload(work_dir / \"video.mp4\"")
     dailymotion = source.index("dailymotion_upload.upload(work_dir / \"video.mp4\"")
-    vertical = source.index("output_basename=\"video_vertical\"")
-    shorts = source.index("youtube_upload.upload(vertical_path")
-    assert youtube < vertical and dailymotion < vertical < shorts
-    assert 'os.environ.get("PRISM_RENDER_VERTICAL", "0") == "1"' in source
-    assert 'os.environ.get("PRISM_UPLOAD_VERTICAL", "0") == "1"' in source
+    compose = source.index("shorts_compose.compose(")
+    shorts = source.index("youtube_upload.upload(shorts_path")
+    assert youtube < compose and dailymotion < compose < shorts
+    assert 'os.environ.get("PRISM_SHORTS", "0") == "1"' in source

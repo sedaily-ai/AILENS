@@ -39,6 +39,7 @@ from generate_script import (  # noqa: E402
 from render_from_script import _extract_render_script, _fill_missing_top_level, render_and_upload  # noqa: E402
 import video_settings  # noqa: E402
 import prism_notify  # noqa: E402
+import shorts_compose  # noqa: E402
 import youtube_upload  # noqa: E402
 from youtube_upload import shorts_metadata  # noqa: E402
 import dailymotion_upload  # noqa: E402
@@ -251,39 +252,21 @@ def _run(s3, work_dir: Path, *, batch_id: str, item_id: str, job_id: str, articl
             print(f"[prism-batch] 데일리모션 업로드 실패: {e}")
             status["dailymotion_error"] = str(e)[:500]
 
-    # 세로(9:16) 숏폼 렌더 — 가로 유튜브·데일리모션 업로드가 끝난 뒤에 돌린다(세로 렌더 시간만큼 가로 공개가
-    # 늦어지지 않게). 가로와 같은 각본·성우로 AiPrismVertical 컴포지션을 한 번 더 렌더해
-    # media/video-lab/{job_id}_vertical.mp4 로 올린다. 아직 장면 좌표가 가로 기준이라 세로는 오른쪽이
-    # 잘린 상태이고(디자인 세로 대응은 다음 단계), 그래서 기본은 꺼짐이다 — 렌더 비용이 2배라
-    # 세로 디자인이 끝나면 PRISM_RENDER_VERTICAL=1로 켠다. 쇼츠 공개는 PRISM_UPLOAD_VERTICAL로 따로 켠다.
-    if os.environ.get("PRISM_RENDER_VERTICAL", "0") == "1":
-        report("render_vertical")
-        print(f"[prism-batch] {item_id} — 세로 숏폼 렌더")
-        vertical_override = {**(_voice_override(type_code) or {}), "format": "vertical"}
-        if render_and_upload(s3, job_id, script, work_dir, vertical_override,
-                             output_basename="video_vertical", s3_suffix="_vertical"):
-            status["vertical_key"] = f"media/video-lab/{job_id}_vertical.mp4"
-            print(f"[prism-batch] {item_id} — 세로 숏폼 완료 {status['vertical_key']}")
-        else:
-            # 세로 렌더가 실패해도 가로 영상은 이미 올라갔으므로 편 자체는 계속 진행한다(완료로 둔다).
-            status["vertical_error"] = "세로 렌더 실패(가로는 정상)"
-            print(f"[prism-batch] {item_id} — 세로 숏폼 렌더 실패(무시, 가로는 정상)")
-
-    # 유튜브 쇼츠 공개(세로 mp4) — PRISM_UPLOAD_VERTICAL=1일 때만. 기본은 꺼짐: 지금 세로는 장면 좌표가 가로
-    # 기준이라 오른쪽이 잘려 있어 공개하면 안 된다(세로 디자인 대응이 끝난 뒤 켠다). 세로 렌더가 성공해
-    # 파일이 있을 때만 시도하고, 실패해도 가로 업로드·편 완료에는 영향이 없다. 쇼츠는 세로 영상에
-    # #Shorts를 붙여 일반 업로드하면 유튜브가 쇼츠로 분류한다(별도 API 없음).
-    vertical_path = work_dir / "video_vertical.mp4"
-    if (os.environ.get("PRISM_UPLOAD_VERTICAL", "0") == "1" and creds
-            and status.get("vertical_key") and vertical_path.exists()):
-        report("upload")
+    # 유튜브 쇼츠 자동 공개 — PRISM_SHORTS=1일 때만(기본 꺼짐: 완성 모습을 확인한 뒤 켠다). 방금 올린 가로 영상을
+    # 세로 틀 가운데에 넣고 위에 제목·아래에 AI PRISM 배너를 붙여(shorts_compose.py, ffmpeg) 쇼츠로 올린다.
+    # 렌더를 다시 하지 않고, 가로 업로드가 모두 끝난 뒤에 돌아서 가로 공개를 늦추지 않는다. 합성이나 업로드가
+    # 실패해도 가로 영상·편 완료에는 영향이 없다. 쇼츠는 세로 영상에 #Shorts를 붙여 올리면 유튜브가 분류한다.
+    if os.environ.get("PRISM_SHORTS", "0") == "1" and creds:
+        report("shorts")
         try:
-            shorts_meta = shorts_metadata(meta)
-            video_id = youtube_upload.upload(vertical_path, shorts_meta, creds)
+            shorts_path = work_dir / "video_shorts.mp4"
+            shorts_compose.compose(work_dir / "video.mp4", shorts_path, meta["title"])
+            report("upload")
+            video_id = youtube_upload.upload(shorts_path, shorts_metadata(meta), creds)
             status["youtube_shorts_url"] = f"https://www.youtube.com/shorts/{video_id}"
             print(f"[prism-batch] {item_id} — 유튜브 쇼츠 업로드 {status['youtube_shorts_url']}")
         except Exception as e:  # noqa: BLE001
-            print(f"[prism-batch] 유튜브 쇼츠 업로드 실패: {e}")
+            print(f"[prism-batch] 유튜브 쇼츠 실패: {e}")
             status["youtube_shorts_error"] = str(e)[:500]
 
     report("done")
