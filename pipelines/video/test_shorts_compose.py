@@ -12,11 +12,25 @@ def test_short_title_is_one_line():
     assert shorts_compose.wrap_title("Seoul rents rise") == ["Seoul rents rise"]
 
 
-def test_long_title_wraps_to_three_lines_with_ellipsis():
+def test_long_title_wraps_to_max_lines_with_ellipsis():
     lines = shorts_compose.wrap_title("Only a fraction of Seoul's redevelopment zones have broken ground despite the new rules " * 2)
     assert len(lines) == shorts_compose.TITLE_MAX_LINES
     assert lines[-1].endswith("…")
     assert all(len(line) <= shorts_compose.TITLE_WRAP for line in lines)
+
+
+def test_date_tail_after_pipe_is_dropped():
+    assert shorts_compose.wrap_title("Leveraged Chip ETF Losses and Won Shock | November 7 2026") == [
+        "Leveraged Chip ETF", "Losses and Won Shock"]
+
+
+def test_real_episode_titles_fit_without_ellipsis():
+    for t in (
+        "Bond-Mixed ETFs Top 17 Trillion Won, Dividends Rise: What It Means for Retirees",
+        "Eunma Reconstruction Levy and Public-Site Compensation Reform",
+        "AI Checkout Goes Bakery: Why Vision Checkout's Growth Is Hitting a Wall",
+    ):
+        assert not shorts_compose.wrap_title(t)[-1].endswith("…"), t
 
 
 def test_build_args_places_video_in_vertical_canvas_without_shell():

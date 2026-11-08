@@ -19,16 +19,18 @@ BG_COLOR = "0x1C2A4A"
 TITLE_COLOR = "0xF2EBDD"
 ACCENT_COLOR = "0xF7C531"
 
-TITLE_FONT_SIZE = 76
-TITLE_LINE_HEIGHT = 96
-TITLE_TOP = 230
-TITLE_WRAP = 20      # 한 줄 글자 수 (1080 폭에 좌우 여백 60px을 두고 맞춘 값)
-TITLE_MAX_LINES = 3
+TITLE_FONT_SIZE = 64
+TITLE_LINE_HEIGHT = 82
+TITLE_TOP = 190
+TITLE_WRAP = 24      # 한 줄 글자 수 (NotoSansKR-800 64px 평균 글자폭 36px, 좌우 여백 80px 기준)
+TITLE_MAX_LINES = 4
 BANNER_Y = 1450
 
 
 def wrap_title(title: str) -> list[str]:
-    """제목을 최대 3줄로 나눈다. 넘치면 마지막 줄 끝을 …로 줄인다."""
+    """제목을 최대 4줄로 나눈다. 넘치면 마지막 줄 끝을 …로 줄인다.
+    에피소드 제목 끝의 ' | November 7 2026' 같은 날짜 꼬리는 쇼츠 화면에서는 뺀다."""
+    title = title.split(" | ")[0]
     lines = textwrap.wrap(" ".join(title.split()), width=TITLE_WRAP, break_long_words=True) or [""]
     if len(lines) > TITLE_MAX_LINES:
         lines = lines[:TITLE_MAX_LINES]
