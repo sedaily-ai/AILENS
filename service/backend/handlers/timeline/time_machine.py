@@ -649,6 +649,9 @@ def lambda_handler(event: dict, context) -> dict:
             result.get('date'), len(result.get('articles', [])), result.get('cached'),
         )
         return success_response(result)
+    except bigkinds_search.BigKindsRejected:
+        logger.warning('빅카인즈 요청 거부')
+        return error_response('빅카인즈 데이터를 가져오지 못했습니다.', status_code=502, code='BIGKINDS_REJECTED')
     except Exception:  # noqa: BLE001
         logger.error('time-machine 오류', exc_info=True)
         return error_response('빅카인즈 데이터를 가져오지 못했습니다.', status_code=502, code='BIGKINDS_ERROR')

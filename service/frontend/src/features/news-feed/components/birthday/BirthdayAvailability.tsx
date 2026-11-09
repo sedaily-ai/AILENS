@@ -4,7 +4,7 @@ import { useEffect, useState } from 'react';
 import { parseDate } from './lib/birthdayModel';
 import type { FrontPageReason } from '@/shared/lib/api/timelineApi';
 import { frontPageNotice, loadFrontScene, type FrontPageState } from './lib/birthdayFrontPage';
-import { newspaperImageUrl } from './lib/birthdayNewspaper';
+import { newspaperImageUrl, newspaperPreviewUrl } from './lib/birthdayNewspaper';
 import { cachedArticleStatus, type DayStatus } from './lib/availabilityStatus';
 import { needsOwnPhotoProbe, newspaperPhotoDate, newspaperView, type PhotoState } from './lib/birthdayNewspaperView';
 import styles from './birthdayAvailability.module.css';
@@ -20,7 +20,7 @@ const yearFiles = new Map<string, { expires: number; data: Promise<Record<string
 function prefetchPhoto(date: string) {
   const image = new Image();
   image.decoding = 'async';
-  image.src = newspaperImageUrl(date);
+  image.src = newspaperPreviewUrl(date);
 }
 
 async function loadYear(date: string): Promise<Record<string, DayStatus> | null> {

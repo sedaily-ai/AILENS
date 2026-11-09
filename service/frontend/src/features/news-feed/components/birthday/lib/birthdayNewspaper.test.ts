@@ -1,12 +1,20 @@
 import { expect, test, vi } from 'vitest';
 import { frontArticleHref } from './birthdayFrontPage';
 import {
-  frontRequestDate, isPaperlessSunday, loadNewspaperYear, naverArticles, newspaperImageUrl, newspaperYearUrl, parseNewspaperYear, shiftDate, type NewspaperYear,
+  frontRequestDate, isPaperlessSunday, loadNewspaperYear, naverArticles, newspaperImageUrl, newspaperPreviewUrl, newspaperYearUrl, parseNewspaperYear, shiftDate, type NewspaperYear,
 } from './birthdayNewspaper';
 
 const row = (rank: number, over: Record<string, unknown> = {}) => ({ rank, title: `기사 ${rank}`, url: `https://n.news.naver.com/mnews/article/011/${String(rank).padStart(10, '0')}`, ...over });
 const file = (days: Record<string, unknown>, over: Record<string, unknown> = {}) =>
   ({ schema: 1, year: 2026, updated_at: '2026-11-10T06:05:00+09:00', text_covers: [['2026-01-01', '2026-11-03']], days, ...over });
+
+test('사진 미리보기는 고정된 신문 이미지 주소로 최적화한다', () => {
+  const url = new URL(newspaperPreviewUrl('1995-05-17'), 'https://example.test');
+  expect(url.pathname).toBe('/_next/image');
+  expect(url.searchParams.get('url')).toBe('https://ailens.sedaily.ai/timemachine-newspaper/img/1995/05/19950517.jpg');
+  expect(url.searchParams.get('w')).toBe('1024');
+  expect(url.searchParams.get('q')).toBe('75');
+});
 
 test('사진 주소는 날짜로 정해진다', () => {
   expect(newspaperImageUrl('1995-05-17')).toBe('/timemachine-newspaper/img/1995/05/19950517.jpg');

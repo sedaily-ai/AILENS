@@ -80,7 +80,7 @@ class BackfillTests(unittest.TestCase):
         saved = json.loads(s3.objects[key])
         self.assertEqual(saved['days']['1990-01-02']['bigkinds_day'], 'unavailable')
 
-    def test_scheduled_error_pauses_future_backfills(self):
+    def test_scheduled_errors_retry_twice_before_pausing(self):
         import os
         import sys
         import types
@@ -100,9 +100,23 @@ class BackfillTests(unittest.TestCase):
              patch.object(daily_handler, 'build_missing', return_value=report), \
              patch.object(daily_handler, 'write_missing'), \
              patch.object(batch, 'run', side_effect=RuntimeError('API failure')):
-            with self.assertRaises(RuntimeError):
-                daily_handler.handler({'source': 'aws.events'}, None, now=now, s3_client=s3)
-        self.assertTrue(batch.is_paused(s3, 'b'))
+            for attempt in range(3):
+                with self.assertRaises(RuntimeError):
+                    daily_handler.handler({'source': 'aws.events'}, None, now=now, s3_client=s3)
+                self.assertEqual(batch.is_paused(s3, 'b'), attempt == 2)
+
+    def test_rejection_is_identified_and_stops_immediately(self):
+        class Refused(Lambda):
+            def invoke(self, **kwargs):
+                return {'Payload': io.BytesIO(json.dumps({'statusCode': 502, 'body': json.dumps({'code': 'BIGKINDS_REJECTED'})}).encode())}
+        with self.assertRaises(batch.Rejected):
+            batch.run(S3(), Refused(), 'b', 'fn', date(1990, 1, 5), sleep=lambda _: None)
+
+    def test_success_resets_previous_failures(self):
+        s3 = S3()
+        self.assertEqual(batch.note_failure(s3, 'b'), 1)
+        batch.clear_failures(s3, 'b')
+        self.assertEqual(batch._failure_state(s3, 'b')[0], 0)
 
     def test_pause_persists_and_is_detected(self):
         from datetime import datetime, timezone

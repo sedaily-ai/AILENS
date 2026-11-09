@@ -814,3 +814,12 @@ def test_recent_walk_back_does_not_reuse_stale_cache(env):
         'data': {'shown_date': day, 'kind': 'front', 'basis': None, 'articles': [{'news_id': 'old'}]},
     }
     assert tm._own_paper_from_cache(day) is None
+
+
+def test_bigkinds_rejection_is_reported_without_provider_details(env, monkeypatch):
+    def reject(_):
+        raise bs.BigKindsRejected('HTTP 429')
+    monkeypatch.setattr(tm, 'get_front_page_data', reject)
+    status, body = _call(front='1990-01-02')
+    assert status == 502 and body['code'] == 'BIGKINDS_REJECTED'
+    assert '429' not in json.dumps(body)

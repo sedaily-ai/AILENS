@@ -11,6 +11,12 @@ import availability_v2
 
 CHECKPOINT_KEY = 'ops/status/bigkinds-backfill.json'
 PAUSE_KEY = 'ops/status/bigkinds-backfill-paused.json'
+FAILURE_KEY = 'ops/status/bigkinds-backfill-failures.json'
+MAX_FAILURES = 3
+
+
+class Rejected(RuntimeError):
+    """공급자가 요청을 거부해 즉시 멈춰야 하는 경우."""
 START = date(1990, 1, 1)
 
 
@@ -22,6 +28,34 @@ def is_paused(s3, bucket):
 def pause(s3, bucket, now):
     body = json.dumps({'schema': 1, 'paused_at': now.isoformat(timespec='seconds')}).encode('utf-8')
     s3.put_object(Bucket=bucket, Key=PAUSE_KEY, Body=body, ContentType='application/json', CacheControl='no-store')
+
+
+def _failure_state(s3, bucket):
+    page = s3.list_objects_v2(Bucket=bucket, Prefix=FAILURE_KEY, MaxKeys=1)
+    if not any(item['Key'] == FAILURE_KEY for item in page.get('Contents', [])):
+        return 0, {'IfNoneMatch': '*'}
+    obj = s3.get_object(Bucket=bucket, Key=FAILURE_KEY)
+    doc = json.loads(obj['Body'].read())
+    count = doc.get('count')
+    if doc.get('schema') != 1 or type(count) is not int or count < 0 or not obj.get('ETag'):
+        raise ValueError('실패 횟수 기록을 읽을 수 없어요')
+    return count, {'IfMatch': obj['ETag']}
+
+
+def note_failure(s3, bucket):
+    count, condition = _failure_state(s3, bucket)
+    count += 1
+    body = json.dumps({'schema': 1, 'count': count}).encode('utf-8')
+    s3.put_object(Bucket=bucket, Key=FAILURE_KEY, Body=body, ContentType='application/json',
+                  CacheControl='no-store', **condition)
+    return count
+
+
+def clear_failures(s3, bucket):
+    count, condition = _failure_state(s3, bucket)
+    if count:
+        s3.put_object(Bucket=bucket, Key=FAILURE_KEY, Body=b'{"schema":1,"count":0}',
+                      ContentType='application/json', CacheControl='no-store', **condition)
 
 
 def _checkpoint(s3, bucket):
@@ -83,11 +117,15 @@ def _fetch_confirmed(client, function_name, day, sleep):
         if result.get('FunctionError'):
             raise RuntimeError('빅카인즈 조회 함수를 실행하지 못했어요')
         response = json.loads(result['Payload'].read())
-        if response.get('statusCode') != 200:
-            raise RuntimeError('빅카인즈 조회 실패로 수집을 중단했어요')
         body = json.loads(response['body'])
+        if response.get('statusCode') != 200:
+            if body.get('code') == 'BIGKINDS_REJECTED':
+                raise Rejected('빅카인즈가 요청을 거부했어요')
+            raise RuntimeError('빅카인즈 조회 실패로 수집을 중단했어요')
         if body.get('date') != day.isoformat() or body.get('kind') not in ('front', 'day', 'none'):
             raise ValueError('빅카인즈 조회 결과가 예상 형식과 달라요')
+        if body.get('basis') == 'ranking_failed':
+            raise RuntimeError('기사 순위를 확인하지 못했어요')
         return body
 
     body = invoke()

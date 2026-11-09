@@ -226,12 +226,17 @@ def handler(event, context, *, now=None, s3_client=None):
                 if availability_hour == 13:
                     recent = bigkinds_backfill.refresh_recent(s3, client, bucket, backfill_target, today, remaining_ms=remaining)
                     _log('bigkinds_recent', **recent)
-                progress = bigkinds_backfill.run(s3, client, bucket, backfill_target, today, remaining_ms=remaining)
+                progress = bigkinds_backfill.run(s3, client, bucket, backfill_target, today, max_dates=1, remaining_ms=remaining)
                 _log('bigkinds_backfill', **progress)
-            except Exception:
-                # 하위 API는 403/429도 502로 반환하므로 거부와 일시 오류를 구분할 수 없다.
-                # 반복 호출을 피하려고 모두 중지하고 기존 Lambda 오류 알람으로 알린다.
+                if progress['processed']:
+                    bigkinds_backfill.clear_failures(s3, bucket)
+            except bigkinds_backfill.Rejected:
                 bigkinds_backfill.pause(s3, bucket, now.astimezone(KST))
+                raise
+            except Exception:
+                failures = bigkinds_backfill.note_failure(s3, bucket)
+                if failures >= bigkinds_backfill.MAX_FAILURES:
+                    bigkinds_backfill.pause(s3, bucket, now.astimezone(KST))
                 raise
     _emf(NaverSaved=counts.get('saved', 0), NaverErrors=len(errors), NaverBlocked=1 if blocked else 0,
          **({'NaverMissingDays': report['naver']['count'], 'ImageMissingDays': report['image']['count']} if report else {}))

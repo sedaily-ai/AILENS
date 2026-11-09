@@ -1,5 +1,6 @@
 import path from "node:path";
 import type { NextConfig } from "next";
+import { SITE_URL } from "./src/shared/constants/site";
 
 const nextConfig: NextConfig = {
   // SSR 모드: admin 발행이 재빌드 없이 즉시 반영되려면 매 요청마다 서버가 렌더링해야 한다.
@@ -34,6 +35,7 @@ const nextConfig: NextConfig = {
   // 커스텀 loader를 쓰면 내장 /_next/image 엔드포인트가 꺼져 404가 되므로 기본 로더를 쓴다.
   images: {
     remotePatterns: [
+      { protocol: 'https', hostname: new URL(SITE_URL).hostname, pathname: '/timemachine-newspaper/img/**' },
       { protocol: 'https', hostname: 'wimg.sedaily.com' },
       { protocol: 'https', hostname: 'sedaily-mbti-cms-media-dev.s3.us-east-1.amazonaws.com' },
       { protocol: 'https', hostname: 'img.youtube.com' },
