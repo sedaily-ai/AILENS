@@ -256,18 +256,32 @@ def _run(s3, work_dir: Path, *, batch_id: str, item_id: str, job_id: str, articl
     # 세로 틀 가운데에 넣고 위에 제목·아래에 AI PRISM 배너를 붙여(shorts_compose.py, ffmpeg) 쇼츠로 올린다.
     # 렌더를 다시 하지 않고, 가로 업로드가 모두 끝난 뒤에 돌아서 가로 공개를 늦추지 않는다. 합성이나 업로드가
     # 실패해도 가로 영상·편 완료에는 영향이 없다. 쇼츠는 세로 영상에 #Shorts를 붙여 올리면 유튜브가 분류한다.
+    # 데일리모션에도 같은 세로 영상을 올린다(#Shorts 없는 원래 제목). 유튜브와 데일리모션은 서로 독립 — 한쪽이 실패해도 다른 쪽은 올린다.
     if os.environ.get("PRISM_SHORTS", "0") == "1" and creds:
         report("shorts")
+        shorts_path = work_dir / "video_shorts.mp4"
         try:
-            shorts_path = work_dir / "video_shorts.mp4"
             shorts_compose.compose(work_dir / "video.mp4", shorts_path, meta["title"])
-            report("upload")
-            video_id = youtube_upload.upload(shorts_path, shorts_metadata(meta), creds)
-            status["youtube_shorts_url"] = f"https://www.youtube.com/shorts/{video_id}"
-            print(f"[prism-batch] {item_id} — 유튜브 쇼츠 업로드 {status['youtube_shorts_url']}")
         except Exception as e:  # noqa: BLE001
-            print(f"[prism-batch] 유튜브 쇼츠 실패: {e}")
+            print(f"[prism-batch] 쇼츠 합성 실패: {e}")
             status["youtube_shorts_error"] = str(e)[:500]
+        else:
+            report("upload")
+            try:
+                video_id = youtube_upload.upload(shorts_path, shorts_metadata(meta), creds)
+                status["youtube_shorts_url"] = f"https://www.youtube.com/shorts/{video_id}"
+                print(f"[prism-batch] {item_id} — 유튜브 쇼츠 업로드 {status['youtube_shorts_url']}")
+            except Exception as e:  # noqa: BLE001
+                print(f"[prism-batch] 유튜브 쇼츠 실패: {e}")
+                status["youtube_shorts_error"] = str(e)[:500]
+            if dm_creds:
+                try:
+                    dm_shorts = dailymotion_upload.upload(shorts_path, meta, dm_creds)
+                    status["dailymotion_shorts_url"] = dm_shorts["url"]
+                    print(f"[prism-batch] {item_id} — 데일리모션 쇼츠 업로드 {dm_shorts['url']}")
+                except Exception as e:  # noqa: BLE001
+                    print(f"[prism-batch] 데일리모션 쇼츠 실패: {e}")
+                    status["dailymotion_shorts_error"] = str(e)[:500]
 
     report("done")
     print(f"[prism-batch] {item_id} — 완료")
