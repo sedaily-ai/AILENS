@@ -786,3 +786,31 @@ def test_q_takes_precedence_over_front(env):
     post.return_value = _resp([])
     status, body = _call(q='IMF', **{'from': '1997-11-21'}, to='1997-12-31', front='2020-03-12')
     assert status == 200 and 'query' in body
+
+
+def test_recent_front_cache_refreshes_even_if_old_ttl_is_long(env):
+    from datetime import datetime, timedelta, timezone
+    table, post = env
+    day = '2026-10-12'
+    table.items[tm._front_cache_key(day)] = {
+        'cached_at': (datetime.now(timezone.utc) - timedelta(hours=7)).isoformat(),
+        'expires_at': int(time.time()) + 3650 * 86400,
+        'data': {'date': day, 'date_kind': 'front', 'shown_date': day, 'kind': 'front',
+                 'reason': None, 'basis': None, 'articles': [{'news_id': 'old', 'title': 'old'}]},
+    }
+    post.return_value = _resp([_doc(1, sent='2026-10-11T18:00:00.000+09:00')])
+    status, body = _call(front=day)
+    assert status == 200 and body['cached'] is False
+    assert len(_searches(post)) > 0
+
+
+def test_recent_walk_back_does_not_reuse_stale_cache(env):
+    from datetime import datetime, timedelta, timezone
+    table, _ = env
+    day = '2026-10-12'
+    table.items[tm._front_cache_key(day)] = {
+        'cached_at': (datetime.now(timezone.utc) - timedelta(hours=7)).isoformat(),
+        'expires_at': int(time.time()) + 3650 * 86400,
+        'data': {'shown_date': day, 'kind': 'front', 'basis': None, 'articles': [{'news_id': 'old'}]},
+    }
+    assert tm._own_paper_from_cache(day) is None

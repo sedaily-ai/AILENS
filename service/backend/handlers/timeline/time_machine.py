@@ -156,15 +156,15 @@ def _put_cache_item(key: str, item_type: str, date: str, data: dict, ttl_seconds
     })
 
 
-def _read_cache(key: str, negative_key: str, empty_data: dict, label: str) -> Optional[dict]:
+def _read_cache(key: str, negative_key: str, empty_data: dict, label: str, accept=None) -> Optional[dict]:
     """정상 캐시 → 부정 캐시 순으로 조회. 히트하면 저장된 data(부정은 empty_data) 반환."""
     try:
         item = _get_item(key)
-        if item:
+        if item and (accept is None or accept(item)):
             logger.info('캐시 히트: %s', label)
             return item.get('data')
         neg = _get_item(negative_key)
-        if neg:
+        if neg and (accept is None or accept(neg)):
             logger.info('부정 캐시 히트: %s', label)
             return neg.get('data') or empty_data
     except Exception as e:  # noqa: BLE001
@@ -246,6 +246,8 @@ FRONT_LIVE_FALLBACK_TTL_SECONDS = 7 * 86400
 # 생일이 오늘보다 이만큼 지난 날짜면 빅카인즈 적재가 끝났다고 본다. 그 0건(보관본 공백·명절)은 일시적이지 않아 결과를
 # CACHE_TTL_DAYS 동안 둔다(1998-01~08 공백 생일이 6시간마다, 그날 기사 시기 명절 생일이 7일마다 다시 느려지지 않게).
 FRONT_SETTLED_DAYS = 30
+# 최근 자료는 장기 캐시도 주기적으로 다시 조회한다.
+FRONT_RECENT_CACHE_MAX_AGE_SECONDS = 6 * 3600
 
 KIND_FRONT, KIND_DAY, KIND_NONE = 'front', 'day', 'none'
 REASON_SUNDAY, REASON_NO_PAPER, REASON_NOT_YET, REASON_ARCHIVE_MISSING = 'sunday', 'no_paper', 'not_yet', 'archive_missing'
@@ -276,6 +278,18 @@ def _settled(date: str) -> bool:
     """오늘(KST)보다 FRONT_SETTLED_DAYS 일 이상 지난 날짜인가."""
     settled_until = datetime.strptime(today_kst(), DATE_FORMAT) - timedelta(days=FRONT_SETTLED_DAYS)
     return date <= settled_until.strftime(DATE_FORMAT)
+
+
+def _front_cache_fresh(item: dict, day: str) -> bool:
+    if _settled(day):
+        return True
+    try:
+        cached_at = datetime.fromisoformat(item['cached_at'])
+        if cached_at.tzinfo is None:
+            return False
+        return time.time() - cached_at.timestamp() < FRONT_RECENT_CACHE_MAX_AGE_SECONDS
+    except (KeyError, TypeError, ValueError, OverflowError):
+        return False
 
 
 def _front_calendar() -> front_calendar.FrontCalendar:
@@ -310,6 +324,8 @@ def _own_paper_from_cache(day: str) -> Optional[_Resolved]:
         item = _get_item(_front_cache_key(day))
     except Exception as e:  # noqa: BLE001
         logger.warning('거슬러 간 날 캐시 조회 실패: %s', type(e).__name__)
+        return None
+    if item and not _front_cache_fresh(item, day):
         return None
     data = (item or {}).get('data') or {}
     kind, articles, basis = data.get('kind'), data.get('articles'), data.get('basis')
@@ -473,7 +489,8 @@ def get_front_page_data(date: str) -> dict:
     date_kind = KIND_FRONT if _front_page_match(date) else KIND_DAY
     cached = _read_cache(_front_cache_key(date), _front_negative_cache_key(date),
                          {'date': date, 'date_kind': date_kind, 'shown_date': None, 'kind': KIND_NONE,
-                          'reason': REASON_ARCHIVE_MISSING, 'basis': None, 'articles': []}, FRONT_LOG_LABEL)
+                          'reason': REASON_ARCHIVE_MISSING, 'basis': None, 'articles': []}, FRONT_LOG_LABEL,
+                         accept=lambda item: _front_cache_fresh(item, date))
     if cached is not None:
         data = cached
     else:

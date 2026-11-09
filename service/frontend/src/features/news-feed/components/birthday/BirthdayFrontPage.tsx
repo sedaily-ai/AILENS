@@ -11,6 +11,8 @@ import { frontLayout, needsOwnPhotoProbe, newspaperPhotoDate, newspaperView, typ
 import { nb } from './lib/keepTogether';
 import { BirthdayNewspaperPhoto } from './BirthdayNewspaperPhoto';
 import styles from './birthdayStory.module.css';
+import availabilityStyles from './birthdayAvailability.module.css';
+import { NewspaperAvailabilityRow } from './NewspaperAvailabilityRow';
 
 /** 지면에 보여 줄 기사 수 — 첫 기사와 아래 제목 몇 줄. */
 const SHOWN_ARTICLES = 4;
@@ -132,6 +134,16 @@ export function BirthdayFrontPage({ state, birthDate, onRetry, onUseBirthday, on
         : state.data.kind === 'none' ? <div className={styles.paperEmpty}><strong>이 무렵 신문은 보관본에 없어요</strong><p>{`생일과 그 전 ${FRONT_LOOKBACK_DAYS}일 동안의 서울경제가 빅카인즈 보관본에 ${nb('없어요.')}`}</p></div>
         : <Headlines articles={state.data.articles} />}
     </div>
+    {state && <div className={availabilityStyles.availability} role="status">
+      <strong>보여드리는 신문 자료</strong>
+      {shown !== birthDate && <p>선택한 날: {dateLabel(birthDate)} · 신문: {dateLabel(shown)}</p>}
+      <NewspaperAvailabilityRow kind="photo" status={state.status === 'loading' || (view !== null && photoState === 'loading') ? 'loading' : photoState === 'ok' && view !== null ? 'available' : state.status === 'notice' && state.notice !== 'before-archive' ? 'missing' : 'unknown'}>
+        {state.status === 'loading' ? '기록을 찾고 있어요' : state.status === 'notice' && state.notice !== 'before-archive' ? '신문이 나오지 않았어요' : !view ? '사진 확인이 어려워요' : photoState === 'loading' ? '기록을 찾고 있어요' : photoState === 'ok' ? '그날의 기록이 있어요' : '사진을 불러오지 못했어요'}
+      </NewspaperAvailabilityRow>
+      <NewspaperAvailabilityRow kind="article" status={state.status === 'loading' ? 'loading' : view?.list === 'front' || view?.list === 'naver' ? 'available' : view?.list === 'day' ? 'alternative' : state.status === 'notice' || state.status === 'image-only' || (state.status === 'ok' && state.data.kind === 'none' && state.data.reason !== 'not_yet') || view?.ownPhotoDay ? 'missing' : 'unknown'}>
+        {state.status === 'loading' ? '기록을 찾고 있어요' : view?.list === 'front' || view?.list === 'naver' ? '그날의 기록이 있어요' : view?.list === 'day' ? '1면 구분이 어려워요 · 그날 기사 있어요' : state.status === 'notice' && state.notice !== 'before-archive' ? '신문이 나오지 않았어요' : state.status === 'image-only' || (state.status === 'ok' && state.data.kind === 'none' && state.data.reason !== 'not_yet') || view?.ownPhotoDay ? '1면 기사 자료가 없어요' : '기사 확인이 어려워요'}
+      </NewspaperAvailabilityRow>
+    </div>}
     {/* 생일 당일 사진만 보여 주는 날은 그날 기사가 없어 '그날의 기사 모두 보기'가 빈 페이지로 가므로 보관본에 없는 날처럼 감춘다. */}
     {data && data.kind !== 'none' && !view?.ownPhotoDay && <div className={styles.sceneActions}>
       <Link className={styles.sceneAction} href={paperHref(shown)} prefetch={false} data-fx="own">{sameDay ? '그날의 기사 모두 보기' : `${month}월 ${day}일의 기사 모두 보기`}</Link>

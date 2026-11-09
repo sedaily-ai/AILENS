@@ -20,6 +20,8 @@ REGION="${AWS_REGION}"
 BUCKET="${TIMEMACHINE_NEWSPAPER_BUCKET}"
 FUNCTION="${TIMEMACHINE_DAILY_FUNCTION}"
 CAPTURE_FUNCTION="${TIMEMACHINE_CAPTURE_FUNCTION}"
+FRONT_FUNCTION="${TIMEMACHINE_FRONT_FUNCTION}"
+CACHE_TABLE="${TIMEMACHINE_CACHE_TABLE}"
 TOPIC="${TIMEMACHINE_ALERT_TOPIC}"
 ROLE="${FUNCTION}-role"
 RULE="${FUNCTION}-hourly"
@@ -119,9 +121,11 @@ fi
 POLICY="$(cat <<JSON
 {"Version":"2012-10-17","Statement":[
 {"Sid":"WriteLogs","Effect":"Allow","Action":["logs:CreateLogStream","logs:PutLogEvents"],"Resource":"arn:aws:logs:${REGION}:${ACCOUNT}:log-group:${LOG_GROUP}:*"},
-{"Sid":"ListNeededPrefixes","Effect":"Allow","Action":"s3:ListBucket","Resource":"arn:aws:s3:::${BUCKET}","Condition":{"StringLike":{"s3:prefix":["timemachine-newspaper/img/*","timemachine-newspaper/index/v1/*"]}}},
-{"Sid":"ReadYearFiles","Effect":"Allow","Action":"s3:GetObject","Resource":"arn:aws:s3:::${BUCKET}/timemachine-newspaper/index/v1/*"},
-{"Sid":"WriteYearFilesAndMissingList","Effect":"Allow","Action":"s3:PutObject","Resource":["arn:aws:s3:::${BUCKET}/timemachine-newspaper/index/v1/*","arn:aws:s3:::${BUCKET}/ops/status/missing.json"]}
+{"Sid":"ListNeededPrefixes","Effect":"Allow","Action":"s3:ListBucket","Resource":"arn:aws:s3:::${BUCKET}","Condition":{"StringLike":{"s3:prefix":["timemachine-newspaper/img/*","timemachine-newspaper/epaper/*","timemachine-newspaper/index/v1/*","timemachine-newspaper/availability/v1/*","timemachine-newspaper/availability/v2/*","ops/status/bigkinds-backfill.json","ops/status/bigkinds-backfill-paused.json","ops/status/bigkinds-cache-index.json"]}}},
+{"Sid":"ReadYearFiles","Effect":"Allow","Action":"s3:GetObject","Resource":["arn:aws:s3:::${BUCKET}/timemachine-newspaper/index/v1/*","arn:aws:s3:::${BUCKET}/timemachine-newspaper/availability/v1/*","arn:aws:s3:::${BUCKET}/timemachine-newspaper/availability/v2/*","arn:aws:s3:::${BUCKET}/ops/status/bigkinds-backfill.json","arn:aws:s3:::${BUCKET}/ops/status/bigkinds-cache-index.json"]},
+{"Sid":"WriteYearFilesAndMissingList","Effect":"Allow","Action":"s3:PutObject","Resource":["arn:aws:s3:::${BUCKET}/timemachine-newspaper/index/v1/*","arn:aws:s3:::${BUCKET}/ops/status/missing.json","arn:aws:s3:::${BUCKET}/timemachine-newspaper/availability/v1/*","arn:aws:s3:::${BUCKET}/timemachine-newspaper/availability/v2/*","arn:aws:s3:::${BUCKET}/ops/status/bigkinds-backfill.json","arn:aws:s3:::${BUCKET}/ops/status/bigkinds-backfill-paused.json","arn:aws:s3:::${BUCKET}/ops/status/bigkinds-cache-index.json"]},
+{"Sid":"ReadFrontCache","Effect":"Allow","Action":"dynamodb:BatchGetItem","Resource":"arn:aws:dynamodb:${REGION}:${ACCOUNT}:table/${CACHE_TABLE}","Condition":{"ForAllValues:StringLike":{"dynamodb:LeadingKeys":["timemachine_frontv2_*"]}}},
+{"Sid":"InvokeTimeMachine","Effect":"Allow","Action":"lambda:InvokeFunction","Resource":"arn:aws:lambda:${REGION}:${ACCOUNT}:function:${FRONT_FUNCTION}"}
 ]}
 JSON
 )"
@@ -134,7 +138,8 @@ fi
 echo "=== 4/9 코드 묶음 만들기 ==="
 WORK="$(mktemp -d)"
 ZIP="${WORK}/daily.zip"
-(cd "${ROOT}/timemachine-data/collect" && zip -q -j "${ZIP}" crawl_naver_front.py naver_daily.py daily_handler.py)
+(cd "${ROOT}/timemachine-data/collect" && zip -q -j "${ZIP}" crawl_naver_front.py naver_daily.py availability.py availability_v2.py bigkinds_backfill.py cache_index.py daily_handler.py)
+zip -q -j "${ZIP}" "${ROOT}/service/backend/services/timeline/front_page_calendar.json"
 ls -l "${ZIP}"
 
 echo "=== 5/9 Lambda 함수 (파이썬 3.12, 제한 300초, 256MB, 네이버 수집은 꺼진 채) ==="

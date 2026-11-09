@@ -18,6 +18,10 @@ import time
 from datetime import date, datetime, timedelta, timezone
 
 import naver_daily as nd
+import availability
+import availability_v2
+import bigkinds_backfill
+import cache_index
 
 KST = timezone(timedelta(hours=9))
 NAMESPACE = 'Sedaily/LENS/TimemachineNewspaper'
@@ -182,6 +186,53 @@ def handler(event, context, *, now=None, s3_client=None):
         write_missing(s3, bucket, report)
     except Exception as e:  # noqa: BLE001 - 누락 목록은 덤이라 수집 결과를 막지 않는다
         _log('missing', status='error', message=f'{type(e).__name__}')
+    availability_hour = now.astimezone(KST).hour
+    if availability_hour in (13, 14, 15) or 'availability_years' in event:
+        explicit_years = 'availability_years' in event
+        # 매일 13:25에는 모든 연도의 S3 이미지·기사 인덱스를 대조해 과거 업로드도 다음 날 반영한다.
+        # 14·15시에는 오늘자 자료가 늦게 들어온 경우를 위해 올해만 재확인한다.
+        default_years = list(range(1960, today.year + 1)) if availability_hour == 13 else [today.year]
+        years = event.get('availability_years', default_years)
+        if not isinstance(years, list) or not years or (explicit_years and len(years) > 5) or any(type(y) is not int or y < 1960 or y > today.year for y in years):
+            raise RuntimeError('현황 연도는 1960년부터 올해까지 최대 5개입니다')
+        for year in years:
+            doc = availability.build_year(s3, bucket, year, today)
+            v2 = availability_v2.build_year(s3, bucket, year, today, v1=doc)
+            availability.save_year(s3, bucket, doc, now.astimezone(KST))
+            availability_v2.save_year(s3, bucket, v2, now.astimezone(KST))
+        summary_doc = availability.build_summary(s3, bucket, today)
+        availability.save_summary(s3, bucket, summary_doc, now.astimezone(KST))
+        _log('availability', status='saved', years=years)
+    cache_table = os.environ.get('BIGKINDS_CACHE_TABLE', '').strip()
+    if cache_table and event.get('source') == 'aws.events':
+        if context is None or context.get_remaining_time_in_millis() >= 100000:
+            import boto3
+            from botocore.config import Config
+            dynamodb = boto3.client('dynamodb', region_name=region,
+                                    config=Config(connect_timeout=3, read_timeout=5, retries={'max_attempts': 1}))
+            indexed = cache_index.run(s3, dynamodb, bucket, cache_table, today)
+            _log('bigkinds_cache_index', **indexed)
+    backfill_target = os.environ.get('BIGKINDS_BACKFILL_TARGET', '').strip()
+    if backfill_target and event.get('source') == 'aws.events':
+        if bigkinds_backfill.is_paused(s3, bucket):
+            _log('bigkinds_backfill', status='paused')
+        else:
+            import boto3
+            from botocore.config import Config
+            client = boto3.client('lambda', region_name=region,
+                                  config=Config(connect_timeout=5, read_timeout=35, retries={'max_attempts': 0}))
+            remaining = context.get_remaining_time_in_millis if context else None
+            try:
+                if availability_hour == 13:
+                    recent = bigkinds_backfill.refresh_recent(s3, client, bucket, backfill_target, today, remaining_ms=remaining)
+                    _log('bigkinds_recent', **recent)
+                progress = bigkinds_backfill.run(s3, client, bucket, backfill_target, today, remaining_ms=remaining)
+                _log('bigkinds_backfill', **progress)
+            except Exception:
+                # 하위 API는 403/429도 502로 반환하므로 거부와 일시 오류를 구분할 수 없다.
+                # 반복 호출을 피하려고 모두 중지하고 기존 Lambda 오류 알람으로 알린다.
+                bigkinds_backfill.pause(s3, bucket, now.astimezone(KST))
+                raise
     _emf(NaverSaved=counts.get('saved', 0), NaverErrors=len(errors), NaverBlocked=1 if blocked else 0,
          **({'NaverMissingDays': report['naver']['count'], 'ImageMissingDays': report['image']['count']} if report else {}))
     summary = {'enabled': enabled, 'explicit': bool(explicit), 'counts': counts, 'errors': errors[:10],

@@ -17,9 +17,8 @@ FUNCTION="${TIMEMACHINE_CAPTURE_FUNCTION}"
 ROLE="${FUNCTION}-role"
 RULE="${FUNCTION}-hourly"
 LOG_GROUP="/aws/lambda/${FUNCTION}"
-# 새 호가 올라오는 시각을 아직 몰라 매시간 10분에 돈다. 같은 호는 건너뛰므로 여러 번 돌아도 안전하다.
-# 시각을 알게 되면 이 값만 줄여 다시 실행한다.
-SCHEDULE="cron(10 * * * ? *)"
+# KST 13:10, 14:10, 15:10. 이미 당일 이미지와 기사 기록이 있으면 외부 요청 전에 건너뛴다.
+SCHEDULE="cron(10 4-6 * * ? *)"
 
 # 태그 값은 한 곳(여기)에서만 정한다. 형식이 CLI마다 달라 변수를 나눴을 뿐 값은 같다.
 SERVICE_TAG="lens"

@@ -3,6 +3,22 @@
 렌즈 타임머신에서 사용자가 연월일을 고르면 그날의 **지면 1면 이미지**와 **1면 기사 데이터**를 보여 주기 위한
 데이터를 모으고 가공하는 폴더. 콘텐츠 생성·발행(`pipelines/`)과 서비스 런타임(`service/`)과는 별개이며, 서비스 배포 패키지에 들어가지 않는다.
 
+
+## 자료 현황과 수집 일정(2026-11-09)
+
+- 이미지 수집 규칙은 KST 매일 13:10·14:10·15:10이다. 당일 이미지와 e-Paper 기사 기록이 모두 있으면 나머지 회차는 외부 요청 전에 건너뛴다. 발행 시각은 전수 확인되지 않았고, 미수집은 기존 감시·알림으로 확인한다.
+- 기존 누락 감시 함수는 매시간 25분에 실행된다. 매일 13:25에는 1960년부터 올해까지 S3 이미지·기사 인덱스를 다시 대조해 현황과 연도별 집계를 갱신하며, 바뀐 파일만 쓴다. 14:25·15:25에는 올해 현황을 재확인한다. 지정 연도(최대 5개)는 `{"availability_years":[1996,2026]}` 이벤트로 재처리할 수 있다.
+- 공개 현황: `timemachine-newspaper/availability/v1/YYYY.json`, 연도별 집계: `timemachine-newspaper/availability/v1/summary.json`. 조회 가능 범위·확인 시각과 이미지·기사 상태를 따로 기록한다. 오늘 이미지가 아직 없으면 `unknown`, 전수 목록에서 확인한 과거 날짜에 이미지가 없으면 `unavailable`이다. 빅카인즈 기사 데이터는 전수 확인되지 않아 `unknown`이며 화면의 기존 조회로 보완한다. 네이버 수집은 꺼져 있다.
+- 파일의 갱신과 화면 캐시에는 시차가 있다(최대 10분의 캐시 설정). e-Paper 기사 제목·위치 기록은 화면용 기사 목록이 아니므로 기사 제공으로 판정하지 않는다. 실패 시 Lambda 오류 알람을 사용한다.
+
+## 날짜별 현황 v2와 기사 캐시 색인(운영 반영 2026-11-09)
+
+- `availability/v2/YYYY.json`에 사진, 기존 네이버 1면, e-Paper 기록, 빅카인즈 1면·그날 기사를 출처별로 기록한다. e-Paper 기록은 기사 본문 또는 표시 가능한 기사로 간주하지 않는다.
+- 기존 1면 확인 달력의 확인 구간은 최초 조사 시각을 함께 반영하고, 달력이 확인하지 않은 일요일과 실패 날짜는 미확인으로 둔다. 기존 v1 파일도 유지한다.
+- `BIGKINDS_CACHE_TABLE`이 설정된 정기 실행은 DynamoDB의 기존 1면 조회 캐시를 시간당 최대 600일을 50일씩 나눠 읽어 현황에 반영한다. 대체 신문 날짜를 선택일의 기사로 취급하지 않고, 만료되거나 최근 30일 중 6시간이 지난 캐시는 건너뛴다. 전체 날짜를 확인하면 처음부터 다시 순환한다. 기사 본문은 현황에 넣지 않는다.
+- `BIGKINDS_BACKFILL_TARGET`이 설정된 정기 실행은 시간당 최대 2일을 조회하고, 매일 13:25에는 전날을 추가로 확인한다. 캐시에 저장됐는지 재조회로 확인한 뒤 비공개 진행 파일을 전진한다. 오류 시 `ops/status/bigkinds-backfill-paused.json`을 남기고 중지한다. 하위 API가 403·429도 502로 감추므로 원인을 확인하기 전 자동으로 다시 시작하지 않는다.
+- 현재 빅카인즈 API의 호출 한도와 계약은 확인되지 않았다. 신규 백필을 켜기 전 한도와 운영 권한을 확인한다. 현재 `BIGKINDS_CACHE_TABLE`만 켜져 있고, `BIGKINDS_BACKFILL_TARGET`과 네이버 `NAVER_DAILY`는 꺼져 있다. 1990-01-02 소량 조회는 BigKinds 뉴스 검색 응답 시간 초과로 실패했다.
+
 ## 구성
 
 | 경로 | 역할 | 상태 |
@@ -57,7 +73,7 @@ cd build && python3 -m unittest test_build_year_files -v
 
 ## 일일 수집·누락 목록·알림·재처리(2026-11-03)
 
-이미지 수집(`lambda_handler.py`, 매시간 10분)과 별개 함수 `sedaily-lens-timemachine-newspaper-daily`(이름 정본 `config/resources.env`의 `TIMEMACHINE_DAILY_FUNCTION`)가 매시간 25분에 돈다.
+이미지 수집(`lambda_handler.py`, 매일 13·14·15시 10분 KST)과 별개 함수 `sedaily-lens-timemachine-newspaper-daily`(이름 정본 `config/resources.env`의 `TIMEMACHINE_DAILY_FUNCTION`)가 매시간 25분에 돈다.
 
 | 기능 | 동작 |
 |---|---|
@@ -153,13 +169,13 @@ cd collect && python3 -m unittest test_fetch_epaper_front -v                    
 
 ### AWS 일일 실행(Lambda + EventBridge)
 
-- 매일 자동으로 받으려고 Lambda `sedaily-lens-timemachine-newspaper-capture`(이름 정본은 `config/resources.env`의 `TIMEMACHINE_CAPTURE_FUNCTION`)를 EventBridge가 **매시간 10분**에 부른다. 새 호가 올라오는 시각을 아직 몰라서이고, 같은 호는 건너뛰므로 여러 번 돌아도 안전하다. 시각을 알게 되면 `provision.sh`의 `SCHEDULE`만 줄여 다시 실행한다.
+- Lambda `sedaily-lens-timemachine-newspaper-capture`(이름 정본은 `config/resources.env`의 `TIMEMACHINE_CAPTURE_FUNCTION`)를 EventBridge가 **매일 13·14·15시 10분(KST)**에 부른다. 당일 이미지와 기사 기록이 이미 있으면 외부 요청 없이 건너뛴다.
 - 진입점은 `collect/lambda_handler.py`(`handler`). 환경 변수 `NEWSPAPER_BUCKET`, 실행 제한 120초, 256MB, 파이썬 3.12(boto3는 기본 제공). 실패하면 예외로 끝나 Lambda `Errors`에 잡힌다. 로그는 한 줄 JSON(`event`·`status`·`date`·크기)이고 토큰은 들어가지 않는다.
 - 권한은 로그 쓰기, 버킷 `timemachine-newspaper/img/*`·`timemachine-newspaper/epaper/*` 목록 조회, 같은 경로 `PutObject`만이다. 없는 파일에 `head_object`를 하면 목록 권한이 없을 때 404와 403이 구분되지 않아, 접두어를 제한한 목록 조회로 있는지 본다.
 - 만들기: `bash timemachine-data/aws/provision.sh`(AWS 자격 증명이 있는 기기). 계정·버킷 확인 → 로그 그룹(30일) → IAM 역할 → 코드 묶음 → Lambda → 규칙·호출 권한·대상 → 태그를 다시 조회해 `Service=lens` 확인. 이미 있는 리소스는 건너뛴다. 코드만 바꿀 때는 `bash timemachine-data/aws/deploy.sh`(`CodeSha256`과 `State`·`LastUpdateStatus`로 확인). 권한과 코드가 함께 바뀌었으면 `provision.sh`(권한 정책을 덮어써 최신으로 맞춤) → `deploy.sh` 순서로 실행한다.
 - 태그는 `Project=Sedaily-LENS`, `CostCenter=sedaily-ai`, `ServiceName=Sedaily-LENS`, `Environment=prod`, `Service=lens`, `Workload=timemachine-newspaper-capture`.
 - 새 호가 올라오는 시각 확인(CloudWatch Logs Insights, 로그 그룹 `/aws/lambda/<함수 이름>`): `fields @timestamp, date, status | filter event = "capture" and status = "saved" | sort @timestamp asc`
 - 일일 수집이 올린 사진(2026-11-03 이후)은 보관 이미지 점검 목록(`newspaper_manifest.csv`)에 없다. 올린 뒤 대조(`check_images.py --compare`)는 목록의 마지막 날짜 뒤이고 2026-11-03 이후인 파일을 "자동 수집분"으로 따로 알리고 차이로 세지 않는다. 오늘 날짜는 조건에 넣지 않는다(대조가 도는 기기의 시계가 틀려도 결과가 같아야 해서). 이름이 날짜가 아닌 파일, 시작일 이전 파일, 목록 범위 안의 목록 외 파일은 그대로 차이로 센다. 시험 `upload/test_check_images.py`.
-- 아직 없는 것: 실패·미게시 알림(알림 채널 결정 필요).
+- 수집 오류와 사진 누락은 위 일일 감시의 알람과 슬랙 경로를 쓴다. 최초 정기 실행과 알림의 실제 동작은 배포 후 확인한다.
 
 남은 요구사항: 2011-07-09 이전 텍스트는 네이버에 없고 기존 빅카인즈 경로(1994-01~1996-07 1면)가 후퇴하지 않아야 한다. 매일 최신호 1면(e-Paper) 이미지와 네이버 1면 텍스트를 자동 수집하고, 실패 재시도와 누락 알림이 필요하다.

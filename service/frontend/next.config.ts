@@ -93,8 +93,12 @@ const nextConfig: NextConfig = {
   // /sitemap.xml 은 사이트맵 색인이다. 파일 라우트(app/sitemap.xml/route.ts)로 두면 개발 서버에서 sitemap.ts(generateSitemaps)의 메타데이터 라우트와
   // "Conflicting route and metadata at /sitemap.xml" 로 충돌해 앱 전체가 500이 되므로, 색인은 /sitemap-index 에 두고 여기서 /sitemap.xml 로 다시 쓴다.
   async rewrites() {
+    const devNewspaperData = process.env.NODE_ENV === "development"
+      ? [{ source: "/timemachine-newspaper/:path*", destination: "https://ailens.sedaily.ai/timemachine-newspaper/:path*" }]
+      : [];
     return {
       beforeFiles: [
+        ...devNewspaperData,
         { source: "/sitemap.xml", destination: "/sitemap-index" },
         // 홈을 iframe 미리보기용 주소로도 내보낸다. 주소가 따로 있어야 CloudFront 가 이 경로에만 프레임 허용 헤더를 붙일 수 있다.
         { source: "/embed/home", destination: "/" },
