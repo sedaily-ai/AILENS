@@ -4,6 +4,7 @@
 // 표시 규칙: timemachine-data/261103_타임머신_신문장면_표시규칙.md · 연도 파일 형식: timemachine-data/README.md "데이터 구조".
 // 두 파일 모두 같은 출처(/timemachine-newspaper/*, CloudFront → S3)라서 서버 호출이 아니고, 주소에 드러나는 것은 날짜(사진)·연도(목록)뿐이다.
 import type { BigKindsArticle } from '@/shared/lib/api/timelineApi';
+import { SITE_URL } from '@/shared/constants/site';
 
 /**
  * 신문 장면(1면 사진·네이버 1면 목록·새 문구·일요일 대체) 스위치. 이미지 업로드를 확인한 뒤 2026-11-04에 켰다. false로 되돌리면 켜기 전과 같게(사진·연도 파일 요청 없음) 동작한다.
@@ -22,6 +23,11 @@ export const NO_SUNDAY_FROM = '1996-09-29';
 export function newspaperImageUrl(date: string) {
   const [year, month] = date.split('-');
   return `${NEWSPAPER_BASE}/img/${year}/${month}/${date.replaceAll('-', '')}.jpg`;
+}
+/** 신문 미리보기는 축소된 사본을 전송하고, 확대 화면은 원본을 쓴다. */
+export function newspaperPreviewUrl(date: string) {
+  const original = `${SITE_URL}${newspaperImageUrl(date)}`;
+  return `/_next/image?url=${encodeURIComponent(original)}&w=1024&q=75`;
 }
 export const newspaperYearUrl = (year: number) => `${NEWSPAPER_BASE}/index/v1/${year}.json`;
 

@@ -14,7 +14,7 @@ import { prefetchFrontPage } from './lib/birthdayFrontPage';
 import { getBirthdaySelection, getServerBirthdaySelection, rememberBirthdaySelection, subscribeBirthdaySelection, type BirthdaySelection } from './lib/birthdaySession';
 import { BirthdayResults } from './BirthdayResults';
 import { BirthdayDateDial } from './BirthdayDateDial';
-import { nb } from './lib/keepTogether';
+import { BirthdayAvailability, type BirthdaySubstitution } from './BirthdayAvailability';
 import styles from './birthdayMarket.module.css';
 
 /** 생년월일 다이얼이 처음 가리키는 날. 예시 생일 기능은 2026-10-20 요청으로 없앴고, 다이얼 시작 위치로만 남겼다. */
@@ -55,7 +55,7 @@ function useDeparture() {
     const next = { date, mode };
     rememberBirthdaySelection(next);
     // 그날 신문은 '타임머신 타기'를 누른 지금부터 받기 시작한다(홈에서는 결과 페이지로 넘어가는 동안).
-    // 다이얼을 돌리는 동안에는 보내지 않는다 — 날짜는 그날 신문을 찾을 때만 서버로 간다.
+    // 입력 화면에서도 선택한 날짜의 신문 자료를 확인한다.
     if (mode === 'personal') prefetchFrontPage(date);
     open(next);
   }
@@ -73,21 +73,29 @@ function BirthdayIntro({ heading: Heading, formId, initialDate, error, onDateCha
   const id = useId();
   const today = useBirthdayToday();
   const [birthday, setBirthday] = useState(initialDate);
+  const [substitution, setSubstitution] = useState<BirthdaySubstitution | null>(null);
   function submit(event: FormEvent<HTMLFormElement>) { event.preventDefault(); onDepart(birthday, 'personal'); }
-  // 넓은 화면은 왼쪽에 소개·출발 버튼, 오른쪽에 다이얼을 둬 빈 칸 없이 한 덩어리로 보이게 한다(좁은 화면은 소개 → 다이얼 → 출발 순으로 쌓인다).
+  // 넓은 화면은 소개·미리보기와 다이얼을 나란히 두고, 아래쪽 안내와 출발 버튼을 좌우로 맞춘다.
   return <div className={styles.intro}>
     <form id={formId} tabIndex={-1} onSubmit={submit} autoComplete="off" className={styles.form}>
       <div className={styles.introCopy}>
         <p className={styles.eyebrow}>내 생일 타임머신</p>
-        <Heading className={styles.introTitle}>내가 태어난 날,<br />그때와 지금</Heading>
+        <Heading className={styles.introTitle}>내가 태어난 날, 그때와 지금</Heading>
         <p className={styles.description}>그날 서울경제부터 최저시급, 연금 달력까지.<br />생일을 넣고 그날로 돌아가 보세요.</p>
+        <p className={styles.availabilityMessage} aria-hidden={!substitution}>
+          {substitution ? <>
+            <span>{substitution.reason === 'sunday' ? '선택한 날은 일요일이라 신문이 발행되지 않았어요.' : '선택한 날짜의 신문 자료가 보관본에 없어 당일 신문을 보여드릴 수 없어요.'}</span>
+            <strong>대신 {dateLabel(substitution.date)} 신문을 보여드려요.</strong>
+          </> : <span>&nbsp;</span>}
+        </p>
+        <BirthdayAvailability date={birthday} today={today} onSubstitutionChange={setSubstitution} />
       </div>
-      <BirthdayDateDial today={today} value={birthday} onChange={date => { setBirthday(date); onDateChange(); }} errorId={`${id}-error`} />
       <div className={styles.departure}>
-        <p className={styles.note}>생일은 이 탭에만 남고 탭을 닫으면 지워져요. 날짜는 {nb('그날 신문을')} {nb('찾을 때만')} 서버로 보내요. 100만 원 계산은 {nb('연도별 자료만')} 받아 {nb('이 기기에서')} 해요.</p>
+        <p className={styles.note}>생일은 탭을 닫으면 지워져요.<br />신문을 확인할 때는 선택한 날짜만 서버로 보내요.</p>
         <p id={`${id}-error`} role="alert" className={styles.error}>{error}</p>
         <button type="submit" className={styles.primary}>타임머신 타기</button>
       </div>
+      <BirthdayDateDial today={today} value={birthday} onChange={date => { setBirthday(date); setSubstitution(null); onDateChange(); }} errorId={`${id}-error`} />
     </form>
   </div>;
 }

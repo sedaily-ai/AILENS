@@ -17,7 +17,8 @@ fi
 
 WORK="$(mktemp -d)"
 ZIP="${WORK}/daily.zip"
-(cd "${ROOT}/timemachine-data/collect" && zip -q -j "${ZIP}" crawl_naver_front.py naver_daily.py daily_handler.py)
+(cd "${ROOT}/timemachine-data/collect" && zip -q -j "${ZIP}" crawl_naver_front.py naver_daily.py availability.py availability_v2.py bigkinds_backfill.py cache_index.py daily_handler.py)
+zip -q -j "${ZIP}" "${ROOT}/service/backend/services/timeline/front_page_calendar.json"
 LOCAL_SHA="$(openssl dgst -sha256 -binary "${ZIP}" | openssl base64)"
 
 aws lambda update-function-code --function-name "${FUNCTION}" --zip-file "fileb://${ZIP}" --region "${REGION}" \

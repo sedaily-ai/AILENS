@@ -20,6 +20,8 @@ REGION="${AWS_REGION}"
 BUCKET="${TIMEMACHINE_NEWSPAPER_BUCKET}"
 FUNCTION="${TIMEMACHINE_DAILY_FUNCTION}"
 CAPTURE_FUNCTION="${TIMEMACHINE_CAPTURE_FUNCTION}"
+FRONT_FUNCTION="${TIMEMACHINE_FRONT_FUNCTION}"
+CACHE_TABLE="${TIMEMACHINE_CACHE_TABLE}"
 TOPIC="${TIMEMACHINE_ALERT_TOPIC}"
 ROLE="${FUNCTION}-role"
 RULE="${FUNCTION}-hourly"
@@ -119,9 +121,11 @@ fi
 POLICY="$(cat <<JSON
 {"Version":"2012-10-17","Statement":[
 {"Sid":"WriteLogs","Effect":"Allow","Action":["logs:CreateLogStream","logs:PutLogEvents"],"Resource":"arn:aws:logs:${REGION}:${ACCOUNT}:log-group:${LOG_GROUP}:*"},
-{"Sid":"ListNeededPrefixes","Effect":"Allow","Action":"s3:ListBucket","Resource":"arn:aws:s3:::${BUCKET}","Condition":{"StringLike":{"s3:prefix":["timemachine-newspaper/img/*","timemachine-newspaper/index/v1/*"]}}},
-{"Sid":"ReadYearFiles","Effect":"Allow","Action":"s3:GetObject","Resource":"arn:aws:s3:::${BUCKET}/timemachine-newspaper/index/v1/*"},
-{"Sid":"WriteYearFilesAndMissingList","Effect":"Allow","Action":"s3:PutObject","Resource":["arn:aws:s3:::${BUCKET}/timemachine-newspaper/index/v1/*","arn:aws:s3:::${BUCKET}/ops/status/missing.json"]}
+{"Sid":"ListNeededPrefixes","Effect":"Allow","Action":"s3:ListBucket","Resource":"arn:aws:s3:::${BUCKET}","Condition":{"StringLike":{"s3:prefix":["timemachine-newspaper/img/*","timemachine-newspaper/epaper/*","timemachine-newspaper/index/v1/*","timemachine-newspaper/availability/v1/*","timemachine-newspaper/availability/v2/*","ops/status/bigkinds-backfill.json","ops/status/bigkinds-backfill-paused.json","ops/status/bigkinds-cache-index.json","ops/status/bigkinds-backfill-failures.json"]}}},
+{"Sid":"ReadYearFiles","Effect":"Allow","Action":"s3:GetObject","Resource":["arn:aws:s3:::${BUCKET}/timemachine-newspaper/index/v1/*","arn:aws:s3:::${BUCKET}/timemachine-newspaper/availability/v1/*","arn:aws:s3:::${BUCKET}/timemachine-newspaper/availability/v2/*","arn:aws:s3:::${BUCKET}/ops/status/bigkinds-backfill.json","arn:aws:s3:::${BUCKET}/ops/status/bigkinds-cache-index.json","arn:aws:s3:::${BUCKET}/ops/status/bigkinds-backfill-failures.json"]},
+{"Sid":"WriteYearFilesAndMissingList","Effect":"Allow","Action":"s3:PutObject","Resource":["arn:aws:s3:::${BUCKET}/timemachine-newspaper/index/v1/*","arn:aws:s3:::${BUCKET}/ops/status/missing.json","arn:aws:s3:::${BUCKET}/timemachine-newspaper/availability/v1/*","arn:aws:s3:::${BUCKET}/timemachine-newspaper/availability/v2/*","arn:aws:s3:::${BUCKET}/ops/status/bigkinds-backfill.json","arn:aws:s3:::${BUCKET}/ops/status/bigkinds-backfill-paused.json","arn:aws:s3:::${BUCKET}/ops/status/bigkinds-cache-index.json","arn:aws:s3:::${BUCKET}/ops/status/bigkinds-backfill-failures.json"]},
+{"Sid":"ReadFrontCache","Effect":"Allow","Action":"dynamodb:BatchGetItem","Resource":"arn:aws:dynamodb:${REGION}:${ACCOUNT}:table/${CACHE_TABLE}","Condition":{"ForAllValues:StringLike":{"dynamodb:LeadingKeys":["timemachine_frontv2_*"]}}},
+{"Sid":"InvokeTimeMachine","Effect":"Allow","Action":"lambda:InvokeFunction","Resource":"arn:aws:lambda:${REGION}:${ACCOUNT}:function:${FRONT_FUNCTION}"}
 ]}
 JSON
 )"
@@ -134,18 +138,19 @@ fi
 echo "=== 4/9 코드 묶음 만들기 ==="
 WORK="$(mktemp -d)"
 ZIP="${WORK}/daily.zip"
-(cd "${ROOT}/timemachine-data/collect" && zip -q -j "${ZIP}" crawl_naver_front.py naver_daily.py daily_handler.py)
+(cd "${ROOT}/timemachine-data/collect" && zip -q -j "${ZIP}" crawl_naver_front.py naver_daily.py availability.py availability_v2.py bigkinds_backfill.py cache_index.py daily_handler.py)
+zip -q -j "${ZIP}" "${ROOT}/service/backend/services/timeline/front_page_calendar.json"
 ls -l "${ZIP}"
 
 echo "=== 5/9 Lambda 함수 (파이썬 3.12, 제한 300초, 256MB, 네이버 수집은 꺼진 채) ==="
 # 300초: 한 번에 최대 8일을 0.7초 간격으로 받고 재시도(요청마다 최대 3번)까지 해도 넉넉하다. 날짜 지정 재처리는 최대 31일.
-# NAVER_DAILY 는 비워 두어 꺼진 채 만든다. 이미 있는 함수의 환경 변수는 바꾸지 않는다(켜고 끄는 것은 사람이 정한다).
+# NAVER_DAILY는 비워 두고, 기존 캐시 색인과 시간당 한 날짜 백필을 켠다. 기존 함수 환경 변수는 덮어쓰지 않는다.
 if aws lambda get-function --function-name "${FUNCTION}" --region "${REGION}" >/dev/null 2>&1; then
   echo "이미 있음 - 코드는 deploy_daily.sh 로 올리고 환경 변수는 건드리지 않아요"
 else
   aws lambda create-function --function-name "${FUNCTION}" --runtime python3.12 --handler daily_handler.handler \
     --role "arn:aws:iam::${ACCOUNT}:role/${ROLE}" --zip-file "fileb://${ZIP}" --timeout 300 --memory-size 256 \
-    --environment "Variables={NEWSPAPER_BUCKET=${BUCKET}}" \
+    --environment "Variables={NEWSPAPER_BUCKET=${BUCKET},BIGKINDS_CACHE_TABLE=${CACHE_TABLE},BIGKINDS_BACKFILL_TARGET=${FRONT_FUNCTION}}" \
     --description "AI LENS timemachine newspaper Naver front list daily collection and missing list" \
     --tags "${TAGS_EQ}" --region "${REGION}" --query FunctionArn --output text
   aws lambda wait function-active-v2 --function-name "${FUNCTION}" --region "${REGION}"

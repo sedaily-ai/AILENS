@@ -16,16 +16,17 @@ const FONTS = ['800 60px Pretendard', '900 60px Pretendard', '900 64px "Noto Ser
  * 못 불러오면 null이라 카드는 사진 없는 모양으로 그려지고, 불러오는 동안도 같다(도착하면 다시 그린다).
  */
 function useFrontPhoto(date: string | null) {
-  const [loaded, setLoaded] = useState<{ date: string; image: HTMLImageElement } | null>(null);
+  const [loaded, setLoaded] = useState<{ date: string; image: HTMLImageElement | null } | null>(null);
   useEffect(() => {
     if (!date) return;
     let cancelled = false;
     const image = new Image();
-    image.onload = () => { if (!cancelled && image.naturalWidth > 0) setLoaded({ date, image }); };
+    image.onload = () => { if (!cancelled) setLoaded({ date, image: image.naturalWidth > 0 ? image : null }); };
+    image.onerror = () => { if (!cancelled) setLoaded({ date, image: null }); };
     image.src = newspaperImageUrl(date);
-    return () => { cancelled = true; image.onload = null; };
+    return () => { cancelled = true; image.onload = null; image.onerror = null; };
   }, [date]);
-  return date && loaded?.date === date ? loaded.image : null;
+  return date && loaded?.date === date ? loaded : null;
 }
 
 /** ⑥ 공유 — 결과 맨 아래. 9:16 생일 영수증·그날 신문 카드. 휴대폰은 시스템 공유 창(카톡·인스타)으로 바로 보내고, 안 되면 이미지로 저장한다. */
@@ -42,7 +43,8 @@ export function BirthdayShare({ result, mode, assets, assetBase, front, variant,
   const dayNotice = shareDayNotice(current, mode, includeDay);
   const fileName = `lens-birthday-${result.date.year}${current === 'front' ? '-front' : ''}.png`;
   // 그날 신문 카드일 때만 그날 1면 사진을 받는다(카드는 생일 당일 신문이 있을 때만 만들어진다).
-  const photo = useFrontPhoto(current === 'front' ? result.birthDate : null);
+  const photoResult = useFrontPhoto(current === 'front' ? result.birthDate : null);
+  const photo = photoResult?.image ?? null;
 
   useEffect(() => {
     let active = true;
@@ -88,6 +90,7 @@ export function BirthdayShare({ result, mode, assets, assetBase, front, variant,
       <button type="button" aria-pressed={current === 'receipt'} onClick={() => onVariant('receipt')}>생일 영수증</button>
       <button type="button" aria-pressed={current === 'front'} onClick={() => onVariant('front')}>그날 신문 카드</button>
     </div>}
+    {current === 'front' && photoResult?.image === null && <p className={styles.source} role="status">1면 사진을 불러오지 못해, 그날의 기사 제목으로 카드를 만들었어요.</p>}
     {dayToggleShown(current, mode) && <label className={styles.checkbox}><input type="checkbox" checked={includeDay} onChange={event => { setIncludeDay(event.target.checked); setStatus(''); }} />{DAY_TOGGLE_LABEL}</label>}
     {/* 날짜가 찍힐 때는 공유·이미지 저장 버튼 바로 위에서 늘 알린다. */}
     {dayNotice && <p className={styles.source}>{dayNotice}</p>}

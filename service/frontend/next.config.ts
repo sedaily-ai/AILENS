@@ -1,5 +1,6 @@
 import path from "node:path";
 import type { NextConfig } from "next";
+import { SITE_URL } from "./src/shared/constants/site";
 
 const nextConfig: NextConfig = {
   // SSR 모드: admin 발행이 재빌드 없이 즉시 반영되려면 매 요청마다 서버가 렌더링해야 한다.
@@ -34,6 +35,7 @@ const nextConfig: NextConfig = {
   // 커스텀 loader를 쓰면 내장 /_next/image 엔드포인트가 꺼져 404가 되므로 기본 로더를 쓴다.
   images: {
     remotePatterns: [
+      { protocol: 'https', hostname: new URL(SITE_URL).hostname, pathname: '/timemachine-newspaper/img/**' },
       { protocol: 'https', hostname: 'wimg.sedaily.com' },
       { protocol: 'https', hostname: 'sedaily-mbti-cms-media-dev.s3.us-east-1.amazonaws.com' },
       { protocol: 'https', hostname: 'img.youtube.com' },
@@ -93,8 +95,12 @@ const nextConfig: NextConfig = {
   // /sitemap.xml 은 사이트맵 색인이다. 파일 라우트(app/sitemap.xml/route.ts)로 두면 개발 서버에서 sitemap.ts(generateSitemaps)의 메타데이터 라우트와
   // "Conflicting route and metadata at /sitemap.xml" 로 충돌해 앱 전체가 500이 되므로, 색인은 /sitemap-index 에 두고 여기서 /sitemap.xml 로 다시 쓴다.
   async rewrites() {
+    const devNewspaperData = process.env.NODE_ENV === "development"
+      ? [{ source: "/timemachine-newspaper/:path*", destination: "https://ailens.sedaily.ai/timemachine-newspaper/:path*" }]
+      : [];
     return {
       beforeFiles: [
+        ...devNewspaperData,
         { source: "/sitemap.xml", destination: "/sitemap-index" },
         // 홈을 iframe 미리보기용 주소로도 내보낸다. 주소가 따로 있어야 CloudFront 가 이 경로에만 프레임 허용 헤더를 붙일 수 있다.
         { source: "/embed/home", destination: "/" },
