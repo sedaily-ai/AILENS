@@ -62,3 +62,24 @@ def test_shorts_run_after_horizontal_uploads_and_are_off_by_default():
     shorts = source.index("youtube_upload.upload(shorts_path")
     assert youtube < compose and dailymotion < compose < shorts
     assert 'os.environ.get("PRISM_SHORTS", "0") == "1"' in source
+
+
+def test_dailymotion_shorts_link_and_error_shown_separately():
+    base = {"stage": "done", "youtube_url": "y", "dailymotion_url": "d", "youtube_shorts_url": "https://www.youtube.com/shorts/abc"}
+    assert "데일리모션 쇼츠" not in _desc(base)  # 올리려 하지 않은 편에는 아무것도 안 붙는다
+    ok = _desc({**base, "dailymotion_shorts_url": "https://www.dailymotion.com/video/x1"})
+    assert "|데일리모션 쇼츠>" in ok and "|쇼츠>" in ok and ok.startswith("✅")
+    bad = _desc({**base, "dailymotion_shorts_error": "rate limit"})
+    assert bad.startswith("⚠️") and "데일리모션 쇼츠 미업로드(rate limit)" in bad and "|쇼츠>" in bad
+
+
+def test_dailymotion_shorts_upload_is_after_compose_and_independent_of_youtube_result():
+    """합성이 끝난 뒤에만 올리고, 유튜브 쇼츠가 실패해도 데일리모션은 따로 시도한다(둘이 한 try 안에 있으면 안 된다)."""
+    source = (Path(__file__).parent / "prism_batch.py").read_text(encoding="utf-8")
+    compose = source.index("shorts_compose.compose(")
+    yt = source.index("youtube_upload.upload(shorts_path")
+    dm = source.index("dailymotion_upload.upload(shorts_path")
+    assert compose < yt < dm
+    assert "if dm_creds:" in source[yt:dm]
+    between = source[yt:dm]
+    assert "except Exception" in between  # 유튜브 쇼츠의 except가 데일리모션 호출 앞에서 닫힌다
