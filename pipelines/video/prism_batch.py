@@ -21,6 +21,7 @@ import json
 import os
 import re
 import sys
+import traceback
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).parent.parent / "common"))
@@ -105,14 +106,38 @@ def _voice_override(type_code: str) -> dict | None:
 
 def run(s3, work_dir: Path, *, batch_id: str, item_id: str, job_id: str, article_key: str,
         type_code: str, recording_date: str) -> bool:
-    ok = _run(s3, work_dir, batch_id=batch_id, item_id=item_id, job_id=job_id, article_key=article_key,
-              type_code=type_code, recording_date=recording_date)
+    try:
+        ok = _run(s3, work_dir, batch_id=batch_id, item_id=item_id, job_id=job_id, article_key=article_key,
+                  type_code=type_code, recording_date=recording_date)
+    except Exception as e:  # noqa: BLE001
+        # 예상 못 한 오류로 죽으면 상태가 마지막 단계('장면 나누는 중' 등)에 멈춰 CMS에 계속 진행 중으로 보였다
+        # (2026-11-10). 실패를 상태에 남겨 화면에 '실패'와 [다시 시도]가 뜨게 한다.
+        traceback.print_exc()
+        _record_crash(s3, batch_id, item_id, job_id, type_code, e)
+        ok = False
     # 묶음의 마지막 편이면 슬랙에 요약을 한 번 보낸다(prism_notify.py). 알림 실패가 이 편의 결과를 바꾸지 않는다.
     try:
         prism_notify.notify_if_batch_done(s3, batch_id)
     except Exception as e:  # noqa: BLE001
         print(f"[prism-notify] 알림 실패(무시): {e}")
     return ok
+
+
+def _record_crash(s3, batch_id: str, item_id: str, job_id: str, type_code: str, err: Exception) -> None:
+    """_run이 예외로 끝났을 때 상태를 error로 바꾼다. 이미 적힌 제목 등은 살린다."""
+    key = _status_key(batch_id, item_id)
+    status: dict = {}
+    try:
+        status = json.loads(s3.get_object(Bucket=CMS_MEDIA_BUCKET, Key=key)["Body"].read())
+    except Exception:  # noqa: BLE001
+        pass
+    status.update(job_id=job_id, type=type_code, stage="error",
+                  message=f"제작 중 오류로 멈췄습니다: {err!r}"[:1000],
+                  updated_at=dt.datetime.now(dt.timezone.utc).isoformat())
+    try:
+        _put_json(s3, key, status)
+    except Exception as e:  # noqa: BLE001
+        print(f"[prism-batch] 실패 상태 기록 실패(무시): {e}")
 
 
 def _run(s3, work_dir: Path, *, batch_id: str, item_id: str, job_id: str, article_key: str,
