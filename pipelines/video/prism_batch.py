@@ -211,8 +211,17 @@ def _run(s3, work_dir: Path, *, batch_id: str, item_id: str, job_id: str, articl
 
     # 날짜·숫자 검수(2026-11-05) — 녹화일/원문과 어긋나는 날짜·금액을 로그·상태에 남긴다. 렌더를 막지는 않는다
     # (PRISM은 바로 공개라, 확실한 오류는 슬랙·로그로 사람이 보고, 영상 자체는 나간다).
-    date_flags = date_issues(script, article, recording_date=recording_date)
-    number_flags = number_issues(script, article)
+    # 검수는 참고용이라 검수 코드 오류로 영상이 멈추면 안 된다(2026-11-07·09 주식 편이 이것으로 멈춤).
+    try:
+        date_flags = date_issues(script, article, recording_date=recording_date)
+    except Exception as e:  # noqa: BLE001
+        print(f"[prism-batch] [검수] 날짜 검수 건너뜀: {e!r}")
+        date_flags = []
+    try:
+        number_flags = number_issues(script, article)
+    except Exception as e:  # noqa: BLE001
+        print(f"[prism-batch] [검수] 금액 검수 건너뜀: {e!r}")
+        number_flags = []
     for line in date_flags + number_flags:
         print(f"[prism-batch] [검수] {line}")
     if date_flags:
