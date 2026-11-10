@@ -247,13 +247,15 @@ def handle_get(body: dict, path_params: dict, query_params: dict) -> dict:
     items = []
     for item in manifest.get("items", []):
         status = _read_json(f"{_PREFIX}/{batch_id}/{item['item_id']}.status.json") or {"stage": "queued"}
+        # 지금 작업 번호는 편마다 따로 있는 status.json을 기준으로 한다. [다시 시도]를 여러 편 거의 동시에 누르면
+        # manifest.json을 동시에 고치다 한 편의 새 번호가 덮어써져, 화면이 그 편을 계속 '대기'로 보였다(2026-11-10 주식).
+        # status.json은 [다시 시도] 때 새 번호의 queued로 바로 쓰이므로(_run_item) 재시도 직후도 '대기'로 보인다.
+        item = {**item, "job_id": status.get("job_id") or item.get("job_id")}
         row = {**item, "stage": status.get("stage"), "message": status.get("message"), "title": status.get("title"),
                "youtube_url": status.get("youtube_url"), "youtube_error": status.get("youtube_error"),
                "dailymotion_url": status.get("dailymotion_url"), "dailymotion_error": status.get("dailymotion_error")}
         if row["stage"] in ("scene", "render", "done"):  # 대본은 장면 단계에 들어갈 때 저장된다
             row["script_url"] = f"{base}/{_PREFIX}/{batch_id}/{item['item_id']}.script.txt"
-        if status.get("job_id") and status.get("job_id") != item.get("job_id"):
-            row["stage"] = "queued"  # 재시도 직후 — 새 태스크가 아직 상태를 안 썼다
         if row["stage"] == "render":
             row["progress"] = _read_json(f"media/video-lab/{item['job_id']}.progress.json")
         if row["stage"] == "done":
