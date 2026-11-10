@@ -479,15 +479,16 @@ def _korean_amounts(article: str) -> set[float]:
 
     '○조 ○억'·'○억'·'○만'을 각각 환산한다. 대본의 'N billion won' 같은 변환값이 원문 어느 금액에도
     근거가 없으면(= 단위/배율 실수) 잡기 위한 대조용이다. 원문이 콤마로 자리수를 끊어도('4조 5082억')
-    단위 글자 기준으로 끊으므로 콤마의 영향을 받지 않는다."""
+    단위 글자 기준으로 끊으므로 콤마의 영향을 받지 않는다. 숫자는 반드시 숫자로 시작해야 한다 — 쉼표만
+    잡으면('텍사스, 조지아'·'있고, 조건') int('')로 제작 전체가 멈췄다(2026-11-07·09 주식)."""
     vals: set[float] = set()
-    for m in re.finditer(r"([\d,]+)\s*조\s*([\d,]+)?\s*억?", article):
+    for m in re.finditer(r"(\d[\d,]*)\s*조\s*(\d[\d,]*)?\s*억?", article):
         jo = int(m.group(1).replace(",", ""))
         eok = int((m.group(2) or "0").replace(",", "")) if m.group(2) else 0
         vals.add(float(jo * 10**12 + eok * 10**8))
-    for m in re.finditer(r"([\d,]+)\s*억", article):
+    for m in re.finditer(r"(\d[\d,]*)\s*억", article):
         vals.add(float(int(m.group(1).replace(",", "")) * 10**8))
-    for m in re.finditer(r"([\d,]+)\s*만", article):
+    for m in re.finditer(r"(\d[\d,]*)\s*만", article):
         vals.add(float(int(m.group(1).replace(",", "")) * 10**4))
     return vals
 

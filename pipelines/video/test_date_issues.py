@@ -141,3 +141,10 @@ def test_amount_hint_mentions_nearest():
     s = _script("It jumped to 15 million won per pyeong.")
     issues = number_issues(s, "평당 1590만 원까지 올랐다.")
     assert issues and ("가장 가까운" in issues[0] or "배" in issues[0])
+
+
+def test_amount_comma_before_unit_char_does_not_crash():
+    # 2026-11-07·09 주식 편: '텍사스, 조지아'·'있고, 조건'의 쉼표를 숫자로 잡아 int('')로 제작이 멈췄다.
+    s = _script("The company posted 215.9 billion won in annual revenue.")
+    article = "“텍사스, 조지아, 오하이오에 짓는다.” 만기 전에 상환받을 수 있고, 조건에 못 미치면, 만약 2159억 원을 기록했다."
+    assert number_issues(s, article) == []
