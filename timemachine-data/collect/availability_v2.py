@@ -1,12 +1,17 @@
 """타임머신 자료의 날짜별 보유 현황. 원본과 기존 v1은 변경하지 않는다."""
 import json
-from datetime import date, datetime, timezone
+from datetime import date, datetime, timedelta, timezone
 from pathlib import Path
 
 import availability
 
 PREFIX = 'timemachine-newspaper/availability/v2/'
 EPAPER_PREFIX = 'timemachine-newspaper/epaper/'
+# 서울경제 제공 원본 CSV가 현재 확보된 구간. BigKinds 과거 백필과 캐시 색인은
+# 원본 구간 다음 날짜부터 이어간다. CSV 갱신 시 이 기준을 함께 옮긴다.
+PRIMARY_ARTICLE_FROM = date(1990, 1, 1)
+PRIMARY_ARTICLE_THROUGH = date(2026, 10, 31)
+BIGKINDS_START = PRIMARY_ARTICLE_THROUGH + timedelta(days=1)
 CALENDAR_PATH = Path(__file__).with_name('front_page_calendar.json')
 LOCAL_CALENDAR_PATH = Path(__file__).resolve().parents[2] / 'service/backend/services/timeline/front_page_calendar.json'
 

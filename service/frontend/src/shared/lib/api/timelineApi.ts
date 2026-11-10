@@ -124,6 +124,8 @@ const FRONT_REASONS: readonly string[] = ['sunday', 'no_paper', 'not_yet', 'arch
 /** 생일 date에 보여 줄 서울경제(백엔드 time_machine.py front 모드). 생일에 신문이 없으면 서버가 직전 발행일(shown_date)을 골라 준다. */
 export interface FrontPageData {
   date: string;
+  /** 이 저장된 서울경제 CSV가 직접 제공한 날짜인 경우에만 설정한다. */
+  source?: 'sedaily_archive';
   /** 생일 시기에 신문이 있었다면 무엇이었을지 — 면 번호가 있는 시기면 front, 없으면 day. */
   date_kind: Exclude<FrontPageKind, 'none'>;
   shown_date: string | null;

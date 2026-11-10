@@ -15,19 +15,19 @@ class S3(FakeS3):
 class CacheIndexTests(unittest.TestCase):
     def test_cached_status_is_indexed_without_article_content(self):
         now = datetime(2026, 11, 9, tzinfo=timezone.utc)
-        day = '1990-01-01'
-        key = 'timemachine-newspaper/availability/v2/1990.json'
-        doc = {'schema': 2, 'year': 1990, 'days': {day: {'bigkinds_day': 'unknown'}}}
+        day = '2026-11-01'
+        key = 'timemachine-newspaper/availability/v2/2026.json'
+        doc = {'schema': 2, 'year': 2026, 'days': {day: {'bigkinds_day': 'unknown'}}}
         s3 = S3({key: json.dumps(doc).encode()})
         item = {'news_id': 'timemachine_frontv2_' + day, 'expires_at': int(now.timestamp()) + 100,
-                'cached_at': '2026-10-01T00:00:00+00:00', 'data': {'date': day, 'kind': 'day',
+                'cached_at': '2026-11-09T00:00:00+00:00', 'data': {'date': day, 'kind': 'day',
                 'shown_date': day, 'articles': [{'title': 'private title'}]}}
         with patch.object(cache_index, '_read_items', return_value=[item]):
             result = cache_index.run(s3, None, 'b', 'table', date(2026, 11, 9), now=now, max_dates=1)
         saved = json.loads(s3.objects[key])
         self.assertEqual(saved['days'][day]['bigkinds_day'], 'available')
         self.assertNotIn('private title', str(saved))
-        self.assertEqual(result['next_date'], '1990-01-02')
+        self.assertEqual(result['next_date'], '2026-11-02')
         self.assertEqual(s3.puts[-1]['IfNoneMatch'], '*')
 
     def test_recent_expired_and_mismatched_results_are_not_indexed(self):
@@ -56,14 +56,14 @@ class CacheIndexTests(unittest.TestCase):
             with self.assertRaises(RuntimeError):
                 cache_index._read_items(client, 'table', ['1990-01-01'])
 
-    def test_index_wraps_and_reads_in_batches_of_50(self):
+    def test_index_advances_without_wrapping_and_reads_in_batches_of_50(self):
         from unittest.mock import Mock
-        end = date(1991, 1, 1)
-        s3 = S3({cache_index.CHECKPOINT_KEY: json.dumps({'schema': 1, 'next_date': '1990-01-01'}).encode()})
+        end = date(2027, 11, 1)
+        s3 = S3({cache_index.CHECKPOINT_KEY: json.dumps({'schema': 1, 'next_date': '2026-11-01'}).encode()})
         read = Mock(return_value=[])
         with patch.object(cache_index, '_read_items', read):
             result = cache_index.run(s3, None, 'b', 'table', end, max_dates=600)
-        self.assertEqual(result['next_date'], '1990-01-01')
+        self.assertEqual(result['next_date'], end.isoformat())
         self.assertEqual(result['processed'], 365)
         self.assertTrue(all(len(call.args[2]) <= 50 for call in read.call_args_list))
         self.assertEqual(len(read.call_args_list), 8)

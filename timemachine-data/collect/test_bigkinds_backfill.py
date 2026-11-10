@@ -28,16 +28,16 @@ class Lambda:
 class BackfillTests(unittest.TestCase):
     def test_advances_after_success_and_stops_at_limit(self):
         s3, client = S3(), Lambda()
-        result = batch.run(s3, client, 'b', 'fn', date(1990, 1, 5), sleep=lambda _: None)
-        self.assertEqual(result, {'processed': 2, 'next_date': '1990-01-03'})
-        self.assertEqual(client.calls, ['1990-01-01', '1990-01-02'])
+        result = batch.run(s3, client, 'b', 'fn', date(2026, 11, 5), sleep=lambda _: None)
+        self.assertEqual(result, {'processed': 2, 'next_date': '2026-11-03'})
+        self.assertEqual(client.calls, ['2026-11-01', '2026-11-02'])
         self.assertEqual(s3.puts[0]['IfNoneMatch'], '*')
         self.assertEqual(s3.puts[1]['IfMatch'], 'version')
 
     def test_failure_does_not_advance(self):
         s3, client = S3(), Lambda(502)
         with self.assertRaises(RuntimeError):
-            batch.run(s3, client, 'b', 'fn', date(1990, 1, 5))
+            batch.run(s3, client, 'b', 'fn', date(2026, 11, 5))
         self.assertEqual(s3.puts, [])
 
 
@@ -52,7 +52,7 @@ class BackfillTests(unittest.TestCase):
                 return {'Payload': io.BytesIO(json.dumps(response).encode())}
         s3, client = S3(), NotCached()
         with self.assertRaisesRegex(RuntimeError, '캐시에 저장되지'):
-            batch.run(s3, client, 'b', 'fn', date(1990, 1, 5), sleep=lambda _: None)
+            batch.run(s3, client, 'b', 'fn', date(2026, 11, 5), sleep=lambda _: None)
         self.assertEqual(s3.puts, [])
         self.assertEqual(len(client.calls), 2)
 
@@ -110,7 +110,7 @@ class BackfillTests(unittest.TestCase):
             def invoke(self, **kwargs):
                 return {'Payload': io.BytesIO(json.dumps({'statusCode': 502, 'body': json.dumps({'code': 'BIGKINDS_REJECTED'})}).encode())}
         with self.assertRaises(batch.Rejected):
-            batch.run(S3(), Refused(), 'b', 'fn', date(1990, 1, 5), sleep=lambda _: None)
+            batch.run(S3(), Refused(), 'b', 'fn', date(2026, 11, 5), sleep=lambda _: None)
 
     def test_success_resets_previous_failures(self):
         s3 = S3()

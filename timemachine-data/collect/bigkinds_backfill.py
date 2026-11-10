@@ -17,7 +17,7 @@ MAX_FAILURES = 3
 
 class Rejected(RuntimeError):
     """공급자가 요청을 거부해 즉시 멈춰야 하는 경우."""
-START = date(1990, 1, 1)
+START = availability_v2.BIGKINDS_START
 
 
 def is_paused(s3, bucket):
