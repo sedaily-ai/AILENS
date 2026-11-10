@@ -4,7 +4,7 @@
 // 면 번호가 없는 시기(1990~1993, 1996.8~2017.11.12)는 1면 대신 그날 기사를 준다(백엔드 time_machine.py front 모드).
 // 이 기기에서는 자료가 아예 없는 날(창간 전·지면 공백·보관본 시작 전)만 판단하고 그 날짜는 서버에 보내지 않는다.
 import { useEffect, useState } from 'react';
-import { fetchFrontPage, type BigKindsArticle, type FrontPageData } from '@/shared/lib/api/timelineApi';
+import { fetchFrontPage, type BigKindsArticle, type FrontPageData, type FrontPageReason } from '@/shared/lib/api/timelineApi';
 import { dateLabel } from './birthdayModel';
 import { NAVER_FROM, NEWSPAPER_SCENE, frontRequestDate, isPaperlessSunday, loadNewspaperYear, loadSedailyNewspaperMonth, type NaverRow, type NewspaperYear, type SedailyNewspaperMonth } from './birthdayNewspaper';
 import { nb } from './keepTogether';
@@ -35,6 +35,35 @@ export interface FrontNotice { title: string; lines: string[] }
 const WEEKDAYS = ['일', '월', '화', '수', '목', '금', '토'];
 export const weekdayOf = (date: string) => WEEKDAYS[new Date(`${date}T00:00:00Z`).getUTCDay()];
 
+/** 선택한 날짜의 신문이 없거나 대체될 때, 입력 화면과 결과 화면에서 함께 쓰는 원인 문구. */
+export function frontPageReasonLines(date: string, reason: FrontPageReason | null) {
+  const label = dateLabel(date);
+  if (reason === 'sunday') return [`${label}은 일요일이라 서울경제가 발행되지 않았어요.`];
+  if (reason === 'not_yet') return [`${label}자 서울경제는 아직 보관본에 올라오지 않았어요.`];
+  if (reason === 'archive_missing') return [`${label}자 서울경제 자료를 보관본에서 찾지 못했어요.`];
+  return [`${label}자 서울경제 자료를 찾지 못했어요.`, '휴간했거나 보관본에서 빠졌을 수 있어요.'];
+}
+
+/** 실제로 표시하는 대체 날짜 안내. */
+export function frontPageReplacementLine(date: string) {
+  return `대신 ${dateLabel(date)}자 서울경제를 보여드려요.`;
+}
+
+/** 자료 확인 화면과 결과 화면이 함께 쓰는 확정된 기간 안내. */
+export function frontPagePeriodLine(notice: FrontPageNotice, kind: 'photo' | 'article') {
+  if (notice === 'before-founding') return '서울경제 창간 전이에요.';
+  if (notice === 'suspended') return '해당 기간에는 서울경제가 발행되지 않았어요.';
+  return kind === 'article' ? '빅카인즈 보관본은 1990년부터 있어요.' : '이 날짜의 1면 사진을 찾지 못했어요.';
+}
+
+export function newspaperAvailabilityText(kind: 'photo' | 'article', status: 'available' | 'loading' | 'missing' | 'unknown' | 'alternative') {
+  if (status === 'loading') return '자료를 확인하고 있어요.';
+  if (status === 'unknown') return '자료 상태를 확인하지 못했어요.';
+  if (status === 'available') return '자료가 있어요.';
+  if (status === 'alternative') return '1면인지는 불분명하지만 기사 자료가 있어요.';
+  return kind === 'photo' ? '사진 자료를 찾지 못했어요.' : '기사 자료를 찾지 못했어요.';
+}
+
 /** 서버에 묻지 않아도 답이 정해진 날짜면 안내 종류, 아니면 null(조회 필요). */
 export function frontPageNotice(date: string): FrontPageNotice | null {
   const { founded, suspended, archiveFrom } = FRONT_PAGE_RULES;
@@ -52,21 +81,13 @@ export function frontPageNotice(date: string): FrontPageNotice | null {
 export function frontNotice(data: FrontPageData): FrontNotice | null {
   const shown = data.shown_date;
   if (data.kind === 'none' || !shown || shown === data.date) return null;
-  const birthday = nb(dateLabel(data.date));
-  const lines: string[] = [];
-  let title: string;
-  if (data.reason === 'sunday') {
-    title = '생일에는 신문이 나오지 않았어요';
-    lines.push(`${birthday}은 일요일이라 서울경제가 나오지 ${nb('않았어요.')}`);
-  } else if (data.reason === 'not_yet') {
-    title = '오늘 신문은 아직 보관본에 없어요';
-    lines.push(`오늘(${birthday})자 서울경제가 빅카인즈 보관본에 아직 들어오지 ${nb('않았어요.')}`);
-  } else {
-    title = '생일 당일 신문을 찾지 못했어요';
-    lines.push(`${birthday}자 서울경제가 빅카인즈 보관본에 없어요. 명절 등으로 휴간했거나 보관본에서 ${nb('빠진 날이에요.')}`);
-  }
-  lines.push(`대신 가장 가까운 지난 신문인 ${nb(`${dateLabel(shown)} ${weekdayOf(shown)}요일자`)} 서울경제를 ${nb('보여 줘요.')}`);
-  return { title, lines };
+  const title = data.reason === 'sunday' ? '선택한 날은 일요일이라 서울경제가 발행되지 않았어요'
+    : data.reason === 'not_yet' ? '오늘자 서울경제는 아직 보관본에 없어요'
+      : '선택한 날짜의 신문 자료를 찾지 못했어요';
+  return {
+    title,
+    lines: [...frontPageReasonLines(data.date, data.reason), frontPageReplacementLine(shown)],
+  };
 }
 
 /**

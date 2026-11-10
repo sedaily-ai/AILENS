@@ -8,6 +8,7 @@
   font-size: 14px;
   line-height: 1.5;
 }
+.alignBottom { margin-top: auto; }
 .heading {
   display: flex;
   align-items: center;
@@ -31,16 +32,7 @@
   padding: 4px 0;
   border-top: 1px solid #eef1f6;
 }
-.label { display: flex; flex: 0 0 auto; align-items: center; gap: 10px; font-weight: 650; }
-.icon {
-  display: grid;
-  place-items: center;
-  width: 28px;
-  height: 28px;
-  border-radius: 10px;
-  color: #3157a7;
-  background: #f0f5fd;
-}
+.label { display: block; flex: 0 0 auto; font-weight: 650; }
 .status { display: flex; align-items: center; justify-content: flex-end; gap: 5px; min-width: 0; text-align: right; color: #68758a; font-size: 13px; font-weight: 600; word-break: keep-all; }
 .status svg { flex: 0 0 auto; }
 .row[data-state='available'] .status { color: #1d5b4a; }
@@ -48,7 +40,6 @@
 @media (max-width: 380px) {
   .availability { padding: 12px 12px 8px; }
   .row { gap: 8px; }
-  .label { gap: 8px; }
 }
 
 @keyframes availabilitySpin {
