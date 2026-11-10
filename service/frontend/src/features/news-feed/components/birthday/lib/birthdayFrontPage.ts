@@ -6,7 +6,7 @@
 import { useEffect, useState } from 'react';
 import { fetchFrontPage, type BigKindsArticle, type FrontPageData } from '@/shared/lib/api/timelineApi';
 import { dateLabel } from './birthdayModel';
-import { NAVER_FROM, NEWSPAPER_SCENE, frontRequestDate, isPaperlessSunday, loadNewspaperYear, type NaverRow, type NewspaperYear } from './birthdayNewspaper';
+import { NAVER_FROM, NEWSPAPER_SCENE, frontRequestDate, isPaperlessSunday, loadNewspaperYear, loadSedailyNewspaperMonth, type NaverRow, type NewspaperYear, type SedailyNewspaperMonth } from './birthdayNewspaper';
 import { nb } from './keepTogether';
 
 export const FRONT_PAGE_RULES = {
@@ -76,6 +76,7 @@ export function frontNotice(data: FrontPageData): FrontNotice | null {
  */
 export function frontSourceNote(data: FrontPageData | null) {
   if (!data || data.kind === 'none') return '';
+  if (data.source === 'sedaily_archive') return `서울경제 제공 1면 기사 자료예요. 사진이 없는 날도 기사 기록을 ${nb('보여 줘요.')}`;
   const base = `빅카인즈 보관본에서 고른 그날 서울경제 ${nb('기사예요.')} 실제 지면을 옮긴 ${nb('것이 아니에요.')}`;
   if (data?.kind === 'day' && data.basis === 'issue') {
     const filled = data.articles.some(article => !article.coverage);
@@ -139,10 +140,17 @@ export function loadFrontPage(date: string, fetcher: FrontPageFetcher = fetchFro
 export function prefetchFrontPage(date: string, fetcher?: FrontPageFetcher) {
   if (frontPageNotice(date)) return;
   if (!NEWSPAPER_SCENE) { void loadFrontPage(date, fetcher); return; }
-  // 신문 장면은 결과 화면과 같은 날짜(일요일이면 월요일)로 묻고, 네이버 목록 파일도 함께 받아 둔다.
+  // 서울경제 원본이 있으면 월 파일만 준비한다. 원본에 날짜가 없을 때만 기존 API를 미리 부른다.
   const request = frontRequestDate(date);
-  void loadFrontPage(request, fetcher);
-  if (request >= NAVER_FROM) void loadNewspaperYear(Number(request.slice(0, 4)));
+  const [year, month] = date.split('-').map(Number);
+  const archive = loadSedailyNewspaperMonth(year, month);
+  void archive.then(file => {
+    const hasSourceDay = file?.days[date]?.some(article => article.title.trim());
+    if (!hasSourceDay) {
+      void loadFrontPage(request, fetcher);
+      if (request >= NAVER_FROM) void loadNewspaperYear(Number(request.slice(0, 4)));
+    }
+  });
 }
 
 export interface FrontScene {
@@ -154,6 +162,7 @@ export interface FrontScene {
 interface SceneDeps {
   front: (date: string) => Promise<FrontPageData | null>;
   year: (year: number) => Promise<NewspaperYear | null>;
+  month?: (year: number, month: number) => Promise<SedailyNewspaperMonth | null>;
 }
 
 /** 서버는 요청한 날짜(일요일이면 월요일)를 기준으로 답한다. 화면은 생일 기준으로 읽으므로 date와 까닭을 맞춘다. */
@@ -169,10 +178,29 @@ function asBirthday(data: FrontPageData, birthDate: string): FrontPageData {
  * ① 일요일이면 월요일부터 묻고(없으면 서버가 토요일을 고른다) ② 서버가 고른 날짜가 네이버 1면 목록 제공 시기면 연도 파일의 그날 목록을 붙인다.
  * 연도 파일이 없거나 그날이 없어도 실패가 아니다(빅카인즈 기사로 보여 준다). 서버 요청이 실패하면 null.
  */
-export async function loadFrontScene(birthDate: string, deps: SceneDeps = { front: loadFrontPage, year: loadNewspaperYear }, enabled = NEWSPAPER_SCENE): Promise<FrontScene | null> {
+export async function loadFrontScene(birthDate: string, deps: SceneDeps = { front: loadFrontPage, year: loadNewspaperYear, month: loadSedailyNewspaperMonth }, enabled = NEWSPAPER_SCENE): Promise<FrontScene | null> {
   if (!enabled) {
     const data = await deps.front(birthDate);
     return data && { data, naver: null };
+  }
+  // 받은 서울경제 CSV가 해당 날짜를 담고 있으면 이를 최우선 원본으로 쓴다.
+  // 월 파일에 날짜가 없거나 읽지 못했을 때만 기존 BigKinds/네이버 경로로 되돌아간다.
+  const [year, month] = birthDate.split('-').map(Number);
+  const archive = await deps.month?.(year, month);
+  const sourceRows = archive?.days[birthDate]?.filter(article => article.title.trim()) ?? [];
+  if (sourceRows.length) {
+    const articles: BigKindsArticle[] = sourceRows.map(article => ({
+      news_id: article.id,
+      title: article.title,
+      content: [article.subtitle, article.body].filter(Boolean).join('\n\n'),
+      byline: '',
+      category: '',
+      original_link: null,
+    }));
+    return {
+      data: { date: birthDate, source: 'sedaily_archive', date_kind: 'front', shown_date: birthDate, kind: 'front', reason: null, basis: null, articles },
+      naver: null,
+    };
   }
   const request = frontRequestDate(birthDate);
   const requestYear = Number(request.slice(0, 4));

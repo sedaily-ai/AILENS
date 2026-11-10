@@ -3,8 +3,8 @@
 import { useEffect, useState } from 'react';
 import { parseDate } from './lib/birthdayModel';
 import type { FrontPageReason } from '@/shared/lib/api/timelineApi';
-import { frontPageNotice, loadFrontScene, type FrontPageState } from './lib/birthdayFrontPage';
-import { newspaperImageUrl, newspaperPreviewUrl } from './lib/birthdayNewspaper';
+import { frontPageNotice, loadFrontScene, type FrontPageNotice, type FrontPageState } from './lib/birthdayFrontPage';
+import { loadSedailyNewspaperMonth, newspaperImageUrl, newspaperPreviewUrl } from './lib/birthdayNewspaper';
 import { cachedArticleStatus, type DayStatus } from './lib/availabilityStatus';
 import { needsOwnPhotoProbe, newspaperPhotoDate, newspaperView, type PhotoState } from './lib/birthdayNewspaperView';
 import styles from './birthdayAvailability.module.css';
@@ -86,10 +86,13 @@ export function BirthdayAvailability({ date, today, onSubstitutionChange }: { da
     let active = true;
     const notice = frontPageNotice(date);
     const photo = notice && notice !== 'before-archive' ? Promise.resolve<PhotoAvailability>('unavailable') : photoAvailable(date);
+    const [year, month] = date.split('-').map(Number);
+    const archive = loadSedailyNewspaperMonth(year, month);
     // 사진 보유 여부는 다이얼이 멈추기를 기다리지 않는다. 큰 원본 다운로드는 멈춘 뒤 시작한다.
-    void Promise.all([photo, loadYear(date)]).then(([value, days]) => {
+    void Promise.all([photo, loadYear(date), archive]).then(([value, days, sourceMonth]) => {
       if (!active) return;
-      const article = cachedArticleStatus(date, Boolean(notice), days?.[date]);
+      const sourceHasArticles = sourceMonth?.days[date]?.some(article => article.title.trim()) ?? false;
+      const article = sourceHasArticles ? 'front' : cachedArticleStatus(date, Boolean(notice), days?.[date]);
       setResult(previous => previous?.date === date && previous.complete ? previous : { date, shown: date, reason: null, photo: value, article, complete: false });
     });
     const timer = window.setTimeout(() => {
@@ -106,15 +109,20 @@ export function BirthdayAvailability({ date, today, onSubstitutionChange }: { da
   }, [date, valid, onSubstitutionChange]);
   const current = valid && result?.date === date ? result : null;
   if (!valid) return null;
+  const notice: FrontPageNotice | null = frontPageNotice(date);
+  const unavailableMessage = notice === 'before-founding' ? '서울경제 창간 전이에요'
+    : notice === 'suspended' ? '해당 기간에는 서울경제가 발행되지 않았어요'
+      : notice === 'before-archive' ? '이 시기 자료는 보관본에 없어요'
+        : '자료가 없어 보여드릴 수 없어요';
   return <div className={styles.availability} role="status" aria-live="polite">
     <div className={styles.heading}>
       <strong>선택한 날짜의 신문 자료</strong>
     </div>
     <NewspaperAvailabilityRow kind="photo" status={!current ? 'loading' : current.photo === 'available' ? 'available' : current.photo === 'unavailable' ? 'missing' : 'unknown'}>
-      {!current ? '기록을 찾고 있어요' : current.photo === 'available' ? '그날의 기록이 있어요' : current.photo === 'unknown' ? '자료 여부를 알 수 없어요' : '자료가 없어 보여드릴 수 없어요'}
+      {!current ? '기록을 찾고 있어요' : current.photo === 'available' ? '그날의 기록이 있어요' : current.photo === 'unknown' ? '자료 여부를 알 수 없어요' : unavailableMessage}
     </NewspaperAvailabilityRow>
     <NewspaperAvailabilityRow kind="article" status={!current || current.article === 'loading' ? 'loading' : current.article === 'front' ? 'available' : current.article === 'day' ? 'alternative' : current.article === 'unavailable' ? 'missing' : 'unknown'}>
-      {!current || current.article === 'loading' ? '기록을 찾고 있어요' : current.article === 'front' ? '그날의 기록이 있어요' : current.article === 'day' ? '기사는 있어요 · 1면인지는 불분명해요' : current.article === 'unknown' ? '자료 여부를 알 수 없어요' : '자료가 없어 보여드릴 수 없어요'}
+      {!current || current.article === 'loading' ? '기록을 찾고 있어요' : current.article === 'front' ? '그날의 기록이 있어요' : current.article === 'day' ? '기사는 있어요 · 1면인지는 불분명해요' : current.article === 'unknown' ? '자료 여부를 알 수 없어요' : unavailableMessage}
     </NewspaperAvailabilityRow>
   </div>;
 }

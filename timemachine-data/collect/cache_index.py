@@ -5,7 +5,7 @@ from datetime import date, datetime, timedelta, timezone
 import availability_v2
 
 CHECKPOINT_KEY = 'ops/status/bigkinds-cache-index.json'
-START = date(1990, 1, 1)
+START = availability_v2.BIGKINDS_START
 
 
 def _load_progress(s3, bucket):
@@ -66,7 +66,7 @@ def run(s3, dynamodb, bucket, table, today, *, now=None, max_dates=600):
     now = now or datetime.now(timezone.utc)
     start, condition = _load_progress(s3, bucket)
     if start >= today:
-        start = START
+        return {'processed': 0, 'next_date': start.isoformat()}
     end = min(start + timedelta(days=max_dates), today)
     dates = [(start + timedelta(days=i)).isoformat() for i in range((end - start).days)]
     if not dates:
@@ -109,7 +109,7 @@ def run(s3, dynamodb, bucket, table, today, *, now=None, max_dates=600):
             doc['updated_at'] = now.isoformat(timespec='seconds')
             s3.put_object(Bucket=bucket, Key=key, Body=json.dumps(doc, ensure_ascii=False, separators=(',', ':')).encode(),
                           ContentType='application/json; charset=utf-8', CacheControl='public, max-age=600', IfMatch=obj['ETag'])
-    next_day = START if end >= today else end
+    next_day = end
     s3.put_object(Bucket=bucket, Key=CHECKPOINT_KEY,
                   Body=json.dumps({'schema': 1, 'next_date': next_day.isoformat()}).encode(),
                   ContentType='application/json', CacheControl='no-store', **condition)

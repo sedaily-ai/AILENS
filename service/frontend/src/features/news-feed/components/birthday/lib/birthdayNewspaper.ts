@@ -30,6 +30,61 @@ export function newspaperPreviewUrl(date: string) {
   return `/_next/image?url=${encodeURIComponent(original)}&w=1024&q=75`;
 }
 export const newspaperYearUrl = (year: number) => `${NEWSPAPER_BASE}/index/v1/${year}.json`;
+export const newspaperMonthUrl = (year: number, month: number) => `${NEWSPAPER_BASE}/index/v2/${year}/${String(month).padStart(2, '0')}.json`;
+
+/** 서울경제 원본 1면 기사. CSV의 모든 필드를 보존하는 월별 정적 파일 형식. */
+export interface SedailyFrontArticle {
+  id: string;
+  title: string;
+  subtitle: string;
+  body: string;
+}
+export interface SedailyNewspaperMonth {
+  year: number;
+  month: number;
+  days: Record<string, SedailyFrontArticle[]>;
+}
+
+const isObject = (value: unknown): value is Record<string, unknown> => typeof value === 'object' && value !== null && !Array.isArray(value);
+
+export function parseSedailyNewspaperMonth(raw: unknown, year: number, month: number): SedailyNewspaperMonth | null {
+  if (!isObject(raw) || raw.schema !== 2 || raw.year !== year || raw.month !== month || !isObject(raw.days)) return null;
+  const days: Record<string, SedailyFrontArticle[]> = {};
+  for (const [day, rawArticles] of Object.entries(raw.days)) {
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(day) || Number(day.slice(0, 4)) !== year || Number(day.slice(5, 7)) !== month || !Array.isArray(rawArticles)) return null;
+    const articles: SedailyFrontArticle[] = [];
+    for (const rawArticle of rawArticles) {
+      if (!isObject(rawArticle) || typeof rawArticle.id !== 'string' || !/^\d+\.\d+$/.test(rawArticle.id)
+        || typeof rawArticle.title !== 'string' || typeof rawArticle.subtitle !== 'string' || typeof rawArticle.body !== 'string') return null;
+      articles.push({ id: rawArticle.id, title: rawArticle.title, subtitle: rawArticle.subtitle, body: rawArticle.body });
+    }
+    days[day] = articles;
+  }
+  return { year, month, days };
+}
+
+async function fetchSedailyNewspaperMonth(year: number, month: number): Promise<SedailyNewspaperMonth | null> {
+  try {
+    const response = await fetch(newspaperMonthUrl(year, month));
+    if (!response.ok) return null;
+    return parseSedailyNewspaperMonth(await response.json(), year, month);
+  } catch {
+    return null;
+  }
+}
+
+const newspaperMonths = new Map<string, Promise<SedailyNewspaperMonth | null>>();
+export function loadSedailyNewspaperMonth(year: number, month: number, fetcher = fetchSedailyNewspaperMonth) {
+  const key = `${year}-${String(month).padStart(2, '0')}`;
+  const known = newspaperMonths.get(key);
+  if (known) return known;
+  const request = fetcher(year, month).catch(() => null).then(file => {
+    if (!file) newspaperMonths.delete(key);
+    return file;
+  });
+  newspaperMonths.set(key, request);
+  return request;
+}
 
 export function shiftDate(date: string, days: number) {
   const moved = new Date(`${date}T00:00:00Z`);
