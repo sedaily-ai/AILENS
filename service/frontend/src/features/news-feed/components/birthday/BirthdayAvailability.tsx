@@ -3,7 +3,7 @@
 import { useEffect, useState } from 'react';
 import { parseDate } from './lib/birthdayModel';
 import type { FrontPageReason } from '@/shared/lib/api/timelineApi';
-import { frontPageNotice, loadFrontScene, type FrontPageNotice, type FrontPageState } from './lib/birthdayFrontPage';
+import { frontPageNotice, frontPagePeriodLine, loadFrontScene, newspaperAvailabilityText, type FrontPageNotice, type FrontPageState } from './lib/birthdayFrontPage';
 import { loadSedailyNewspaperMonth, newspaperImageUrl, newspaperPreviewUrl } from './lib/birthdayNewspaper';
 import { cachedArticleStatus, type DayStatus } from './lib/availabilityStatus';
 import { needsOwnPhotoProbe, newspaperPhotoDate, newspaperView, type PhotoState } from './lib/birthdayNewspaperView';
@@ -77,11 +77,12 @@ async function loadAvailability(date: string, selectedPhoto: Promise<PhotoAvaila
   return { date, shown, reason: state.status === 'ok' ? state.data.reason : null, photo, article, complete: true };
 }
 
-export function BirthdayAvailability({ date, today, onSubstitutionChange }: { date: string; today: string; onSubstitutionChange?: (substitution: BirthdaySubstitution | null) => void }) {
+export function BirthdayAvailability({ date, today, onSubstitutionChange, onCheckingChange, alignBottom = false }: { date: string; today: string; onSubstitutionChange?: (substitution: BirthdaySubstitution | null) => void; onCheckingChange?: (checking: boolean) => void; alignBottom?: boolean }) {
   const [result, setResult] = useState<Availability | null>(null);
   const valid = Boolean(parseDate(date, today));
   useEffect(() => {
     onSubstitutionChange?.(null);
+    onCheckingChange?.(valid);
     if (!valid) return;
     let active = true;
     const notice = frontPageNotice(date);
@@ -94,8 +95,19 @@ export function BirthdayAvailability({ date, today, onSubstitutionChange }: { da
       const sourceHasArticles = sourceMonth?.days[date]?.some(article => article.title.trim()) ?? false;
       const article = sourceHasArticles ? 'front' : cachedArticleStatus(date, Boolean(notice), days?.[date]);
       setResult(previous => previous?.date === date && previous.complete ? previous : { date, shown: date, reason: null, photo: value, article, complete: false });
+      // 날짜별 현황 파일이나 서울경제 원본에서 답을 얻었으면 화면에서 필요한 확인은 끝났다.
+      // 서버가 대체 날짜를 찾는 응답은 별도로 이어가되 버튼을 계속 잠그지 않는다.
+      if (article !== 'loading') onCheckingChange?.(false);
     });
+    let finishTimer = 0;
     const timer = window.setTimeout(() => {
+      finishTimer = window.setTimeout(() => {
+        if (!active) return;
+        setResult(previous => previous?.date === date
+          ? { ...previous, article: previous.article === 'loading' ? 'unknown' : previous.article, complete: true }
+          : previous);
+        onCheckingChange?.(false);
+      }, 10_000);
       void photo.then(value => { if (active && value === 'available') prefetchPhoto(date); });
       void loadAvailability(date, photo).then(value => {
         if (!active) return;
@@ -103,26 +115,33 @@ export function BirthdayAvailability({ date, today, onSubstitutionChange }: { da
           ? { ...value, article: previous.article } : value);
         onSubstitutionChange?.(value.shown !== date ? { date: value.shown, reason: value.reason } : null);
         if (value.photo === 'available' && value.shown !== date) prefetchPhoto(value.shown);
+      }).catch(() => {
+        if (!active) return;
+        setResult(previous => previous?.date === date
+          ? { ...previous, article: previous.article === 'loading' ? 'unknown' : previous.article, complete: true }
+          : previous);
+        onCheckingChange?.(false);
+      }).finally(() => {
+        window.clearTimeout(finishTimer);
+        if (active) onCheckingChange?.(false);
       });
     }, 400);
-    return () => { active = false; window.clearTimeout(timer); };
-  }, [date, valid, onSubstitutionChange]);
+    return () => { active = false; window.clearTimeout(timer); window.clearTimeout(finishTimer); };
+  }, [date, valid, onSubstitutionChange, onCheckingChange]);
   const current = valid && result?.date === date ? result : null;
   if (!valid) return null;
   const notice: FrontPageNotice | null = frontPageNotice(date);
-  const unavailableMessage = notice === 'before-founding' ? '서울경제 창간 전이에요'
-    : notice === 'suspended' ? '해당 기간에는 서울경제가 발행되지 않았어요'
-      : notice === 'before-archive' ? '이 시기 자료는 보관본에 없어요'
-        : '자료가 없어 보여드릴 수 없어요';
-  return <div className={styles.availability} role="status" aria-live="polite">
+  const photoStatus = !current ? 'loading' : current.photo === 'available' ? 'available' : current.photo === 'unavailable' ? 'missing' : 'unknown';
+  const articleStatus = !current || current.article === 'loading' ? 'loading' : current.article === 'front' ? 'available' : current.article === 'day' ? 'alternative' : current.article === 'unknown' ? 'unknown' : 'missing';
+  return <div className={`${styles.availability}${alignBottom ? ` ${styles.alignBottom}` : ''}`} role="status" aria-live="polite">
     <div className={styles.heading}>
       <strong>선택한 날짜의 신문 자료</strong>
     </div>
-    <NewspaperAvailabilityRow kind="photo" status={!current ? 'loading' : current.photo === 'available' ? 'available' : current.photo === 'unavailable' ? 'missing' : 'unknown'}>
-      {!current ? '기록을 찾고 있어요' : current.photo === 'available' ? '그날의 기록이 있어요' : current.photo === 'unknown' ? '자료 여부를 알 수 없어요' : unavailableMessage}
+    <NewspaperAvailabilityRow kind="photo" status={photoStatus}>
+      {notice && photoStatus === 'missing' ? frontPagePeriodLine(notice, 'photo') : newspaperAvailabilityText('photo', photoStatus)}
     </NewspaperAvailabilityRow>
-    <NewspaperAvailabilityRow kind="article" status={!current || current.article === 'loading' ? 'loading' : current.article === 'front' ? 'available' : current.article === 'day' ? 'alternative' : current.article === 'unavailable' ? 'missing' : 'unknown'}>
-      {!current || current.article === 'loading' ? '기록을 찾고 있어요' : current.article === 'front' ? '그날의 기록이 있어요' : current.article === 'day' ? '기사는 있어요 · 1면인지는 불분명해요' : current.article === 'unknown' ? '자료 여부를 알 수 없어요' : unavailableMessage}
+    <NewspaperAvailabilityRow kind="article" status={articleStatus}>
+      {notice && articleStatus === 'missing' ? frontPagePeriodLine(notice, 'article') : newspaperAvailabilityText('article', articleStatus)}
     </NewspaperAvailabilityRow>
   </div>;
 }

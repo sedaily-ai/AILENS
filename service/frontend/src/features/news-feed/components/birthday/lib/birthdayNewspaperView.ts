@@ -2,9 +2,9 @@
 // 표시 규칙과 안내 문구 정본: timemachine-data/261103_타임머신_신문장면_표시규칙.md (1~4절).
 // 신문 장면 스위치(NEWSPAPER_SCENE)가 꺼져 있으면 화면이 이 파일을 쓰지 않고 지금 문구를 그대로 쓴다.
 import type { BigKindsArticle, FrontPageData } from '@/shared/lib/api/timelineApi';
-import { frontSourceNote, weekdayOf, type FrontNotice, type FrontPageState } from './birthdayFrontPage';
-import { dateLabel } from './birthdayModel';
-import { isPaperlessSunday, naverArticles, shiftDate } from './birthdayNewspaper';
+import type { FrontPageReason } from '@/shared/lib/api/timelineApi';
+import { frontPageReasonLines, frontPageReplacementLine, frontSourceNote, type FrontNotice, type FrontPageState } from './birthdayFrontPage';
+import { isPaperlessSunday, naverArticles } from './birthdayNewspaper';
 import { nb } from './keepTogether';
 
 /** 사진을 불러오는 중 · 불러옴 · 못 찾음(없음과 네트워크 문제를 구분할 수 없다). */
@@ -78,20 +78,17 @@ export function newspaperPhotoDate(state: FrontPageState, birthDate: string, own
 }
 
 // 월·일만 쓰되 해가 다르면(12월 31일 → 1월 1일 등) 연도까지 쓴다. 날짜는 한 줄에 붙여 둔다.
-const dayLabel = (date: string, birthDate: string) => nb(date.slice(0, 4) === birthDate.slice(0, 4) ? dateLabel(date).replace(/^\d+년 /, '') : dateLabel(date));
-
-function substituteNotice(birthDate: string, shown: string, oneFace: boolean): FrontNotice {
-  const paper = oneFace ? '서울경제 1면을' : '서울경제를';
-  const when = `${dayLabel(shown, birthDate)} ${weekdayOf(shown)}요일자`;
-  if (isPaperlessSunday(birthDate)) {
-    const lines = ['일요일이라 서울경제가 나오지 않았어요.'];
-    if (shown > birthDate) lines.push(`대신 다음 날인 ${nb(when)} ${paper} ${nb('보여 줘요.')}`);
-    else lines.push(`월요일에도 신문이 없어서 ${shown === shiftDate(birthDate, -1) ? '하루 전인' : '가장 가까운 지난 신문인'} ${nb(when)} ${paper} ${nb('보여 줘요.')}`);
-    return { title: '생일에는 신문이 나오지 않았어요', lines };
+function substituteNotice(birthDate: string, shown: string, reason: FrontPageReason | null): FrontNotice {
+  const actualReason = reason === 'sunday' || isPaperlessSunday(birthDate) ? 'sunday' : reason;
+  if (actualReason === 'sunday') {
+    return {
+      title: '선택한 날은 일요일이라 서울경제가 발행되지 않았어요',
+      lines: [...frontPageReasonLines(birthDate, 'sunday'), frontPageReplacementLine(shown)],
+    };
   }
   return {
-    title: '그날 1면을 찾지 못했어요',
-    lines: ['명절 등으로 쉬었거나 보관본에서 빠진 날이에요.', `대신 가장 가까운 지난 신문인 ${nb(when)} ${paper} ${nb('보여 줘요.')}`],
+    title: '선택한 날짜의 신문 자료를 찾지 못했어요',
+    lines: [...frontPageReasonLines(birthDate, actualReason), frontPageReplacementLine(shown)],
   };
 }
 
@@ -163,7 +160,7 @@ export function newspaperView(state: FrontPageState, birthDate: string, photo: P
     list: p.list,
     articles: p.articles,
     ownPhotoDay: p.ownPhotoDay === true,
-    substitute: p.shown !== birthDate ? substituteNotice(birthDate, p.shown, oneFace) : null,
+    substitute: p.shown !== birthDate ? substituteNotice(birthDate, p.shown, state.status === 'ok' ? state.data.reason : null) : null,
     empty: emptyNotice(p, photo, birthDate),
     kicker: `${p.shown === birthDate ? '내가 태어난 날' : '내 생일 무렵'} 서울경제${oneFace ? ' 1면' : ''}`,
     heading: oneFace ? '그날의 서울경제 1면' : '그날의 서울경제',

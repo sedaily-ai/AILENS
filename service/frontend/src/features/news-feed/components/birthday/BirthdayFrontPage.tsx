@@ -3,7 +3,7 @@ import Link from 'next/link';
 import { ExternalLink, Info } from 'lucide-react';
 import type { FrontPageData } from '@/shared/lib/api/timelineApi';
 import type { FrontNotice, FrontPageNotice, FrontPageState } from './lib/birthdayFrontPage';
-import { FRONT_LOOKBACK_DAYS, frontArticleHref, frontNotice, frontSourceNote, shareableFront, weekdayOf } from './lib/birthdayFrontPage';
+import { FRONT_LOOKBACK_DAYS, frontArticleHref, frontNotice, frontPagePeriodLine, frontSourceNote, newspaperAvailabilityText, shareableFront, weekdayOf } from './lib/birthdayFrontPage';
 import { guestKicker } from './lib/birthdayArrival';
 import { dateLabel } from './lib/birthdayModel';
 import { NEWSPAPER_SCENE } from './lib/birthdayNewspaper';
@@ -109,11 +109,23 @@ export function BirthdayFrontPage({ state, birthDate, onRetry, onUseBirthday, on
   const spoken = state?.status === 'loading' ? '그날 신문을 찾고 있어요.'
     : substituted ? `생일 당일 신문이 없어 ${dateLabel(shown)}자 신문을 보여 줘요.` : '';
   const sceneName = view ? view.kicker : kicker(state);
+  const photoStatus = !state ? 'unknown' : state.status === 'loading' || (view !== null && photoState === 'loading') ? 'loading' : photoState === 'ok' && view !== null ? 'available' : state.status === 'notice' && state.notice !== 'before-archive' ? 'missing' : view ? 'missing' : 'unknown';
+  const articleStatus = !state ? 'unknown' : state.status === 'loading' ? 'loading' : view?.list === 'front' || view?.list === 'naver' ? 'available' : view?.list === 'day' ? 'alternative' : state.status === 'notice' || state.status === 'image-only' || (state.status === 'ok' && state.data.kind === 'none' && state.data.reason !== 'not_yet') || view?.ownPhotoDay ? 'missing' : 'unknown';
+  const periodNotice = state?.status === 'notice' ? state.notice : null;
   return <section id="birthday-front" className={`${styles.scene} ${styles.narrowScene}`} aria-labelledby="birthday-front-title">
     <p className={styles.kicker}>{guest ? guestKicker(sceneName) : sceneName}</p>
     <h3 id="birthday-front-title" className="sr-only">{view ? view.heading : '그날의 서울경제'}</h3>
     <p className="sr-only" role="status">{spoken}</p>
     {view ? <FrontNote note={view.substitute} /> : data && <FrontNote note={frontNotice(data)} />}
+    {state && <div className={availabilityStyles.availability} role="status">
+      <strong>보여드리는 신문 자료</strong>
+      <NewspaperAvailabilityRow kind="photo" status={photoStatus}>
+        {periodNotice && photoStatus === 'missing' ? frontPagePeriodLine(periodNotice, 'photo') : newspaperAvailabilityText('photo', photoStatus)}
+      </NewspaperAvailabilityRow>
+      <NewspaperAvailabilityRow kind="article" status={articleStatus}>
+        {periodNotice && articleStatus === 'missing' ? frontPagePeriodLine(periodNotice, 'article') : newspaperAvailabilityText('article', articleStatus)}
+      </NewspaperAvailabilityRow>
+    </div>}
     <div className={styles.paper} aria-busy={state?.status === 'loading'}>
       {/* 제호 줄은 날짜·요일만. 면 번호는 붙이지 않는다(1면 사진은 아래에 따로 있다). */}
       <div className={styles.masthead}><strong>서울경제</strong>{state && <span>{masthead(shown)}</span>}</div>
@@ -134,16 +146,6 @@ export function BirthdayFrontPage({ state, birthDate, onRetry, onUseBirthday, on
         : state.data.kind === 'none' ? <div className={styles.paperEmpty}><strong>이 무렵 신문은 보관본에 없어요</strong><p>{`생일과 그 전 ${FRONT_LOOKBACK_DAYS}일 동안의 서울경제가 빅카인즈 보관본에 ${nb('없어요.')}`}</p></div>
         : <Headlines articles={state.data.articles} />}
     </div>
-    {state && <div className={availabilityStyles.availability} role="status">
-      <strong>보여드리는 신문 자료</strong>
-      {shown !== birthDate && <p>선택한 날: {dateLabel(birthDate)} · 신문: {dateLabel(shown)}</p>}
-      <NewspaperAvailabilityRow kind="photo" status={state.status === 'loading' || (view !== null && photoState === 'loading') ? 'loading' : photoState === 'ok' && view !== null ? 'available' : state.status === 'notice' && state.notice !== 'before-archive' ? 'missing' : 'unknown'}>
-        {state.status === 'loading' ? '기록을 찾고 있어요' : state.status === 'notice' && state.notice !== 'before-archive' ? '신문이 나오지 않았어요' : !view ? '사진 확인이 어려워요' : photoState === 'loading' ? '기록을 찾고 있어요' : photoState === 'ok' ? '그날의 기록이 있어요' : '사진을 불러오지 못했어요'}
-      </NewspaperAvailabilityRow>
-      <NewspaperAvailabilityRow kind="article" status={state.status === 'loading' ? 'loading' : view?.list === 'front' || view?.list === 'naver' ? 'available' : view?.list === 'day' ? 'alternative' : state.status === 'notice' || state.status === 'image-only' || (state.status === 'ok' && state.data.kind === 'none' && state.data.reason !== 'not_yet') || view?.ownPhotoDay ? 'missing' : 'unknown'}>
-        {state.status === 'loading' ? '기록을 찾고 있어요' : view?.list === 'front' || view?.list === 'naver' ? '그날의 기록이 있어요' : view?.list === 'day' ? '1면 구분이 어려워요 · 그날 기사 있어요' : state.status === 'notice' && state.notice !== 'before-archive' ? '신문이 나오지 않았어요' : state.status === 'image-only' || (state.status === 'ok' && state.data.kind === 'none' && state.data.reason !== 'not_yet') || view?.ownPhotoDay ? '1면 기사 자료가 없어요' : '기사 확인이 어려워요'}
-      </NewspaperAvailabilityRow>
-    </div>}
     {/* 생일 당일 사진만 보여 주는 날은 그날 기사가 없어 '그날의 기사 모두 보기'가 빈 페이지로 가므로 보관본에 없는 날처럼 감춘다. */}
     {data && data.kind !== 'none' && !view?.ownPhotoDay && <div className={styles.sceneActions}>
       <Link className={styles.sceneAction} href={paperHref(shown)} prefetch={false} data-fx="own">{sameDay ? '그날의 기사 모두 보기' : `${month}월 ${day}일의 기사 모두 보기`}</Link>

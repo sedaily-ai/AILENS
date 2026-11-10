@@ -30,7 +30,7 @@
 .arrival .title { margin-top: 24px !important; font-size: 40px; }
 
 /* ② 그날 서울경제 — 지면 제호와 겹줄, 세리프 제목. */
-.paper { margin-top: 16px; padding: 24px 20px 8px; border: 1px solid #d1d5db; border-radius: 4px; background: #fff; }
+.paper { margin-top: 16px; padding: 24px 20px 8px; border: 1px solid #d1d5db; border-radius: 16px; background: #fff; }
 .masthead { text-align: center; padding-bottom: 12px; border-bottom: 4px double #111827; }
 .masthead strong { display: block; font-family: 'Noto Serif KR', serif; font-size: 32px; font-weight: 900; letter-spacing: -.02em; line-height: 1.2; }
 .masthead span { display: block; margin-top: 4px; font-size: 13px; color: #4b5563; }
