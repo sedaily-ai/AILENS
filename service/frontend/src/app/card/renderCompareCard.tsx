@@ -22,7 +22,7 @@ export const CARD_TEXT_MAX: Record<CardVariant, number> = { og: 62, story: 110 }
 type CardFont = { name: string; data: ArrayBuffer; weight: 500 | 700; style: 'normal' };
 let fontsPromise: Promise<CardFont[]> | null = null;
 
-function loadFonts(): Promise<CardFont[]> {
+export function loadFonts(): Promise<CardFont[]> {
   if (!fontsPromise) {
     const read = async (file: string, weight: 500 | 700): Promise<CardFont> => {
       const buf = await readFile(join(process.cwd(), 'public', 'fonts', 'card', file));

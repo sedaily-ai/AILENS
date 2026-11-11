@@ -238,7 +238,9 @@ export async function buildLensArticleMetadata(
   const title = buildPageTitle(headline);
   const description = articleDescription(lens);
   const url = `${SITE_URL}${lensPath(lens)}`;
-  const shareImages = await pickShareImages(lens);
+  // 메신저 미리보기용 공유 카드(PNG). 예전엔 기사 사진/웹툰 컷(WebP)을 그대로 넣어 카카오톡에 썸네일이 안 뜨는 경우가 있었다(2026-11-11).
+  // 카드는 메신저 봇이 요청할 때만 만들어지므로 이 메타 생성은 이미지 크기를 재지 않아 더 가볍다. 구조화 데이터(JSON-LD)는 실제 사진을 그대로 쓴다.
+  const shareCard = { url: `${SITE_URL}/card/${encodeURIComponent(lens.id)}/share.png`, width: 1200, height: 630 };
   return {
     title,
     description,
@@ -257,7 +259,7 @@ export async function buildLensArticleMetadata(
       section: displayCategoryLabel(lens.category) || '경제',
       tags: articleKeywords(lens),
       // 잰 크기만 선언한다. 측정에 실패한 이미지엔 값을 박지 않는다.
-      images: [{ url: shareImages.primary.url, ...(shareImages.primary.width ? { width: shareImages.primary.width, height: shareImages.primary.height } : {}), alt: headline }],
+      images: [{ ...shareCard, type: 'image/png', alt: headline }],
       locale: 'ko_KR',
       siteName: 'AI LENS — 서울경제',
     },
@@ -265,7 +267,7 @@ export async function buildLensArticleMetadata(
       card: 'summary_large_image',
       title,
       description,
-      images: [shareImages.primary.url],
+      images: [shareCard.url],
     },
     // 검색·공유·서지 보강 메타: 뉴스 키워드, 수정 시각, 분류, Dublin Core, 슬랙·트위터 라벨.
     other: {
