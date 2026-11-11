@@ -1,16 +1,19 @@
 import { fetchLensBySlug } from '@/shared/lib/api/cmsPostsApi';
 import { buildCompareCard } from '@/shared/lib/content/compareCard';
 import { CARD_TEXT_MAX, renderCompareCard, type CardVariant } from '../../renderCompareCard';
+import { renderShareCard } from '../../renderShareCard';
 
 // 비교 카드 이미지 — /card/{기사 id}/og.png(링크 미리보기 1200×630), /card/{기사 id}/story.png(저장용 1080×1350).
 // 크기를 쿼리스트링이 아니라 경로로 받는다: CloudFront 캐시 키에 쿼리스트링이 들어가지 않아(cache-policy-rsc-aware.json)
 // ?size= 로 나누면 먼저 캐시된 크기가 다른 크기 요청에도 나간다.
 const FILES: Record<string, CardVariant> = { 'og.png': 'og', 'story.png': 'story' };
+// 기사 공유 카드(사진+제목, 1200×630) — 카카오톡 등 메신저 미리보기용. 비교 카드와 달리 4형식 문장이 없어도 만든다.
+const SHARE_FILE = 'share.png';
 
 export async function GET(_req: Request, { params }: { params: Promise<{ id: string; file: string }> }) {
   const { id: rawId, file } = await params;
   const variant = FILES[file];
-  if (!variant) return new Response('Not found', { status: 404 });
+  if (!variant && file !== SHARE_FILE) return new Response('Not found', { status: 404 });
   let id = rawId;
   try {
     id = decodeURIComponent(rawId);
@@ -19,6 +22,15 @@ export async function GET(_req: Request, { params }: { params: Promise<{ id: str
   }
   const lens = await fetchLensBySlug(id);
   if (!lens) return new Response('Not found', { status: 404, headers: { 'Cache-Control': 'public, s-maxage=60' } });
+  if (file === SHARE_FILE) {
+    try {
+      // 기사 공유 카드(사진+제목) — 기사 상세의 og:image. 제목이 고쳐질 수 있어 비교 카드와 같이 CDN 1시간 보관.
+      return await renderShareCard(lens, { 'Cache-Control': 'public, max-age=600, s-maxage=3600, stale-while-revalidate=86400' });
+    } catch (e) {
+      console.error('share card render failed:', id, e);
+      return new Response('Failed to render card', { status: 500, headers: { 'Cache-Control': 'no-store' } });
+    }
+  }
   const card = buildCompareCard(lens, CARD_TEXT_MAX[variant]);
   if (card.entries.length === 0) return new Response('Not found', { status: 404, headers: { 'Cache-Control': 'public, s-maxage=60' } });
   try {
