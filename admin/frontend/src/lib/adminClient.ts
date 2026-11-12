@@ -15,6 +15,7 @@ import type {
   ChatThreadSummary,
   ChatThreadDetail,
   CostResponse,
+  AnalyticsSummary,
   AuditResponse,
   NewsletterStatsResponse,
   CmsPost,
@@ -416,6 +417,9 @@ export const adminApi = {
 
   // Cost & Audit
   getCost: () => cachedGet("cost", () => request<CostResponse>("/admin/cost")),
+  // 홈 "사용자 데이터 분석"(2026-11-12) — 백엔드가 BigQuery 결과를 1시간 캐시한다.
+  getAnalyticsSummary: () =>
+    cachedGet("analytics-summary", () => request<AnalyticsSummary>("/admin/analytics/summary")),
   getAudit: (limit = 50) =>
     cachedGet(`audit|${limit}`, () => request<AuditResponse>(`/admin/audit?limit=${limit}`)),
 

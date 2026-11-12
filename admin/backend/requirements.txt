@@ -1,6 +1,12 @@
 argon2-cffi==25.1.0
 PyJWT==2.12.1
 
+# 홈 "독자 반응"(2026-11-12, shared/bigquery_client.py) — 구글 서비스 계정 토큰을
+# 받으려면 JWT를 RS256으로 서명해야 하고, PyJWT는 RS256에 cryptography가 필요하다.
+# google-cloud-bigquery(grpc·protobuf 포함)는 zip이 커져 쓰지 않는다.
+# cp39-abi3 manylinux2014_x86_64 휠 존재 확인(2026-11-12, Lambda python3.11).
+cryptography==44.0.2
+
 # Lambda 런타임 내장 boto3(1.35.0, 미고정 상태였음)는 Bedrock Converse의
 # cachePoint를 몰라 ParamValidationError로 클라이언트 단에서 막는다
 # (2026-09-24, 직접 재현 확인). 프롬프트 캐싱(routes/prompts.py::

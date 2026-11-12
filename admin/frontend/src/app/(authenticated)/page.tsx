@@ -12,6 +12,7 @@ import {
   type Column,
 } from "@/components/charts";
 import { ErrorNote } from "@/components/Feedback";
+import { UserAnalytics } from "@/components/UserAnalytics";
 import type { AuditEntry, CostResponse, DriversResponse } from "@/lib/types";
 
 const ACTIVITY_DAYS = 14;
@@ -128,6 +129,9 @@ export default function DashboardPage() {
           />
         </div>
       </div>
+
+      {/* 사용자 데이터 분석(2026-11-12) — 자체 조회·오류 표시를 가져서 위 운영 위젯 실패와 섞이지 않는다. */}
+      <UserAnalytics />
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
         <div className="lg:col-span-2 ui-enter" style={{ ["--i" as string]: 3 }}>

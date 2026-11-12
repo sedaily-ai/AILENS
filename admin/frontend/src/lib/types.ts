@@ -187,6 +187,98 @@ export interface CostResponse {
   note: string;
 }
 
+/* 홈 "사용자 데이터 분석" — admin/backend/routes/analytics.py 응답 (2026-11-12).
+   비율은 % 숫자(예: 4.0 = 4%), 분모가 0이면 null. */
+export interface AnalyticsSpan {
+  from: string;
+  to: string;
+}
+
+export interface AnalyticsEngagement {
+  sessions: number;
+  users: number;
+  median_engaged_sec: number | null;
+  pages_per_session: number | null;
+  article_reads: number;
+  read_to_end_rate: number | null;
+  article_sessions: number;
+  multi_article_rate: number | null;
+  returning_users: number;
+  returning_rate: number | null;
+}
+
+export interface AnalyticsRetention {
+  new_users: number;
+  returned_7d: number;
+  rate: number | null;
+}
+
+export interface AnalyticsArticle {
+  path: string;
+  title: string;
+  reads: number;
+  read_to_end_rate: number | null;
+  median_engaged_sec: number | null;
+}
+
+export interface AnalyticsSource {
+  label: string;
+  source: string | null;
+  medium: string | null;
+  users: number;
+  multi_day_rate: number | null;
+}
+
+export interface AnalyticsWebtoon {
+  variant: string;
+  starts: number;
+  completes: number;
+  rate: number | null;
+}
+
+export interface AnalyticsSummary {
+  as_of: string;
+  generated_at: string;
+  internal_filter_since: string;
+  low_sample: number;
+  windows: {
+    cur: AnalyticsSpan;
+    prev: AnalyticsSpan;
+    retention_cur: AnalyticsSpan;
+    retention_prev: AnalyticsSpan;
+    month: AnalyticsSpan;
+  };
+  engagement: { cur: AnalyticsEngagement | null; prev: AnalyticsEngagement | null };
+  retention: { cur: AnalyticsRetention | null; prev: AnalyticsRetention | null };
+  articles: { top: AnalyticsArticle[]; bottom: AnalyticsArticle[]; count: number; min_reads: number };
+  sources: AnalyticsSource[];
+  webtoon: AnalyticsWebtoon[];
+  /* 세부 분석(최근 30일) */
+  breakdowns: {
+    section: AnalyticsBreakdownRow[];
+    source: AnalyticsBreakdownRow[];
+    age: AnalyticsBreakdownRow[];
+    device: AnalyticsBreakdownRow[];
+  };
+  landing: AnalyticsLandingRow[];
+  hourly: number[]; // 0~23시(한국 시간) 방문 시작 수
+  features: { total_sessions: number; items: { k: string; sessions: number; rate: number | null }[] };
+}
+
+export interface AnalyticsBreakdownRow {
+  k: string;
+  reads: number;
+  read_to_end_rate: number | null;
+  median_engaged_sec: number | null;
+}
+
+export interface AnalyticsLandingRow {
+  k: string;
+  sessions: number;
+  one_page_rate: number | null;
+  pages_per_session: number | null;
+}
+
 export interface AuditEntry {
   ts: string;
   action: string;
