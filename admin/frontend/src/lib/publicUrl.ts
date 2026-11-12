@@ -1,5 +1,10 @@
 const PUBLIC_SITE = "https://ailens.sedaily.ai";
 
+// GA4가 기록한 경로(예: "/markets/2026/10/09/한글-슬러그")를 공개 사이트 링크로 — 홈 "독자 반응" 기사 목록용.
+export function publicPathUrl(path: string): string {
+  return `${PUBLIC_SITE}${encodeURI(path)}`;
+}
+
 // letters/webtoon/lens만 공개 사이트에 상세 페이지가 있다(service/frontend/src/app/
 // {letters,webtoon,lens}/[.../]page.tsx) — video는 홈 화면 카드로만 노출되고
 // 개별 URL이 없다. trend_card 채널(과거 "카드 전용 글"용)은 2026-08-17

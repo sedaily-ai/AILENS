@@ -13,6 +13,7 @@ import logging
 import auth
 from routes import (
     admin_password,
+    analytics,
     audit as audit_route,
     chat_threads,
     cost,
@@ -74,6 +75,8 @@ HANDLERS: dict[str, tuple] = {
     "PUT /admin/chat-threads/{thread_id}": (chat_threads.handle_update, True),
     "DELETE /admin/chat-threads/{thread_id}": (chat_threads.handle_delete, True),
     "GET /admin/cost": (cost.handle_summary, True),
+    # 홈 "독자 반응"(2026-11-12) — routes/analytics.py. ⚠️ API Gateway create-route 1개 필요(아래 video-lab 주석과 같은 함정).
+    "GET /admin/analytics/summary": (analytics.handle_summary, True),
     "GET /admin/audit": (audit_route.handle_list, True),
     "GET /admin/newsletter/stats": (newsletter.handle_stats, True),
     # CMS posts (2026-07-27)
