@@ -26,10 +26,13 @@ const DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
 
 async function load(date: string): Promise<{ dates: string[]; items: CmsLens[] } | null> {
   if (!DATE_RE.test(date)) return null;
-  const dates = await fetchPaperDates();
-  if (!dates.includes(date)) return null;
-  const items = pickLensPostsForHome(await fetchLensPostsOnDate(date));
-  return items.length > 0 ? { dates, items } : null;
+  // 지면 여부는 그날 기사로 판정한다. fetchPaperDates()는 최신 1,000건 안에서만 날짜를 모아
+  // 기사가 쌓이면 옛 지면(2026-11 기준 10/20 이전)이 목록에서 빠져 404가 났다.
+  const [dates, posts] = await Promise.all([fetchPaperDates(), fetchLensPostsOnDate(date)]);
+  const items = pickLensPostsForHome(posts);
+  if (items.length === 0) return null;
+  // 목록 밖 옛 날짜면 날짜 이동 메뉴에서도 보이도록 끼워 넣는다(최신순 유지).
+  return { dates: dates.includes(date) ? dates : [...dates, date].sort().reverse(), items };
 }
 
 export async function generateMetadata({ params }: { params: Promise<{ date: string }> }): Promise<Metadata> {

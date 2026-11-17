@@ -5,6 +5,8 @@ import { SITE_URL } from "./src/shared/constants/site";
 const nextConfig: NextConfig = {
   // SSR 모드: admin 발행이 재빌드 없이 즉시 반영되려면 매 요청마다 서버가 렌더링해야 한다.
   output: "standalone",
+  // 응답 헤더 X-Powered-By: Next.js를 내보내지 않는다(보안 점검 2026-11: 프레임워크 노출 제거).
+  poweredByHeader: false,
   // 트레이싱 루트를 이 앱 폴더로 고정한다. 제거하면 배포가 깨진다.
   // 2026-10-13 모노레포 전환 — 레포 루트로 올렸다. service/frontend 가 @ailens/domain
   // (레포 루트 packages/) 에 의존하므로, 트레이싱 루트를 앱 폴더로 좁히면 standalone 이
