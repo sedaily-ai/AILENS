@@ -90,6 +90,7 @@ interface SlotState {
   status: "idle" | "pending" | "done" | "error";
   imageUrl: string | null;
   caption?: string;
+  textCaption?: boolean;
   /** 글자 없는 원본 그림(말풍선 편집이 이 위에 다시 합성). 이번 세션에서 생성한 컷만 있다(저장본 복원분엔 없음). */
   bgUrl?: string | null;
   /** 실제로 그려진 말풍선 위치(말풍선 편집 손잡이의 시작 위치) */
@@ -215,7 +216,7 @@ export function WebtoonCutGenerator({
    *  저장된 imagePreview 메시지들을 testId별로 모아 내려준다(PromptChatLab.tsx
    *  참고). 2026-09-26 — 테스트가 여러 개로 늘어나면서 컷 번호 하나만으론
    *  키가 부족해졌다(테스트 여러 개가 같은 번호를 동시에 쓸 수 있음). */
-  restoredImages?: Record<string, Record<number, { imageUrl: string; model?: string; caption?: string }>>;
+  restoredImages?: Record<string, Record<number, { imageUrl: string; model?: string; caption?: string; textCaption?: boolean }>>;
   /** 소켓 연결 자체는 부모(PromptChatLab)가 useAdminChatSocket()으로 한 번만
    *  만들어 내려준다 — 2026-09-16 리팩토링 감사, 이 컴포넌트가 따로
    *  WebSocket을 열면 같은 화면에 소켓이 2개가 된다(그 훅 docstring 참고). */
@@ -305,6 +306,7 @@ export function WebtoonCutGenerator({
               status: "done",
               imageUrl: restored.imageUrl,
               caption: restored.caption,
+              textCaption: restored.textCaption,
             };
           }
         }
@@ -416,11 +418,11 @@ export function WebtoonCutGenerator({
   useEffect(() => {
     return subscribe((msg) => {
       if (msg.type === "cut_image") {
-        const m = msg as unknown as { cut: number; test_id?: string; image_url: string; caption?: string; bg_url?: string; layout?: BubbleLayout[] };
+        const m = msg as unknown as { cut: number; test_id?: string; image_url: string; caption?: string; text_caption?: boolean; bg_url?: string; layout?: BubbleLayout[] };
         setTests((prev) =>
           prev.map((t) =>
             t.id === m.test_id && t.slots[m.cut]
-              ? { ...t, slots: { ...t.slots, [m.cut]: { ...t.slots[m.cut], status: "done", imageUrl: m.image_url, caption: m.caption, bgUrl: m.bg_url ?? null, layout: m.layout ?? null, error: null } } }
+              ? { ...t, slots: { ...t.slots, [m.cut]: { ...t.slots[m.cut], status: "done", imageUrl: m.image_url, caption: m.caption, textCaption: m.text_caption, bgUrl: m.bg_url ?? null, layout: m.layout ?? null, error: null } } }
               : t
           )
         );
@@ -565,7 +567,7 @@ export function WebtoonCutGenerator({
                 )}
               </div>
 
-              {s.status === "done" && (s.caption ?? s.sourceCut?.narration) && (
+              {s.status === "done" && s.textCaption !== false && (s.caption ?? s.sourceCut?.narration) && (
                 <p className="px-1 py-2 text-[12px] leading-relaxed text-[var(--text-primary)]">{s.caption ?? s.sourceCut?.narration}</p>
               )}
               <textarea
@@ -830,7 +832,7 @@ export function WebtoonCutGenerator({
         const images = Object.values(t.slots)
           .filter((s) => s.status === "done" && s.imageUrl)
           .sort((a, b) => a.index - b.index)
-          .map((s) => ({ index: s.index, url: s.imageUrl as string, caption: s.caption ?? s.sourceCut?.narration }));
+          .map((s) => ({ index: s.index, url: s.imageUrl as string, caption: s.textCaption === false ? undefined : (s.caption ?? s.sourceCut?.narration) }));
         return <WebtoonPreviewModal title={`테스트 ${tests.indexOf(t) + 1}`} images={images} onClose={() => setPreviewTestId(null)} />;
       })()}
       {editing && (() => {
@@ -923,7 +925,7 @@ export function WebtoonProductionCutGrid({
    *  그대로 넘기면 된다 — 여기서는 "production" 키만 본다. 부모가
    *  `key={threadId}`로 이 컴포넌트를 마운트해 대화가 바뀔 때마다
    *  통째로 새로 시작하게 하므로, 복원은 이 초기값 한 번으로 충분하다. */
-  restoredImages?: Record<string, Record<number, { imageUrl: string; model?: string; caption?: string }>>;
+  restoredImages?: Record<string, Record<number, { imageUrl: string; model?: string; caption?: string; textCaption?: boolean }>>;
 }) {
   const [model, setModel] = useState(productionModel ?? IMAGE_MODELS[0].id);
   const [slots, setSlots] = useState<Record<number, SlotState>>(() => {
@@ -932,7 +934,7 @@ export function WebtoonProductionCutGrid({
     if (restored) {
       for (let idx = 1; idx <= SLOT_COUNT; idx++) {
         const r = restored[idx];
-        if (r) initial[idx] = { ...initial[idx], status: "done", imageUrl: r.imageUrl, caption: r.caption };
+        if (r) initial[idx] = { ...initial[idx], status: "done", imageUrl: r.imageUrl, caption: r.caption, textCaption: r.textCaption };
       }
     }
     return initial;
@@ -941,9 +943,9 @@ export function WebtoonProductionCutGrid({
   useEffect(() => {
     return subscribe((msg) => {
       if (msg.type === "cut_image") {
-        const m = msg as unknown as { cut: number; test_id?: string; image_url: string; caption?: string };
+        const m = msg as unknown as { cut: number; test_id?: string; image_url: string; caption?: string; text_caption?: boolean };
         if (m.test_id !== "production") return;
-        setSlots((prev) => (prev[m.cut] ? { ...prev, [m.cut]: { ...prev[m.cut], status: "done", imageUrl: m.image_url, caption: m.caption, error: null } } : prev));
+        setSlots((prev) => (prev[m.cut] ? { ...prev, [m.cut]: { ...prev[m.cut], status: "done", imageUrl: m.image_url, caption: m.caption, textCaption: m.text_caption, error: null } } : prev));
       } else if (msg.type === "cut_image_error") {
         const m = msg as unknown as { cut: number; test_id?: string; error: string };
         if (m.test_id !== "production") return;
@@ -1101,7 +1103,7 @@ export function WebtoonProductionCutGrid({
               )}
             </div>
 
-            {s.status === "done" && (s.caption ?? s.sourceCut?.narration) && (
+            {s.status === "done" && s.textCaption !== false && (s.caption ?? s.sourceCut?.narration) && (
               <p className="px-1 py-2 text-[12px] leading-relaxed text-[var(--text-primary)]">{s.caption ?? s.sourceCut?.narration}</p>
             )}
             <textarea
@@ -1128,7 +1130,7 @@ export function WebtoonProductionCutGrid({
       {previewOpen && (
         <WebtoonPreviewModal
           title="프로덕션"
-          images={orderedSlots.filter((s) => s.status === "done" && s.imageUrl).map((s) => ({ index: s.index, url: s.imageUrl as string, caption: s.caption ?? s.sourceCut?.narration }))}
+          images={orderedSlots.filter((s) => s.status === "done" && s.imageUrl).map((s) => ({ index: s.index, url: s.imageUrl as string, caption: s.textCaption === false ? undefined : (s.caption ?? s.sourceCut?.narration) }))}
           onClose={() => setPreviewOpen(false)}
         />
       )}

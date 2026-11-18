@@ -1,13 +1,14 @@
 """만평 출력 크기 조정과 기존 웹툰 그리기 보조 함수.
 
 운영 진입점 compose()는 이미지 위에 글자를 합성하지 않는다.
-설명은 외부 텍스트로 표시하며 옛 합성 옵션도 무시한다.
+설명은 그림을 덮지 않는 하단 자막 띠로 붙이며 옛 말풍선 합성 옵션은 무시한다.
 """
 import math
 import re
 from pathlib import Path
 
 from PIL import Image, ImageDraw, ImageFilter, ImageFont
+from webtoon_contract import external_caption
 
 FONT_PATH = Path(__file__).parent / "assets" / "NotoSansKR-Bold.ttf"
 
@@ -993,11 +994,41 @@ _BASE_METRICS = {
 
 
 def compose(img_path: Path, cut: dict, faces: list[dict] | None = None, scale: float = 1.0) -> list[dict]:
-    """만평은 그림을 가리지 않는다. 옛 대사·합성 옵션도 무시하고 기존 출력 배율만 유지한다."""
+    """말풍선 없이 원본 그림 아래에 자막 띠를 붙인다. 그림 영역은 덮거나 자르지 않는다."""
+    text = external_caption(cut)
+    if not text and scale == 1.0:
+        return []
+    with Image.open(img_path) as source:
+        img = source.convert("RGB")
     if scale != 1.0:
-        with Image.open(img_path) as source:
-            img = source.convert("RGB")
         img = img.resize((round(img.width * scale), round(img.height * scale)), Image.LANCZOS)
         img = img.filter(ImageFilter.UnsharpMask(radius=1.2, percent=40, threshold=3))
-        img.save(img_path)
+    if text:
+        draw = ImageDraw.Draw(img)
+        padding = max(8, round(img.width * 0.025))
+        for size in range(max(12, round(img.width * 0.034)), max(10, round(img.width * 0.020)) - 1, -1):
+            font = ImageFont.truetype(str(FONT_PATH), size)
+            lines = _wrap_text(draw, text, font, max(1, img.width - padding * 4))
+            if len(lines) <= 4:
+                break
+        else:
+            raise NarrationOverflowError("자막이 너무 길어 이미지 밖 설명으로 표시합니다.")
+        spacing = max(3, round(size * 0.3))
+        block = "\n".join(lines)
+        box = draw.multiline_textbbox((0, 0), block, font=font, spacing=spacing, align="center")
+        height = box[3] - box[1]
+        out = Image.new("RGB", (img.width, img.height + height + padding * 2), (32, 32, 32))
+        out.paste(img, (0, 0))
+        ImageDraw.Draw(out).multiline_text(
+            ((img.width - (box[2] - box[0])) / 2 - box[0], img.height + padding - box[1]),
+            block, font=font, fill="white", spacing=spacing, align="center",
+        )
+        img = out
+    # 저장 도중 실패해도 유료 생성 원본을 훼손하지 않는다.
+    temp = img_path.with_name(img_path.stem + ".caption-tmp.png")
+    try:
+        img.save(temp)
+        temp.replace(img_path)
+    finally:
+        temp.unlink(missing_ok=True)
     return []

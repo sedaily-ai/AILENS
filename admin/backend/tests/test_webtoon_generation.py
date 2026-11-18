@@ -36,9 +36,11 @@ def test_generation_keeps_art_and_returns_external_caption(monkeypatch, art):
         "dialogue": [{"speaker": "A", "line": "옛 대사"}], "bubble_detect": True, "bubble_webtoon": True,
     }, push=events.append)
     assert model.call_args.args[2] is False
-    assert s3.put_object.call_args.kwargs["Body"] == raw
+    with Image.open(io.BytesIO(s3.put_object.call_args.kwargs["Body"])) as image:
+        assert image.height > 60
+        assert image.crop((0, 0, 80, 60)).tobytes() == Image.open(io.BytesIO(raw)).tobytes()
     assert events[0]["layout"] == []
-    assert events[0]["caption"] == "설명" and events[0]["text_caption"] is True
+    assert events[0]["caption"] == "설명" and events[0]["text_caption"] is False
     assert update.call_args.args[1]["status"] == "done"
 
 
@@ -51,4 +53,19 @@ def test_recompose_returns_uncovered_background_and_legacy_caption(art):
     assert result["statusCode"] == 200
     payload = json.loads(result["body"])
     assert payload["layout"] == [] and payload["caption"] == "설명으로 보존"
+    with Image.open(io.BytesIO(s3.put_object.call_args.kwargs["Body"])) as image:
+        assert image.height > 60
+        assert image.crop((0, 0, 80, 60)).tobytes() == Image.open(io.BytesIO(raw)).tobytes()
+
+
+def test_recompose_font_failure_keeps_art_and_external_caption(art, monkeypatch):
+    raw, s3 = art
+    monkeypatch.setattr(generate.compose_text, "compose", Mock(side_effect=OSError("cannot open font")))
+    result = generate.handle_recompose({
+        "bg_url": "https://test-media.s3.us-east-1.amazonaws.com/media/webtoon-lab/old-bg.png",
+        "cut": {"cut": 1, "narration": "설명"},
+    }, {}, {})
+    payload = json.loads(result["body"])
+    assert result["statusCode"] == 200 and payload["text_caption"] is True
+    assert payload["caption"] == "설명"
     assert s3.put_object.call_args.kwargs["Body"] == raw

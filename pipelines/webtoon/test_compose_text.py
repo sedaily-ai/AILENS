@@ -71,20 +71,50 @@ def test_explicit_single_bubble_position_still_wins():
 def test_compose_never_covers_art_even_with_legacy_bubbles(tmp_path):
     path = tmp_path / "panel.png"
     Image.new("RGB", (1216, 832), "navy").save(path)
-    before = path.read_bytes()
+    before = Image.open(path).copy()
     layout = ct.compose(path, {"cut": 1, "title": "제목", "caption": "숫자", "closing_caption": "마무리",
                               "bubble_style": "oval", "bubble_margin": True,
                               "dialogue": [{"speaker": "A", "line": "조건을 확인하나요?"},
                                            {"speaker": "B", "line": "예산 심의가 필요해요."}],
                               "narration": "예산 승인 뒤 결정한다."})
     assert layout == []
-    assert path.read_bytes() == before
+    with Image.open(path) as result:
+        assert result.width == before.width and result.height > before.height
+        assert ImageChops.difference(before, result.crop((0, 0, before.width, before.height))).getbbox() is None
+        band = result.crop((0, before.height, result.width, result.height))
+        assert band.getpixel((0, 0)) == (32, 32, 32)
+        assert band.getextrema()[0][1] == 255
 
 
 def test_compose_scales_only_the_art(tmp_path):
     path = tmp_path / "panel.png"
     Image.new("RGB", (100, 60), "navy").save(path)
-    assert ct.compose(path, {"title": "제목", "narration": "설명"}, scale=1.5) == []
+    assert ct.compose(path, {}, scale=1.5) == []
     with Image.open(path) as img:
         assert img.size == (150, 90)
         assert img.getpixel((75, 45)) == (0, 0, 128)
+
+
+def test_subtitle_overflow_preserves_original_file(tmp_path):
+    path = tmp_path / "long.png"
+    Image.new("RGB", (1216, 832), "navy").save(path)
+    before = path.read_bytes()
+    with pytest.raises(ct.NarrationOverflowError):
+        ct.compose(path, {"narration": "아주 긴 설명 " * 1000})
+    assert path.read_bytes() == before
+
+
+def test_subtitle_save_failure_preserves_original_file(tmp_path, monkeypatch):
+    path = tmp_path / "panel.png"
+    Image.new("RGB", (1216, 832), "navy").save(path)
+    before = path.read_bytes()
+
+    def partial_save(image, target):
+        Path(target).write_bytes(b"partial image")
+        raise OSError("disk full")
+
+    monkeypatch.setattr(Image.Image, "save", partial_save)
+    with pytest.raises(OSError, match="disk full"):
+        ct.compose(path, {"narration": "자막"})
+    assert path.read_bytes() == before
+    assert not path.with_name("panel.caption-tmp.png").exists()

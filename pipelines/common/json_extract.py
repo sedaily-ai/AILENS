@@ -76,6 +76,38 @@ def repair_invalid_escapes(text: str) -> str:
     return "".join(out)
 
 
+def _repair_json_separators(text: str) -> str:
+    """문자열은 보존하고 끝 쉼표·문자열 값 뒤 잘못된 세미콜론만 제거한다."""
+    out = []
+    quoted = escaped = False
+    for i, ch in enumerate(text):
+        if quoted:
+            if escaped:
+                escaped = False
+            elif ch == "\\":
+                escaped = True
+            elif ch == '"':
+                quoted = False
+        elif ch == '"':
+            quoted = True
+        elif ch == ",":
+            j = i + 1
+            while j < len(text) and text[j].isspace():
+                j += 1
+            if j < len(text) and text[j] in "}]":
+                continue
+        elif ch == ";":
+            j, k = i + 1, len(out) - 1
+            while j < len(text) and text[j].isspace():
+                j += 1
+            while k >= 0 and out[k].isspace():
+                k -= 1
+            if k >= 0 and out[k] == '"' and j < len(text) and text[j] in ",}]":
+                continue
+        out.append(ch)
+    return "".join(out)
+
+
 def loads_lenient(text: str) -> Any:
     """json.loads() 를 시도하고, 문법 오류면 이스케이프를 수리해 한 번 더 시도한다.
 
@@ -87,11 +119,7 @@ def loads_lenient(text: str) -> Any:
     except json.JSONDecodeError:
         pass
     fixed = repair_invalid_escapes(text)
-    try:
-        return json.loads(fixed)
-    except json.JSONDecodeError:
-        # Sonnet 5 가 가끔 값 뒤에 세미콜론을 흘린다(`"...강조";,`). 문자열 끝 따옴표 바로 뒤의 ; 만 지운다.
-        return json.loads(re.sub(r'"\s*;\s*(?=[,}\]])', '"', fixed))
+    return json.loads(_repair_json_separators(fixed))
 
 
 def extract_json_object(text: str) -> dict:

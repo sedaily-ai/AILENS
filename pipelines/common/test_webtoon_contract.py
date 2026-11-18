@@ -204,10 +204,10 @@ def test_external_caption_preserves_new_and_legacy_text(cut, expected):
     assert external_caption(cut) == expected
 
 
-def test_editorial_direction_overrides_stored_style():
+def test_selected_version_style_is_preserved_with_no_bubble_rules():
     prompt = wi.build_background_prompt("", "Draw two speakers with balloons.", style="Romance webtoon.")
-    assert prompt.rindex("FINAL ART DIRECTION") > prompt.index("Draw two speakers")
-    assert "newspaper editorial cartoon" in prompt
+    assert prompt.rindex("FINAL IMAGE RULES") > prompt.index("Draw two speakers")
+    assert "Romance webtoon." in prompt
     assert "empty balloons" in prompt
     assert "outside the image" in prompt
 
@@ -220,4 +220,4 @@ def test_long_prompt_keeps_no_bubble_rules_inside_provider_limit():
     assert "empty balloons" in prompt
     nova = wi.build_style_guide_prompt("wide", "Scene. " * 3000)
     assert len(nova) <= 1024
-    assert "newspaper editorial cartoon" in nova and "empty balloons" in nova
+    assert "Scene." in nova and "empty balloons" in nova

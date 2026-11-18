@@ -8,13 +8,13 @@ from __future__ import annotations
 import re
 
 EDITORIAL_CARTOON_RULES = (
-    "\n\nFINAL ART DIRECTION — takes precedence over earlier style and text instructions: "
-    "Draw a newspaper editorial cartoon illustration with expressive ink linework, "
-    "simplified forms, restrained colors and a clear visual metaphor grounded in the scene. "
-    "Communicate through composition, objects, expressions and actions. "
+    "\n\nFINAL IMAGE RULES — preserve the selected prompt version's art direction: "
+    "Follow the supplied scene's art style, specific subjects, actions and relationships faithfully. "
+    "Do not substitute unrelated objects or reuse a generic gauge from another scene. "
+    "Do not invent national flags or country emblems; omit flags unless the scene names the country. "
     "Do NOT draw speech bubbles, thought bubbles, empty balloons, caption boxes, "
     "text, letters, numbers, labels, writing, watermarks or logos anywhere. "
-    "Do NOT render any text. Keep the entire artwork unobstructed. Explanations are displayed outside the image."
+    "Do NOT render any text. Keep the artwork unobstructed. Explanations are displayed in a subtitle band outside the image."
 )
 
 # ─────────────────────────────────────────────────────────────

@@ -103,6 +103,9 @@ def test_long_external_captions_keep_all_cuts(webtoon, monkeypatch, tmp_path):
     for cut in script_input["cuts"]:
         cut["narration"] = "그림 아래 설명 " * 100
         cut["dialogue"] = [{"speaker": "A", "line": "옛 대사"}]
+    def fail_band(*args, **kwargs):
+        raise webtoon.compose_text.NarrationOverflowError("자막이 너무 깁니다")
+    monkeypatch.setattr(webtoon.compose_text, "compose", fail_band)
     _script_responses(webtoon, monkeypatch, [script_input])
     script = publishing.run_webtoon_with_retry(webtoon, "a", _article(tmp_path), tmp_path,
                                                manage_gpu=False, log_prefix="test")
@@ -118,4 +121,4 @@ def test_resume_does_not_mark_old_images_as_text_free(webtoon, monkeypatch, tmp_
     _script_responses(webtoon, monkeypatch, [_valid_script()])
     webtoon.run_article("a", str(_article(tmp_path)), tmp_path)
     assert not (out / "컷1.textcaption").exists()
-    assert (out / "컷2.textcaption").exists()
+    assert not (out / "컷2.textcaption").exists()

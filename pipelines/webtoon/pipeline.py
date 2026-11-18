@@ -343,16 +343,18 @@ def run_article(name: str, article_path: str, output_root: Path = Path("."), res
                 has_dialogue=False,
                 retries=cfg["retries"],
             )
-            if ok:
-                try:
-                    compose_text.compose(img_path, cut, faces, scale=compose_text.OUTPUT_SCALE)
-                except Exception as e:
-                    print(f"{tag} 컷{n} 출력 크기 조정 실패(원본 유지): {e}")
         else:
             prompt = build_image_prompt(cut["image_prompt"], cut)
             ok = generate_image(prompt, img_path)
         if ok:
-            (out / f"컷{n}.textcaption").write_text("1", encoding="utf-8")
+            marker = out / f"컷{n}.textcaption"
+            marker.unlink(missing_ok=True)
+            try:
+                compose_text.compose(img_path, cut, faces if active_model in _PROVIDER_CONFIG else None,
+                                     scale=compose_text.OUTPUT_SCALE)
+            except Exception as e:
+                print(f"{tag} 컷{n} 자막 띠 합성 실패(그림 밖 설명으로 표시): {e}")
+                marker.write_text("1", encoding="utf-8")
         print(f"{tag} 컷{n} {'완료' if ok else '실패'}")
 
     if _CUT_WORKERS > 1 and active_model in _PROVIDER_CONFIG:

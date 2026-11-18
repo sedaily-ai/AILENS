@@ -122,7 +122,7 @@ export interface ChatThreadMessage {
    *  안 된다(WebtoonCutGenerator.tsx 모듈 docstring 참고). 구버전에 저장된
    *  메시지는 이 필드가 없다 — PromptChatLab.tsx가 복원 시 첫 번째
    *  테스트로 묶는다. */
-  imagePreview?: { cut: number; imageUrl: string; model?: string; testId?: string; caption?: string };
+  imagePreview?: { cut: number; imageUrl: string; model?: string; testId?: string; caption?: string; textCaption?: boolean };
   /** storyboard 메시지에만 딸려온다 — 화면 표시용 storyboard 필드는
    *  요약본이라, 컷 이미지 재요청까지 이어가려면 원본 전체 cuts가
    *  따로 필요하다(WebtoonStoryboardCut[]). */

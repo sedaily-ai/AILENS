@@ -246,7 +246,7 @@ export const WebtoonImageSettingsPanel = forwardRef<WebtoonImageSettingsPanelHan
         </p>
       </div>
       <p className="text-[11px] leading-relaxed text-[var(--text-faint)]">
-        여러 컷의 만평으로 제작합니다. 말풍선과 이미지 위 글자를 사용하지 않으며, 설명은 그림 아래에 표시합니다.
+        여러 컷의 만평으로 제작합니다. 말풍선과 이미지 위 글자를 사용하지 않으며, 설명은 그림 아래의 짙은 자막 띠에 표시하며, 다운로드 이미지에도 포함됩니다.
       </p>
       {publishing && <p className="text-[10.5px] text-[var(--text-faint)]">발행 중...</p>}
     </div>

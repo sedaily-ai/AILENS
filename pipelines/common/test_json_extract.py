@@ -22,6 +22,24 @@ def test_valid_json_untouched():
     assert loads_lenient('{"a": 1}') == {"a": 1}
 
 
+def test_trailing_commas_in_nested_storyboard_are_repaired():
+    assert extract_json_object('```json\n{"cuts":[{"image_prompt":"A scene.",},],}\n```') == {
+        "cuts": [{"image_prompt": "A scene."}],
+    }
+
+
+def test_comma_and_brackets_inside_strings_are_not_changed():
+    value = 'Keep ,} and ,] plus "quoted text" and a backslash \\.'
+    source = '{"text":' + json.dumps(value) + ',}'
+    assert loads_lenient(source) == {"text": value}
+
+
+def test_quoted_semicolon_inside_string_is_preserved_during_repair():
+    value = 'Keep ";, here'
+    source = '{"text":' + json.dumps(value) + ',}'
+    assert loads_lenient(source) == {"text": value}
+
+
 def test_valid_escapes_survive_repair():
     # 정상 이스케이프는 손대지 않는다 — 줄바꿈·따옴표·역슬래시·유니코드
     src = '{"s": "a\\nb \\"q\\" c\\\\d \\uAC00"}'

@@ -133,23 +133,22 @@ def run_composed_generation(job_id: str, cut: dict, push=None, model: str = "sd_
         tmp_path = Path(f"/tmp/webtoon-lab-{job_id}.png")
         tmp_path.write_bytes(image_bytes)
         layout: list = []
+        text_caption = False
         try:
             layout = compose_text.compose(tmp_path, cut, faces) or []
-        except compose_text.NarrationOverflowError:
-            tmp_path.unlink(missing_ok=True)
-            raise
         except Exception as e:  # noqa: BLE001 — 배경은 유지, 합성 실패만 로그
-            logger.warning(f"webtoon-lab 컷{cut.get('cut')} 텍스트 합성 실패(배경만 유지): {e}")
+            text_caption = True
+            logger.warning(f"webtoon-lab 컷{cut.get('cut')} 자막 띠 합성 실패(외부 설명 표시): {e}")
         final_bytes = tmp_path.read_bytes()
         tmp_path.unlink(missing_ok=True)
 
         key = f"media/webtoon-lab/{job_id}.png"
         jobs.s3().put_object(Bucket=bucket, Key=key, Body=final_bytes, ContentType="image/png")
         image_url = f"https://{bucket}.s3.us-east-1.amazonaws.com/{key}"
-        jobs.update_job(job_id, {"status": "done", "image_url": image_url, "bg_url": bg_url, "caption": external_caption(cut), "text_caption": True, "updated_at": time_utils.now_iso()})
+        jobs.update_job(job_id, {"status": "done", "image_url": image_url, "bg_url": bg_url, "caption": external_caption(cut), "text_caption": text_caption, "updated_at": time_utils.now_iso()})
         audit.log("webtoon-lab-generate-composed-done", {"job_id": job_id, "cut": cut.get("cut")})
         if push:
-            push({"type": "cut_image", "cut": cut.get("cut"), "test_id": cut.get("test_id"), "image_url": image_url, "bg_url": bg_url, "layout": layout, "caption": external_caption(cut), "text_caption": True, "model": model})
+            push({"type": "cut_image", "cut": cut.get("cut"), "test_id": cut.get("test_id"), "image_url": image_url, "bg_url": bg_url, "layout": layout, "caption": external_caption(cut), "text_caption": text_caption, "model": model})
     except Exception as e:  # noqa: BLE001 — 비동기 invocation 최상위, 안 잡으면 job이 영원히 pending
         logger.exception(f"webtoon-lab composed generate failed: {job_id}")
         jobs.update_job(job_id, {"status": "error", "error": str(e)[:500], "updated_at": time_utils.now_iso()})
@@ -207,12 +206,18 @@ def handle_recompose(body: dict, path_params: dict, query_params: dict) -> dict:
     job_id = uuid.uuid4().hex
     tmp_path = Path(f"/tmp/webtoon-recompose-{job_id}.png")
     tmp_path.write_bytes(bg_bytes)
+    text_caption = False
     try:
-        layout = compose_text.compose(tmp_path, cut, None) or []
+        try:
+            layout = compose_text.compose(tmp_path, cut, None) or []
+        except Exception as e:  # noqa: BLE001 — 원본을 반환하고 설명은 화면에서 표시한다
+            layout = []
+            text_caption = True
+            logger.warning(f"webtoon-lab 재합성 실패(원본·외부 설명 유지): {e}")
         final_bytes = tmp_path.read_bytes()
     finally:
         tmp_path.unlink(missing_ok=True)
     key = f"media/webtoon-lab/{job_id}.png"
     jobs.s3().put_object(Bucket=bucket, Key=key, Body=final_bytes, ContentType="image/png")
     audit.log("webtoon-lab-recompose", {"cut": cut.get("cut"), "bg": bg_key})
-    return response.ok({"image_url": f"https://{bucket}.s3.us-east-1.amazonaws.com/{key}", "layout": layout, "caption": external_caption(cut), "text_caption": True})
+    return response.ok({"image_url": f"https://{bucket}.s3.us-east-1.amazonaws.com/{key}", "layout": layout, "caption": external_caption(cut), "text_caption": text_caption})
