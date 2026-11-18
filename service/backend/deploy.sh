@@ -50,8 +50,8 @@ pip3 install \
   beautifulsoup4==4.12.3 \
   boto3 \
   botocore \
-  pg8000==1.31.2 \
-  "PyJWT[crypto]==2.10.1" \
+  pg8000==1.31.6 \
+  "PyJWT[crypto]==2.15.1" \
   -t lambda-build \
   --platform manylinux2014_x86_64 \
   --python-version 3.11 \
