@@ -24,7 +24,7 @@ python-dotenv==1.0.1
 # =============================================================================
 # PostgreSQL + pgvector (similarity search)
 # =============================================================================
-pg8000==1.31.2
+pg8000==1.31.6
 
 # =============================================================================
 # JWT verification (Cognito ID tokens) — used by core/auth.py
@@ -32,7 +32,7 @@ pg8000==1.31.2
 # `[crypto]` extra brings in the `cryptography` package required for RS256
 # signature verification (Cognito uses RSA-256). PyJWKClient (included in
 # PyJWT >= 2.0) handles JWKS fetch + cache by `kid`.
-PyJWT[crypto]==2.10.1
+PyJWT[crypto]==2.15.1
 
 # =============================================================================
 # Dev / Test (excluded from Lambda package)
