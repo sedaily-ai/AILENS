@@ -150,7 +150,7 @@ SD_ULTRA_MODEL_ID = profile_arn("image_sd_ultra")  # lens-webtoon-image-sd-ultra
 
 # 그림에 글자·말풍선이 들어가는 것을 막는 금지어는 본문의 CRITICAL 문구와 별개로
 # 모델의 negative_prompt 필드로도 보낸다.
-ULTRA_NEGATIVE_PROMPT = "text, letters, words, writing, speech bubble, caption, subtitle, watermark, logo, signature"
+ULTRA_NEGATIVE_PROMPT = "text, letters, words, writing, speech bubble, thought bubble, empty balloon, caption box, caption, subtitle, watermark, logo, signature"
 
 # 기사 단위 seed — pipeline.run_article이 기사마다 한 번 정한다(None이면 모델이 무작위로 정함).
 # 같은 기사의 컷이 같은 seed를 쓰면 분위기가 비슷해지고, 같은 조건으로 한 컷만 다시 뽑을 수 있다.

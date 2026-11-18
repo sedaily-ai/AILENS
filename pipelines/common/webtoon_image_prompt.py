@@ -7,6 +7,16 @@ from __future__ import annotations
 
 import re
 
+EDITORIAL_CARTOON_RULES = (
+    "\n\nFINAL ART DIRECTION — takes precedence over earlier style and text instructions: "
+    "Draw a newspaper editorial cartoon illustration with expressive ink linework, "
+    "simplified forms, restrained colors and a clear visual metaphor grounded in the scene. "
+    "Communicate through composition, objects, expressions and actions. "
+    "Do NOT draw speech bubbles, thought bubbles, empty balloons, caption boxes, "
+    "text, letters, numbers, labels, writing, watermarks or logos anywhere. "
+    "Do NOT render any text. Keep the entire artwork unobstructed. Explanations are displayed outside the image."
+)
+
 # ─────────────────────────────────────────────────────────────
 # 안전망 기본값 — DDB(PROMPT#webtoon-image/published)를 못 읽을 때만 쓴다.
 # 시행착오 이력은 pipelines/webtoon/prompts.py 상단에 있다.
@@ -281,51 +291,19 @@ def build_background_prompt(
         style_block = f"{style}\n" if style else ""
         style_block += f"Camera: {camera}. 3:2 horizontal."
         visual = style_block + characters_block(characters) + f"\n\n[SCENE]\n{scene}"
-    return (
+    visual = (
         visual
         + (SCENE_REINFORCEMENT if include_scene_reinforcement else "")
         + (CHARACTER_REINFORCEMENT if (characters and include_character_reinforcement) else "")
-        + "\n\nCRITICAL: Do NOT render any text, letters, writing, signage text, "
-        "or speech bubbles anywhere in this image — pure illustration only, no "
-        "readable characters of any kind. Text will be added separately afterward."
     )
+    # 공급자가 9500자로 자르더라도 만평·말풍선 금지 지침은 남긴다.
+    return visual[:9500 - len(EDITORIAL_CARTOON_RULES)] + EDITORIAL_CARTOON_RULES
 
-
-# Nova Canvas 경로용 짧은 프롬프트 조립.
-#
-# 실측 함정: 긴 인물 묘사(characters_block)와 재강조 문구를 붙이면 화풍이 반실사 사진으로
-# 돌아간다. 화풍은 "flat cel-shaded webtoon, NOT photorealistic" 같은 텍스트 지시를 앞에 두고
-# 나머지를 짧게 유지해야 지켜지므로, 이 프롬프트는 스타일 + 카메라 + [SCENE] + 짧은 내용 규칙
-# + 텍스트 렌더 금지로 한정한다.
-#
-# 단 성별 정보는 빠뜨리면 안 된다. 장면 텍스트가 옷차림으로만 A/B를 부르면 어느 쪽이
-# 누구인지 판단할 근거가 없어 인물 구성이 컷마다 흔들렸다. "A는 여성, B는 남성"이라는
-# 한 줄 역할 매핑만 추가하면 화풍 훼손 없이 안정된다. 이 줄은 화풍 내용이 아니라 구조적
-# 배선이라 admin 편집 대상이 아니며, 화풍 본문은 get_style()(admin이 저장한 STYLE)을 쓴다.
-_STYLE_AB_ROLE_LINE = " Two recurring characters from the reference image: A is the woman, B is the man."
-
-
-def _style_hint_from_db() -> str:
-    return get_style() + _STYLE_AB_ROLE_LINE
-
-_STYLE_GUIDE_CONTENT_RULES = (
-    "Contemporary present-day South Korea only — do NOT render historical, "
-    "period, fantasy, or traditional hanbok clothing or settings. Do NOT "
-    "render the likeness of any real public figure, and do NOT render real "
-    "corporate logos, trademarks, or institutional insignia. Render exactly "
-    "what [SCENE] describes and nothing more — no extra background crowds "
-    "or characters beyond what [SCENE] specifies."
-)
 
 def build_style_guide_prompt(camera: str, scene: str) -> str:
-    """Nova Canvas 경로용 프롬프트. 위 주석대로 일부러 짧게 유지하며(스타일 + 성별 역할
-    한 줄 + 카메라 + 장면 + 내용 규칙 + 텍스트 렌더 금지), 인물 묘사는 받지 않는다."""
-    return (
-        _style_hint_from_db()
-        + f"\nCamera: {camera}."
-        + f"\n\n[SCENE]\n{scene}"
-        + f"\n\n{_STYLE_GUIDE_CONTENT_RULES}"
-        + "\n\nCRITICAL: Do NOT render any text, letters, writing, signage text, "
-        "or speech bubbles anywhere in this image — pure illustration only, no "
-        "readable characters of any kind. Text will be added separately afterward."
+    """Nova의 1024자 상한에서도 만평·무문자 지침을 먼저 보존한다."""
+    content_rules = (
+        " Modern setting, anonymous generic characters; no identifiable public-figure likeness, "
+        "real corporate logos or institutional insignia. No extra people beyond the scene."
     )
+    return (EDITORIAL_CARTOON_RULES.strip() + content_rules + f"\nCamera: {camera}.\n[SCENE]\n{scene}")[:1024]

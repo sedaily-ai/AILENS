@@ -29,6 +29,7 @@ import requests  # noqa: E402
 
 import lens_cms_client as cms  # noqa: E402
 import publishing as pu  # noqa: E402
+from webtoon_contract import external_caption
 
 APPLY = "--apply" in sys.argv
 ONLY = sys.argv[sys.argv.index("--only") + 1] if "--only" in sys.argv else None
@@ -82,9 +83,7 @@ def _make_webtoon(article: dict, article_path: Path, out_dir: Path, upload) -> d
         if not cut_path.exists():
             print(f"   컷{n} 파일 없음 — 건너뜀")
             continue
-        caption = cut.get("narration") or (
-            " ".join(f'{d["speaker"]}: {d["line"]}' for d in cut.get("dialogue", [])) if cut.get("dialogue") else ""
-        ) or cut.get("caption", "")
+        caption = external_caption(cut)
         bullets.append(caption)
         webp = cut_path.with_suffix(".webp")
         Image.open(cut_path).convert("RGB").save(webp, "WEBP", quality=90, method=6)

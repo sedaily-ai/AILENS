@@ -7,6 +7,7 @@
 from __future__ import annotations
 
 from media_duration import measured_duration
+from webtoon_contract import external_caption
 
 import importlib.util
 import os
@@ -350,9 +351,7 @@ def publish_article(
                 if not cut_path.exists():
                     print(f"[{log_prefix}] {name} 컷{n} 파일 없음(생성 실패) — 이 컷만 건너뜀")
                     continue
-                caption = cut.get("narration") or (
-                    " ".join(f'{d["speaker"]}: {d["line"]}' for d in cut.get("dialogue", [])) if cut.get("dialogue") else ""
-                ) or cut.get("caption", "")
+                caption = external_caption(cut)
                 webtoon_bullets.append(caption)
                 # 나레이션을 그림에 굽지 않은 컷이면(웹툰 합성이 남긴 표시 파일) 사이트가 컷 아래 여백에 글자로 보여준다.
                 text_caption_flag = {"text_caption": True} if (out_dir / name / f"컷{n}.textcaption").exists() else {}

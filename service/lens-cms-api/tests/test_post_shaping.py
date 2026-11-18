@@ -64,3 +64,23 @@ def test_apply_admin_extra_none_fills_nulls():
     cms_repo._apply_admin_extra(p, None)
     assert p["body_inline"] == {"category": None, "subcategory": None, "paper_section": None, "photo_image_url": None}
     assert p["display_order"] is None and p["editor_id"] is None
+
+
+def test_lens_caption_flags_survive_normalized_read_and_public_response():
+    images = [{"url": "new", "caption": "그림 아래 설명"}, {"url": "old", "caption": "옛 이미지"}]
+    extra = {"body_inline": {"lenses": [{"label": "웹툰", "images": [
+        {"url": "old"}, {"url": "new", "text_caption": True}, {"url": "removed", "text_caption": True},
+    ]}]}}
+    cur = MagicMock()
+    cur.fetchall.return_value = [{"format": "webtoon", "images_json": images, "media_url": None}]
+    items = cms_repo._fetch_lens_items(cur, 1, extra)
+    assert items[0]["images"][0]["text_caption"] is True
+    assert "text_caption" not in items[0]["images"][1]
+    result = shaping.shape_lens({"slug": "s", "body_inline": {"lenses": items}})
+    assert result["lenses"][0]["images"] == items[0]["images"]
+
+
+def test_standalone_caption_flags_match_url_and_preserve_old_images():
+    post = {"body_inline": {"images": [{"url": "new"}, {"url": "old"}]}}
+    cms_repo._apply_admin_extra(post, {"body_inline": {"images": [{"url": "new", "text_caption": True}]}})
+    assert post["body_inline"]["images"] == [{"url": "new", "text_caption": True}, {"url": "old"}]

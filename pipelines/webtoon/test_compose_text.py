@@ -68,13 +68,23 @@ def test_explicit_single_bubble_position_still_wins():
     assert layout[0]["tip_x"] == pytest.approx(0.8, abs=0.002)
 
 
-def test_margin_bubble_tails_stop_above_faces(tmp_path):
+def test_compose_never_covers_art_even_with_legacy_bubbles(tmp_path):
     path = tmp_path / "panel.png"
     Image.new("RGB", (1216, 832), "navy").save(path)
-    layout = ct.compose(path, {"bubble_style": "oval", "bubble_margin": True,
+    before = path.read_bytes()
+    layout = ct.compose(path, {"cut": 1, "title": "제목", "caption": "숫자", "closing_caption": "마무리",
+                              "bubble_style": "oval", "bubble_margin": True,
                               "dialogue": [{"speaker": "A", "line": "조건을 확인하나요?"},
                                            {"speaker": "B", "line": "예산 심의가 필요해요."}],
                               "narration": "예산 승인 뒤 결정한다."})
-    height = Image.open(path).height
-    assert len(layout) == 2
-    assert all(box["tip_y"] * height <= round(832 * 0.30) + 832 * 0.05 for box in layout)
+    assert layout == []
+    assert path.read_bytes() == before
+
+
+def test_compose_scales_only_the_art(tmp_path):
+    path = tmp_path / "panel.png"
+    Image.new("RGB", (100, 60), "navy").save(path)
+    assert ct.compose(path, {"title": "제목", "narration": "설명"}, scale=1.5) == []
+    with Image.open(path) as img:
+        assert img.size == (150, 90)
+        assert img.getpixel((75, 45)) == (0, 0, 128)

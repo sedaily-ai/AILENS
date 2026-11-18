@@ -1,5 +1,16 @@
 # Admin Stack
 
+## 웹툰 만평 전환 (2026-11-18, 운영 반영 완료)
+
+웹툰은 8컷을 유지하고 말풍선 없는 만평과 그림 아래 설명으로 전환한다. 각본 생성은 공통
+`webtoon_contract.SCRIPT_OUTPUT_ADDENDUM`을 적용하고, 컷 생성·재합성의 `compose_text.compose()`는
+배율 조정만 수행한다. CMS 미리보기는 생성 결과의 설명을 그림 아래 표시하며 말풍선 설정 UI를 제거했다.
+공개 API는 `admin_extra`의 `text_caption`을 이미지 URL 기준으로 복원해 응답까지 보존한다.
+관리자 Lambda·CMS 정적 화면·공개 API·자동 발행 파이프라인(revision 120)에 배포했다.
+저장된 웹툰 프롬프트 v65와 이미지 설정 v31은 유지하며, 코드 제작 규칙이 모든 버전에 적용된다.
+사용자가 별도로 프롬프트를 발행하거나 설정을 바꿀 필요는 없다.
+검증·산출물은 `docs/worklog/2026-11/2026-11-18-말풍선없는-만평전환.md` 참고.
+
 CLAUDE.md 의 Admin track 섹션에서 분리됨 — Backend Admin Lambda / Feature Flags / Thresholds / Prompts / Secrets / Admin Frontend / Admin-5 통합 reference. Admin-1~5 모든 phase 종료 (Admin-5 ✓), 누적 reference 안정화.
 
 본 파일이 admin stack 의 단일 reference. 향후 admin 변경 시 본 파일 업데이트.

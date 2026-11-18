@@ -111,7 +111,7 @@ type WsPush =
   // 부분에도 출력이 되는데, 출력할 필요 없고요... 우측에만 출력된게
   // 나오도록". 한때 appendMessage(말풍선으로도 보임)로 연결했었는데
   // 그걸 되돌린 것.
-  | { type: "cut_image"; cut: number; test_id?: string; image_url: string; model?: string }
+  | { type: "cut_image"; cut: number; test_id?: string; image_url: string; model?: string; caption?: string }
   | { type: "pong" };
 
 export function PromptChatLab({
@@ -184,7 +184,7 @@ export function PromptChatLab({
   // 바깥 키로 한 겹 더 둔다. 구버전(testId 없이 저장된) 메시지는 "legacy"
   // 키 하나로 묶는다 — 그 글자 자체는 의미 없고, 그냥 restoredImages의
   // Object.entries() 순서상 첫 번째 테스트로 복원되기만 하면 된다.
-  const [restoredCutImages, setRestoredCutImages] = useState<Record<string, Record<number, { imageUrl: string; model?: string }>>>({});
+  const [restoredCutImages, setRestoredCutImages] = useState<Record<string, Record<number, { imageUrl: string; model?: string; caption?: string }>>>({});
   const {
     sidebarCollapsed,
     setSidebarCollapsed,
@@ -421,10 +421,10 @@ export function PromptChatLab({
           : null
       );
       setRestoredCutImages(
-        detail.messages.reduce<Record<string, Record<number, { imageUrl: string; model?: string }>>>((acc, m) => {
+        detail.messages.reduce<Record<string, Record<number, { imageUrl: string; model?: string; caption?: string }>>>((acc, m) => {
           if (m.imagePreview) {
             const testId = m.imagePreview.testId ?? "legacy";
-            acc[testId] = { ...acc[testId], [m.imagePreview.cut]: { imageUrl: m.imagePreview.imageUrl, model: m.imagePreview.model } };
+            acc[testId] = { ...acc[testId], [m.imagePreview.cut]: { imageUrl: m.imagePreview.imageUrl, model: m.imagePreview.model, caption: m.imagePreview.caption } };
           }
           return acc;
         }, {})
@@ -521,7 +521,7 @@ export function PromptChatLab({
             // 동작한다, 화면에 말풍선으로 안 보였을 뿐 저장 자체는 항상
             // 서버에 했었다.
             persistArtifact({
-              imagePreview: { cut: msg.cut, imageUrl: msg.image_url, model: msg.model, testId: msg.test_id },
+              imagePreview: { cut: msg.cut, imageUrl: msg.image_url, model: msg.model, testId: msg.test_id, caption: msg.caption },
             });
             break;
         }

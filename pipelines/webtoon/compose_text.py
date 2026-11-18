@@ -1,9 +1,7 @@
-"""뉴스 웹툰 파이프라인 — 텍스트 합성(말풍선·캡션·내레이션·제목).
+"""만평 출력 크기 조정과 기존 웹툰 그리기 보조 함수.
 
-확산 계열 이미지 모델은 프롬프트로 요청한 한글을 정확히 그리지 못한다. 모델에는 텍스트 없는
-배경 그림만 맡기고, 말풍선·캡션·내레이션·제목은 이 파일이 PIL로 배경 위에 직접 합성한다.
-스크립트 JSON에는 화자 위치(x/y)가 없으므로 말풍선은 화자(A/B)·균등 분할 기준으로 배치하고,
-사람·얼굴 위치(detect)가 주어지면 그에 맞춰 자리와 꼬리 끝을 계획한다.
+운영 진입점 compose()는 이미지 위에 글자를 합성하지 않는다.
+설명은 외부 텍스트로 표시하며 옛 합성 옵션도 무시한다.
 """
 import math
 import re
@@ -995,90 +993,11 @@ _BASE_METRICS = {
 
 
 def compose(img_path: Path, cut: dict, faces: list[dict] | None = None, scale: float = 1.0) -> list[dict]:
-    """(scale > 1이면 배경을 Lanczos로 키운 뒤 글자·말풍선을 그 크기에 맞춰 새로 그린다 — 아래 _compose_at 참고.)"""
-    global _SCALE
-    g = globals()
-    prev_scale = _SCALE
-    _SCALE = scale
-    for name, base in _BASE_METRICS.items():
-        g[name] = max(1, int(round(base * scale))) if name in ("_OUTLINE_WIDTH", "_ICON_STROKE_W") else base * scale
-    try:
-        return _compose_at(img_path, cut, faces, scale)
-    finally:
-        _SCALE = prev_scale
-        for name, base in _BASE_METRICS.items():
-            g[name] = base
-
-
-def _compose_at(img_path: Path, cut: dict, faces: list[dict] | None, scale: float) -> list[dict]:
-    """배경 이미지(img_path) 위에 cut의 title/dialogue/caption/(closing_caption 또는 narration)을
-    순서대로 합성해 같은 경로에 덮어쓰고, 그려진 말풍선 배치를 돌려준다. faces는 항상 None이다
-    (draw_dialogue 참고).
-
-    - closing_caption과 narration은 둘 다 하단 요소라 겹친다. closing_caption이 있으면 그것만 쓴다.
-    - 컷1은 draw_cover_header(브랜드 라벨 + 헤드라인 박스), 컷2~8은 title_fill_for_cut() 색의 draw_title을 쓴다.
-    - 제목 하단 y좌표(title_bottom)를 draw_dialogue()에 넘겨 말풍선이 제목과 겹치지 않게 한다.
-    - narration/closing_caption을 caption보다 먼저 그리고 그 상단 y좌표를 caption에 넘겨, 하단 요소끼리 겹치지 않게 한다."""
-    img = Image.open(img_path).convert("RGB")
+    """만평은 그림을 가리지 않는다. 옛 대사·합성 옵션도 무시하고 기존 출력 배율만 유지한다."""
     if scale != 1.0:
-        # 그림은 Lanczos로 키우고 가장자리를 아주 약하게 샤픈(과하면 인공물이 생겨 약하게).
+        with Image.open(img_path) as source:
+            img = source.convert("RGB")
         img = img.resize((round(img.width * scale), round(img.height * scale)), Image.LANCZOS)
         img = img.filter(ImageFilter.UnsharpMask(radius=1.2, percent=40, threshold=3))
-    global _BUBBLE_STYLE
-    _BUBBLE_STYLE = cut.get("bubble_style") or "classic"
-    # 말풍선 여백 모드(bubble_margin) — 그림 위에 흰 여백을 붙여 말풍선을 그 여백에 둔다(레퍼런스 웹툰 방식: 그림을 가리지 않는다).
-    detect_in = cut.get("detect")
-    max_bottom_in = 0.85
-    tail_target_y = None
-    if cut.get("bubble_margin") and cut.get("dialogue"):
-        H0 = img.height
-        margin_px = int(round(H0 * (_MARGIN_RATIO + (0.16 if cut.get("cut") == 1 and cut.get("title") else 0.0))))  # 표지는 제목 띠 자리까지 더한다
-        ext = Image.new("RGB", (img.width, H0 + margin_px), (255, 255, 255))
-        ext.paste(img, (0, margin_px))
-        img = ext
-        if detect_in:
-            shift = lambda b: {**b, "t": (b["t"] * H0 + margin_px) / img.height, "h": b["h"] * H0 / img.height}  # noqa: E731
-            detect_in = {"persons": [shift(b) for b in detect_in.get("persons", [])], "faces": [shift(b) for b in detect_in.get("faces", [])]}
-        max_bottom_in = (margin_px + 0.10 * H0) / img.height  # 여백 + 그림 윗부분 조금까지만
-        tail_target_y = margin_px + 0.04 * H0  # 기본 꼬리가 얼굴 중앙을 덮지 않게 그림 상단에서 멈춘다.
-    cut_no = cut.get("cut")
-    title_bottom = None
-    if cut_no == 1 and cut.get("title"):
-        title_bottom = draw_cover_header(img, "서울경제 웹툰", cut["title"], cut.get("title_keyword"))
-    elif cut.get("title"):
-        title_bottom = draw_title(img, cut["title"], fill=title_fill_for_cut(cut_no))
-    layout: list[dict] = []
-    if cut.get("dialogue"):
-        layout = draw_dialogue(img, cut["dialogue"], faces, title_bottom, detect_in, max_bottom_in, tail_target_y) or []
-    bottom_top = None
-    band_text = (cut.get("closing_caption") or cut.get("narration") or "").strip()
-    margin_mode = bool(cut.get("bubble_margin") and cut.get("dialogue"))
-    # 나레이션을 이미지에 굽지 않고 사이트가 컷 아래 여백에 글자로 보여주는 모드. 켜져 있으면 검정 띠를 붙이지 않는다.
-    narration_as_text = bool(cut.get("narration_as_text"))
-    if band_text and not margin_mode:
-        if cut.get("closing_caption"):
-            bottom_top = draw_closing_caption(img, cut["closing_caption"])
-        else:
-            bottom_top = draw_narration(img, cut["narration"])
-    if cut.get("caption"):
-        draw_caption(img, cut["caption"], bottom_limit=bottom_top)
-    if band_text and margin_mode and not narration_as_text:
-        # 웹툰식(여백) 모드 — 나레이션은 그림 위에 덮지 않고 그림 아래에 검은 띠를 붙여 흰 글씨로 얹는다(그림을 가리지 않는다).
-        d = ImageDraw.Draw(img)
-        f = _font(34)
-        lines = _wrap_text(d, band_text, f, int(img.width * 0.84))
-        _, block_h = _measure_block(d, lines, f)
-        band_h = int(block_h + _k(46))
-        H1 = img.height
-        out = Image.new("RGB", (img.width, H1 + band_h), (18, 18, 18))
-        out.paste(img, (0, 0))
-        od = ImageDraw.Draw(out)
-        ty = H1 + (band_h - block_h) / 2
-        for ln in lines:
-            _draw_line_highlight(od, img.width / 2, ty, ln, f, (255, 255, 255), _ACCENT_ON_DARK)  # 핵심 숫자만 파랑으로
-            ty += od.textbbox((0, 0), ln, font=f)[3] + _LINE_SPACING
-        ratio = H1 / out.height  # 풍선 위치 비율을 띠가 붙은 최종 높이 기준으로 다시 맞춘다(CMS 편집 손잡이용)
-        layout = [{**b, "y": round(b["y"] * ratio, 4), "h": round(b["h"] * ratio, 4), "tip_y": round(b["tip_y"] * ratio, 4)} for b in layout]
-        img = out
-    img.save(img_path)
-    return layout
+        img.save(img_path)
+    return []

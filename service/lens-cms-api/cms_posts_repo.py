@@ -165,6 +165,12 @@ def _lens_extra_by_label(admin_extra: Optional[Dict[str, Any]]) -> Dict[str, Dic
     return {item["label"]: item for item in lenses if item.get("label")}
 
 
+def _images_with_caption_flags(images: list, source_images: list) -> list:
+    """정규화 테이블에 없는 표시 옵션은 같은 URL의 admin_extra에서 복원한다."""
+    text_urls = {img.get("url") for img in source_images if isinstance(img, dict) and img.get("text_caption") is True}
+    return [{**img, **({"text_caption": True} if img.get("url") in text_urls else {})} for img in images]
+
+
 def _fetch_lens_items(cur, pub_id: int, admin_extra: Optional[Dict[str, Any]] = None) -> List[Dict[str, Any]]:
     extra_by_label = _lens_extra_by_label(admin_extra)
     cur.execute(_LENS_RENDITIONS_SELECT, (pub_id,))
@@ -185,7 +191,7 @@ def _fetch_lens_items(cur, pub_id: int, admin_extra: Optional[Dict[str, Any]] = 
                 if k.get("term") and k.get("explain")
             ],
             "paragraphs": row.get("body_json") or [],
-            "images": row.get("images_json") or [],
+            "images": _images_with_caption_flags(row.get("images_json") or [], extra_item.get("images") or []),
             "video_url": row["media_url"] if fmt == "video" else None,
             "thumbnail_url": row.get("thumbnail_url"),
             "media_url": row["media_url"] if fmt == "podcast" else None,
@@ -205,6 +211,8 @@ def _apply_admin_extra(post: Dict[str, Any], admin_extra: Optional[Dict[str, Any
     일반화했다."""
     extra = admin_extra or {}
     extra_body = extra.get("body_inline") or {}
+    if post["body_inline"].get("images"):
+        post["body_inline"]["images"] = _images_with_caption_flags(post["body_inline"]["images"], extra_body.get("images") or [])
     post["body_inline"]["category"] = extra_body.get("category")
     # 하위 카테고리(2026-10-01 신설) — category와 같은 자리, 같은 병합 규칙.
     post["body_inline"]["subcategory"] = extra_body.get("subcategory")

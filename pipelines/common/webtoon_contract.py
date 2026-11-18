@@ -21,8 +21,39 @@ SCRIPT_OUTPUT_ADDENDUM = (
     "구도와 장소는 기사 내용 및 지침에 맞게 선택한다. "
     "원문 근거가 부족해 8컷을 구성할 수 없으면 사실을 만들지 말고 "
     'generation_status="needs_article", cuts=[], planning에 부족한 정보를 적는다. '
+    "최우선 제작 규칙: 앞선 지침의 대화형 웹툰·고정 진행자·말풍선·텍스트 합성 요구보다 "
+    "이 규칙을 우선한다. 기존 8컷을 유지하되 신문 만평(editorial cartoon)으로 만든다. "
+    "기사에 근거한 상징, 시각적 비유, 대비, 표정과 행동으로 컷마다 핵심을 전달한다. "
+    "고정 진행자 두 명이 설명하는 구도를 반복하지 않는다. 비유를 실제 사건이나 새 사실로 제시하지 않는다. "
+    "각 image_prompt에는 editorial cartoon illustration 화풍과 장면을 영어로 작성한다. "
+    "speech/thought bubbles, empty balloons, text, captions, labels, lettering을 모두 금지한다. "
+    "모든 컷에 그림 아래 표시할 짧은 한국어 설명을 narration으로 작성한다. "
+    "dialogue는 빈 배열, bubble_1과 bubble_2는 null, title/caption/closing_caption은 빈 문자열로 둔다. "
     "다른 설명 없이 JSON 객체 하나만 응답한다."
 )
+
+
+def external_caption(cut: dict) -> str:
+    """새 설명을 우선하고, 옛 각본의 대사도 그림 밖에서 읽을 수 있게 보존한다."""
+    for key in ("narration", "new_conclusion", "closing_caption"):
+        value = cut.get(key)
+        if isinstance(value, str) and value.strip():
+            return value.strip()
+    dialogue = cut.get("dialogue")
+    lines = [d["line"].strip() for d in dialogue
+             if isinstance(d, dict) and isinstance(d.get("line"), str) and d["line"].strip()] if isinstance(dialogue, list) else []
+    if not lines:
+        for key in ("bubble_1", "bubble_2"):
+            bubble = cut.get(key)
+            if isinstance(bubble, dict) and isinstance(bubble.get("text"), str) and bubble["text"].strip():
+                lines.append(bubble["text"].strip())
+    if lines:
+        return " ".join(lines)
+    for key in ("caption", "keyword", "title", "headline"):
+        value = cut.get(key)
+        if isinstance(value, str) and value.strip():
+            return value.strip()
+    return ""
 
 
 def image_options(data: dict) -> dict:
