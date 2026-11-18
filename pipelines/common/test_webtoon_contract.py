@@ -9,7 +9,7 @@ from types import SimpleNamespace
 import pytest
 
 sys.path.insert(0, str(Path(__file__).parent))
-from webtoon_contract import cut_metadata, image_options, validate_storyboard  # noqa: E402
+from webtoon_contract import cut_metadata, external_caption, image_options, validate_storyboard  # noqa: E402
 import webtoon_image as wi  # noqa: E402
 
 ROOT = Path(__file__).resolve().parents[2]
@@ -37,11 +37,13 @@ def test_real_normalizers_preserve_options_and_evidence(path, function):
     # 배치 import가 모델·환경을 초기화하지 않도록 실제 순수 함수들만 로드한다.
     tree = ast.parse((ROOT / path).read_text())
     names = {function, "_cut_number", "_first_nonempty", "_dialogue_from_bubbles"}
-    ns = {"cut_metadata": cut_metadata, "validate_storyboard": validate_storyboard}
+    ns = {"cut_metadata": cut_metadata, "validate_storyboard": validate_storyboard, "external_caption": external_caption}
     exec(compile(ast.Module(body=[n for n in tree.body if isinstance(n, ast.FunctionDef) and n.name in names],
                             type_ignores=[]), path, "exec"), ns)
     cuts = ns[function](_storyboard())
     assert len(cuts) == 8
+    assert cuts[0]["dialogue"] == []
+    assert cuts[0]["narration"] == "예산 승인 시 시행한다."
     assert cuts[0]["negative_prompt"] == "watercolor, extra people"
     assert cuts[0]["image_seed"] == 42
     assert cuts[0]["fact_ids"] == ["F1"]
@@ -186,3 +188,36 @@ def test_explicit_camera_and_style_are_preserved():
     prompt = wi.build_background_prompt("medium two-shot", "Two presenters.", style="Cel-shaded webtoon.")
     assert prompt.startswith("Cel-shaded webtoon.\nCamera: medium two-shot. 3:2 horizontal.")
     assert "Two presenters." in prompt
+
+
+@pytest.mark.parametrize("cut, expected", [
+    ({"narration": "설명", "dialogue": [{"line": "대사"}]}, "설명"),
+    ({"new_conclusion": "결론"}, "결론"),
+    ({"closing_caption": "마무리"}, "마무리"),
+    ({"dialogue": [{"speaker": "A", "line": "첫 문장"}, {"line": "둘째 문장"}]}, "첫 문장 둘째 문장"),
+    ({"bubble_1": {"text": "옛 대사"}}, "옛 대사"),
+    ({"caption": "수치"}, "수치"),
+    ({"narration": " ", "dialogue": [None, {"line": 1}], "title": "제목"}, "제목"),
+    ({}, ""),
+])
+def test_external_caption_preserves_new_and_legacy_text(cut, expected):
+    assert external_caption(cut) == expected
+
+
+def test_selected_version_style_is_preserved_with_no_bubble_rules():
+    prompt = wi.build_background_prompt("", "Draw two speakers with balloons.", style="Romance webtoon.")
+    assert prompt.rindex("FINAL IMAGE RULES") > prompt.index("Draw two speakers")
+    assert "Romance webtoon." in prompt
+    assert "empty balloons" in prompt
+    assert "outside the image" in prompt
+
+
+def test_long_prompt_keeps_no_bubble_rules_inside_provider_limit():
+    prompt = wi.build_background_prompt("", "Scene. " * 3000, style="",
+                                        include_scene_reinforcement=False, include_character_reinforcement=False)
+    assert len(prompt) <= 9500
+    assert prompt.endswith("outside the image.")
+    assert "empty balloons" in prompt
+    nova = wi.build_style_guide_prompt("wide", "Scene. " * 3000)
+    assert len(nova) <= 1024
+    assert "Scene." in nova and "empty balloons" in nova

@@ -1,11 +1,11 @@
 """뉴스 웹툰 파이프라인 — 핵심 엔진.
 
 기사 1건을 받아 8컷 웹툰(이미지 8장 + 세로 스크롤 1장)을 만든다.
-흐름은 스크립트+장면 연출(단일 Bedrock 호출) → 컷 이미지 생성 → 텍스트 합성 → 스티칭이다.
+흐름은 스크립트+장면 연출(단일 Bedrock 호출) → 컷 이미지 생성 → 출력 크기 조정·외부 설명 표시 → 스티칭이다.
 중간 결과(JSON)를 파일로 저장하므로 재실행하면 끝난 단계는 건너뛰고 이어서 진행한다(resume).
 텍스트 생성은 Bedrock Claude만 쓰고, GPT는 휴면 상태인 이미지 경로(generate_image)에만 남아 있다.
 """
-import sys, json, base64, re, time, os, threading
+import sys, json, base64, re, time, os
 from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 
@@ -13,10 +13,9 @@ sys.path.insert(0, str(Path(__file__).parent.parent / "common"))
 import ddb_prompt  # pipelines/common/ — letters/podcast와 공용
 from openai_client import get_client  # pipelines/common/ — 이미지 생성 전용
 from bedrock_client import call_text  # 스크립트·장면 연출용
-from webtoon_contract import SCRIPT_OUTPUT_ADDENDUM as _SCRIPT_OUTPUT_ADDENDUM, cut_metadata, validate_storyboard
+from webtoon_contract import SCRIPT_OUTPUT_ADDENDUM as _SCRIPT_OUTPUT_ADDENDUM, cut_metadata, external_caption, validate_storyboard
 from json_extract import extract_json_object  # pipelines/common/ — 공용
 
-import prompts
 import compose_text
 from stitch import stitch
 
@@ -35,10 +34,6 @@ N_CUTS = 8
 # 이미지 API 대기가 대부분이라 동시에 돌리면 컷 수만큼 걸리던 시간이 크게 준다. 이미지 API 동시 호출
 # 한도를 고려해 4로 둔다. PUBLISH_PARALLEL=0(common/publishing.py)이면 예전처럼 한 장씩 만든다.
 _CUT_WORKERS = 1 if os.environ.get("PUBLISH_PARALLEL", "1") == "0" else 4
-
-# compose_text.compose()는 글자 크기·말풍선 스타일을 모듈 전역 변수에 잠시 바꿔 넣고 그리므로
-# 두 컷을 동시에 합성하면 서로의 설정을 덮어쓴다. 이미지 생성만 동시에 하고 합성은 이 락으로 한 컷씩 한다.
-_COMPOSE_LOCK = threading.Lock()
 
 # 이미지 모델은 코드 상수가 아니라 admin이 발행한 DDB 문서(webtoon-image/published)의 IMAGE_MODEL
 # 섹션에서 기사 처리 시작 때 읽는다(webtoon_image.get_active_image_model()). 저장하면 재배포 없이
@@ -63,9 +58,6 @@ _PROVIDER_CONFIG = {
 from webtoon_image import (
     generate_cut_image_to_file,
     get_active_image_model,
-    characters_block as _characters_block,
-    SCENE_REINFORCEMENT as _SCENE_REINFORCEMENT,
-    CHARACTER_REINFORCEMENT as _CHARACTER_REINFORCEMENT,
 )
 
 _JSON_INSTRUCTION = (
@@ -175,18 +167,6 @@ def _first_nonempty(*values: object) -> str:
     return ""
 
 
-def _dialogue_from_bubbles(c: dict) -> list[dict]:
-    """v11 스키마는 "dialogue" 배열 대신 bubble_1/bubble_2로 준다. 옛 dialogue 스키마와 나란히 지원한다."""
-    if c.get("dialogue"):
-        return c["dialogue"]
-    lines = []
-    for key in ("bubble_1", "bubble_2"):
-        b = c.get(key)
-        if isinstance(b, dict) and b.get("text"):
-            speaker = "A" if b.get("speaker") == "female" else "B" if b.get("speaker") == "male" else key
-            lines.append({"speaker": speaker, "line": b["text"]})
-    return lines
-
 
 class StoryboardRejected(ValueError):
     """각본을 쓸 수 없다: 스토리보드 계약(컷 8개·image_prompt·근거 인용 등)을 통과하지 못했거나
@@ -211,32 +191,23 @@ def _normalize_cuts(script: dict) -> list[dict]:
         cuts.append({
             **cut_metadata(script, c),
             "cut": cut_number if cut_number is not None else idx,
-            "narration": _first_nonempty(c.get("narration"), c.get("new_conclusion")),
+            "narration": external_caption(c),
             "caption": _first_nonempty(c.get("caption"), c.get("keyword")),
             "closing_caption": c.get("closing_caption") or "",
             "title": _first_nonempty(c.get("title"), c.get("headline")),
             "title_keyword": c.get("title_keyword") or "",
-            "dialogue": _dialogue_from_bubbles(c),
+            "dialogue": [],
             "image_prompt": c.get("image_prompt") or "",
         })
     return cuts
 
 
 def build_image_prompt(image_prompt: str, cut: dict, characters: dict | None = None) -> str:
-    """장면(image_prompt)과 대사·캡션·내레이션을 합친 GPT 경로용 이미지 프롬프트."""
-    style = prompts.get_style() + "\n3:2 horizontal."
-    parts = [
-        style, _characters_block(characters), f"\n\n[SCENE]\n{image_prompt}", _SCENE_REINFORCEMENT,
-        _CHARACTER_REINFORCEMENT if characters else "",
-    ]
-    if cut.get("narration"):
-        parts.append(prompts.narration(cut["narration"]))
-    if cut.get("caption"):
-        parts.append(prompts.caption(cut["caption"]))
-    if cut.get("dialogue"):
-        pairs = [(d["speaker"], d["line"], d.get("tone", "보통")) for d in cut["dialogue"]]
-        parts.append(prompts.bubbles(*pairs))
-    return "".join(parts)
+    """휴면 GPT 경로도 공통 만평·무문자 지침을 사용한다."""
+    from webtoon_image_prompt import build_background_prompt
+
+    return build_background_prompt("", image_prompt, style="",
+                                   include_scene_reinforcement=False, include_character_reinforcement=False)
 
 
 # 이미지 호출에 타임아웃이 없으면 서버 쪽 hang 시 재시도 로직이 무한 대기한다(실제로 한 컷에서 20분 이상
@@ -341,12 +312,7 @@ def run_article(name: str, article_path: str, output_root: Path = Path("."), res
 
     # 3단계: 이미지 생성
     print(f"{tag} 3단계 이미지 생성 ({N_CUTS}컷)")
-    # 기사마다 인물을 새로 짓지 않고 고정 진행자 2인(prompts.get_fixed_characters())을 항상 쓴다
-    # ("AI Lens 웹툰" 포맷). admin이 발행한 DDB가 정본이라 컷 루프 밖에서 한 번만 가져와
-    # 같은 기사의 8컷이 같은 값을 쓰게 한다.
-    characters = prompts.get_fixed_characters()
-
-    # 이미지 모델도 기사 처리 시작 때 admin이 발행한 DDB에서 한 번 읽는다(위 characters와 같은 문서).
+    # 이미지 모델은 기사 처리 시작 때 admin 발행 문서에서 한 번 읽는다.
     active_model = get_active_image_model()
 
     # 기사 단위 seed를 정해 8컷에 같이 쓰고 1_script.json에 남긴다.
@@ -363,12 +329,6 @@ def run_article(name: str, article_path: str, output_root: Path = Path("."), res
     set_run_negative(script.get("negative_prompt") if isinstance(script.get("negative_prompt"), str) else "")
     print(f"{tag} 이미지 seed {image_seed}")
 
-    # CMS "이미지 설정"의 말풍선 얼굴 회피(Rekognition) 토글 — 기사 처리 시작 때 한 번 읽는다(꺼짐이 기본, 읽기 실패도 꺼짐).
-    from webtoon_image import get_bubble_detect, get_bubble_style
-    bubble_detect = get_bubble_detect()
-    bubble_style_on = get_bubble_style()  # 웹툰식 말풍선(타원·얇은 선·위쪽 여백)
-    print(f"{tag} 말풍선 얼굴 회피: {'켜짐' if bubble_detect else '꺼짐'} / 웹툰식 말풍선: {'켜짐' if bubble_style_on else '꺼짐'}")
-
     def _make_cut(cut: dict) -> None:
         n = cut["cut"]
         img_path = out / f"컷{n}.png"
@@ -380,45 +340,21 @@ def run_article(name: str, article_path: str, output_root: Path = Path("."), res
             cfg = _PROVIDER_CONFIG[active_model]
             ok, faces = generate_cut_image_to_file(
                 "", cut["image_prompt"], active_model, img_path,
-                has_dialogue=bool(cut.get("dialogue")) or n == 1,
+                has_dialogue=False,
                 retries=cfg["retries"],
             )
-            if ok:
-                # faces는 항상 None이다(얼굴 감지 제거, webtoon_image.generate_cut_image() 참고).
-                # compose_text.compose()가 균등 분할로 폴백한다.
-                # 합성(얼굴 회피 감지 포함)은 _COMPOSE_LOCK 안에서 한 컷씩 한다(락 정의부 주석 참고).
-                with _COMPOSE_LOCK:
-                    try:
-                        cut_for_compose = cut
-                        if bubble_style_on and cut.get("dialogue"):
-                            cut_for_compose = {**cut_for_compose, "bubble_style": "oval", "bubble_margin": True, "narration_as_text": True}
-                        if bubble_detect and cut.get("dialogue"):
-                            import rekognition_people  # pipelines/common/ — 켜져 있을 때만(권한·비용)
-
-                            detect = rekognition_people.detect_people(img_path.read_bytes())  # 실패하면 None → 고정 배치
-                            if detect:
-                                cut_for_compose = {**cut_for_compose, "detect": detect}
-                        try:
-                            compose_text.compose(img_path, cut_for_compose, faces, scale=compose_text.OUTPUT_SCALE)
-                            # 나레이션을 이미지에 굽지 않은 컷(웹툰식 합성이 성공한 경우만)은 표시 파일을 남긴다 — 발행 단계가 이걸 보고 images[].text_caption을 켠다.
-                            # 합성이 실패해 기본 스타일(나레이션이 이미지에 박힘)로 떨어졌으면 파일이 없어 사이트가 글자를 또 얹지 않는다.
-                            if cut_for_compose.get("narration_as_text") and (cut.get("narration") or "").strip():
-                                (out / f"컷{n}.textcaption").write_text("1", encoding="utf-8")
-                        except Exception as e:  # noqa: BLE001 — 새 스타일 합성이 실패해도 기본 스타일로라도 글자는 얹는다
-                            print(f"{tag} 컷{n} 웹툰식 합성 실패({type(e).__name__}: {e}) — 기본 스타일로 재시도")
-                            compose_text.compose(img_path, cut, faces, scale=compose_text.OUTPUT_SCALE)
-                    except compose_text.NarrationOverflowError as e:
-                        # 자막이 그림 하단에 들어가지 않으면 이 컷만 뺀다. 글자 없는 배경이 발행되지 않게 파일을 지운다.
-                        # 발행 단계(publishing._make_webtoon)가 파일 없는 컷을 건너뛰고, 남은 컷이 최소 컷 수 이상이면 발행한다.
-                        # 2026-10-29 전에는 이 예외가 올라가 이미지를 다 만든 웹툰 전체를 버렸다.
-                        print(f"{tag} 컷{n} {e} — 이 컷만 빼고 진행")
-                        img_path.unlink(missing_ok=True)
-                        ok = False
-                    except Exception as e:
-                        print(f"{tag} 컷{n} 텍스트 합성 실패(배경은 유지): {e}")
         else:
-            prompt = build_image_prompt(cut["image_prompt"], cut, characters)
+            prompt = build_image_prompt(cut["image_prompt"], cut)
             ok = generate_image(prompt, img_path)
+        if ok:
+            marker = out / f"컷{n}.textcaption"
+            marker.unlink(missing_ok=True)
+            try:
+                compose_text.compose(img_path, cut, faces if active_model in _PROVIDER_CONFIG else None,
+                                     scale=compose_text.OUTPUT_SCALE)
+            except Exception as e:
+                print(f"{tag} 컷{n} 자막 띠 합성 실패(그림 밖 설명으로 표시): {e}")
+                marker.write_text("1", encoding="utf-8")
         print(f"{tag} 컷{n} {'완료' if ok else '실패'}")
 
     if _CUT_WORKERS > 1 and active_model in _PROVIDER_CONFIG:
@@ -429,18 +365,6 @@ def run_article(name: str, article_path: str, output_root: Path = Path("."), res
     with ThreadPoolExecutor(max_workers=_CUT_WORKERS, thread_name_prefix=f"{name}-cut") as pool:
         # list()로 결과를 모두 꺼내 컷 하나의 예외가 순차 실행 때처럼 run_article() 밖으로 올라가게 한다.
         list(pool.map(_make_cut, cuts))
-
-    # 핵심 정리 카드(웹툰식 모드) — 프롬프트가 key_numbers(핵심 숫자 2~3개와 라벨)를 내면 마지막에 코드로 그린 카드를 한 장 더한다(이미지 모델 호출 없음, 비용 0).
-    if bubble_style_on:
-        try:
-            kn = script.get("key_numbers")
-            if isinstance(kn, list) and len(kn) >= 2:
-                head = script.get("card_title") if isinstance(script.get("card_title"), str) else ""
-                head = head or (script.get("core_question") or "")
-                if compose_text.make_summary_card(out / "컷9.png", head, kn, scale=compose_text.OUTPUT_SCALE):
-                    print(f"{tag} 핵심 정리 카드 생성")
-        except Exception as e:  # noqa: BLE001 — 카드는 덤이라 실패해도 발행을 막지 않는다
-            print(f"{tag} 핵심 정리 카드 생성 실패(건너뜀): {e}")
 
     # 세로 스크롤 합치기
     try:

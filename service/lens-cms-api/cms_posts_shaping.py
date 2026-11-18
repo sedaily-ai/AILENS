@@ -221,7 +221,8 @@ def shape_lens(post: Dict[str, Any]) -> Dict[str, Any]:
             # 글의 body_inline.images와 같은 모양({url, caption}), 저장
             # 위치만 이 슬롯.
             "images": [
-                {"url": img.get("url") or "", "caption": img.get("caption") or ""}
+                {"url": img.get("url") or "", "caption": img.get("caption") or "",
+                 **({"text_caption": True} if img.get("text_caption") is True else {})}
                 for img in (item.get("images") or [])
                 if img.get("url")
             ],

@@ -21,8 +21,33 @@ SCRIPT_OUTPUT_ADDENDUM = (
     "구도와 장소는 기사 내용 및 지침에 맞게 선택한다. "
     "원문 근거가 부족해 8컷을 구성할 수 없으면 사실을 만들지 말고 "
     'generation_status="needs_article", cuts=[], planning에 부족한 정보를 적는다. '
+    "그림에 말풍선을 합성하지 않는다. 독자에게 전달할 핵심 설명은 narration에 담는다. "
+    "화풍과 장면 연출은 선택한 프롬프트 버전의 지침을 따른다. "
     "다른 설명 없이 JSON 객체 하나만 응답한다."
 )
+
+
+def external_caption(cut: dict) -> str:
+    """새 설명을 우선하고, 옛 각본의 대사도 그림 밖에서 읽을 수 있게 보존한다."""
+    for key in ("narration", "new_conclusion", "closing_caption"):
+        value = cut.get(key)
+        if isinstance(value, str) and value.strip():
+            return value.strip()
+    dialogue = cut.get("dialogue")
+    lines = [d["line"].strip() for d in dialogue
+             if isinstance(d, dict) and isinstance(d.get("line"), str) and d["line"].strip()] if isinstance(dialogue, list) else []
+    if not lines:
+        for key in ("bubble_1", "bubble_2"):
+            bubble = cut.get(key)
+            if isinstance(bubble, dict) and isinstance(bubble.get("text"), str) and bubble["text"].strip():
+                lines.append(bubble["text"].strip())
+    if lines:
+        return " ".join(lines)
+    for key in ("caption", "keyword", "title", "headline"):
+        value = cut.get(key)
+        if isinstance(value, str) and value.strip():
+            return value.strip()
+    return ""
 
 
 def image_options(data: dict) -> dict:

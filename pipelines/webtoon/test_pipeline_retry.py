@@ -35,7 +35,6 @@ def webtoon(monkeypatch):
     monkeypatch.setattr(mod.ddb_prompt, "load_prompt", lambda name: "## 0. 지침\n내용")
     monkeypatch.setattr(mod, "get_active_image_model", lambda: "sd_ultra")
     monkeypatch.setattr(mod, "generate_cut_image_to_file", fake_image)
-    monkeypatch.setattr(mod.prompts, "get_fixed_characters", lambda: {})
     monkeypatch.setattr(mod.compose_text, "compose", lambda *args, **kwargs: [])
     monkeypatch.setattr(mod, "stitch", lambda out, n: None)
     monkeypatch.setattr(webtoon_image, "_get_bedrock_image_client", lambda: object())
@@ -99,17 +98,27 @@ def test_unreadable_json_is_retried_with_reason(webtoon, monkeypatch, tmp_path):
     assert len(script["cuts"]) == 8
 
 
-def test_overflowing_narration_drops_only_that_cut(webtoon, monkeypatch, tmp_path):
-    _script_responses(webtoon, monkeypatch, [_valid_script()])
-
-    def compose(img_path, cut, *args, **kwargs):
-        if cut["cut"] == 3:
-            raise webtoon.compose_text.NarrationOverflowError("자막이 하단 영역에 들어가지 않습니다.")
-        return []
-
-    monkeypatch.setattr(webtoon.compose_text, "compose", compose)
+def test_long_external_captions_keep_all_cuts(webtoon, monkeypatch, tmp_path):
+    script_input = _valid_script()
+    for cut in script_input["cuts"]:
+        cut["narration"] = "그림 아래 설명 " * 100
+        cut["dialogue"] = [{"speaker": "A", "line": "옛 대사"}]
+    def fail_band(*args, **kwargs):
+        raise webtoon.compose_text.NarrationOverflowError("자막이 너무 깁니다")
+    monkeypatch.setattr(webtoon.compose_text, "compose", fail_band)
+    _script_responses(webtoon, monkeypatch, [script_input])
     script = publishing.run_webtoon_with_retry(webtoon, "a", _article(tmp_path), tmp_path,
                                                manage_gpu=False, log_prefix="test")
     assert len(script["cuts"]) == 8
-    assert not (tmp_path / "a" / "컷3.png").exists()
-    assert all((tmp_path / "a" / f"컷{n}.png").exists() for n in range(1, 9) if n != 3)
+    assert all((tmp_path / "a" / f"컷{n}.png").exists() for n in range(1, 9))
+    assert all((tmp_path / "a" / f"컷{n}.textcaption").exists() for n in range(1, 9))
+
+
+def test_resume_does_not_mark_old_images_as_text_free(webtoon, monkeypatch, tmp_path):
+    out = tmp_path / "a"
+    out.mkdir()
+    Image.new("RGB", (30, 20), "white").save(out / "컷1.png")
+    _script_responses(webtoon, monkeypatch, [_valid_script()])
+    webtoon.run_article("a", str(_article(tmp_path)), tmp_path)
+    assert not (out / "컷1.textcaption").exists()
+    assert not (out / "컷2.textcaption").exists()

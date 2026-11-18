@@ -43,7 +43,7 @@ from __future__ import annotations
 
 import re
 
-from webtoon_contract import SCRIPT_OUTPUT_ADDENDUM as _SCRIPT_OUTPUT_ADDENDUM, cut_metadata, validate_storyboard
+from webtoon_contract import SCRIPT_OUTPUT_ADDENDUM as _SCRIPT_OUTPUT_ADDENDUM, cut_metadata, external_caption, validate_storyboard
 from routes.prompts import _CATEGORY_BEDROCK, _WEBTOON_JSON_INSTRUCTION, _WEBTOON_SYSTEM_PROMPT, resolve_text_model
 
 _CHAPTER_HEADER_RE = re.compile(r"^##\s*(\d+)\.\s*.+$", re.MULTILINE)
@@ -142,20 +142,6 @@ def _first_nonempty(*values: object) -> str:
     return ""
 
 
-def _dialogue_from_bubbles(c: dict) -> list[dict]:
-    """v11 스키마는 "dialogue" 배열 대신 bubble_1/bubble_2(각각
-    {"speaker":"female"|"male","text":...})로 준다 — 구도 없이 만들어진
-    옛 dialogue 스키마와 나란히 지원."""
-    if c.get("dialogue"):
-        return c["dialogue"]
-    lines = []
-    for key in ("bubble_1", "bubble_2"):
-        b = c.get(key)
-        if isinstance(b, dict) and b.get("text"):
-            speaker = "A" if b.get("speaker") == "female" else "B" if b.get("speaker") == "male" else key
-            lines.append({"speaker": speaker, "line": b["text"]})
-    return lines
-
 
 def normalize_cuts(script: dict) -> list[dict]:
     """단일 호출(build_script_call) 결과의 cuts를 컷 이미지 생성·
@@ -194,12 +180,12 @@ def normalize_cuts(script: dict) -> list[dict]:
         cuts.append({
             **cut_metadata(script, c),
             "cut": cut_number if cut_number is not None else idx,
-            "narration": _first_nonempty(c.get("narration"), c.get("new_conclusion")),
+            "narration": external_caption(c),
             "caption": _first_nonempty(c.get("caption"), c.get("keyword")),
             "closing_caption": c.get("closing_caption") or "",
             "title": _first_nonempty(c.get("title"), c.get("headline")),
             "title_keyword": c.get("title_keyword") or "",
-            "dialogue": _dialogue_from_bubbles(c),
+            "dialogue": [],
             "image_prompt": c.get("image_prompt") or "",
         })
     return cuts

@@ -23,6 +23,7 @@ from pathlib import Path
 
 from shared import audit, response, time_utils
 from routes.webtoon import jobs
+from webtoon_contract import external_caption
 import webtoon_image  # pipelines/common/ — 배포 시 zip에 복사됨(위 docstring 참고)
 import compose_text  # pipelines/webtoon/ — 대사·캡션·내레이션 합성(2026-09-14)
 
@@ -116,7 +117,7 @@ def run_composed_generation(job_id: str, cut: dict, push=None, model: str = "sd_
     try:
         camera = (cut.get("camera") or "").strip()
         scene = (cut.get("scene") or "").strip()
-        has_dialogue = bool(cut.get("dialogue")) or cut.get("cut") == 1
+        has_dialogue = False
         from webtoon_contract import image_options
         options = image_options(cut)
         image_bytes, faces = _generate_composed(camera, scene, has_dialogue, model=model, generation_options=options)
@@ -132,45 +133,22 @@ def run_composed_generation(job_id: str, cut: dict, push=None, model: str = "sd_
         tmp_path = Path(f"/tmp/webtoon-lab-{job_id}.png")
         tmp_path.write_bytes(image_bytes)
         layout: list = []
+        text_caption = False
         try:
-            try:
-                # 웹툰식 말풍선(타원·여백) — 테스트 카드가 정한 값(cut.bubble_webtoon)이 있으면 그것을, 없으면 발행 설정을 따른다
-                use_style = cut.get("bubble_webtoon")
-                if use_style is None:
-                    use_style = webtoon_image.get_bubble_style()
-                if use_style:
-                    cut = {**cut, "bubble_style": "oval", "bubble_margin": True}
-            except Exception as e:  # noqa: BLE001
-                logger.warning(f"웹툰식 말풍선 설정 읽기 실패(기존 스타일): {type(e).__name__}: {e}")
-            try:
-                # 테스트 카드가 정한 값(cut.bubble_detect)이 있으면 그것을, 없으면 발행 설정을 따른다
-                use_detect = cut.get("bubble_detect")
-                if use_detect is None:
-                    use_detect = webtoon_image.get_bubble_detect()
-                if use_detect:
-                    import rekognition_people  # pipelines/common/ — 켜져 있을 때만 import·호출(권한·비용)
-
-                    detect = rekognition_people.detect_people(image_bytes)
-                    if detect:
-                        cut = {**cut, "detect": detect}
-            except Exception as e:  # noqa: BLE001 — 얼굴 인식이 어떻게 실패해도 글자 합성은 고정 배치로 계속한다
-                logger.warning(f"말풍선 얼굴 회피 건너뜀(고정 배치): {type(e).__name__}: {e}")
             layout = compose_text.compose(tmp_path, cut, faces) or []
-        except compose_text.NarrationOverflowError:
-            tmp_path.unlink(missing_ok=True)
-            raise
         except Exception as e:  # noqa: BLE001 — 배경은 유지, 합성 실패만 로그
-            logger.warning(f"webtoon-lab 컷{cut.get('cut')} 텍스트 합성 실패(배경만 유지): {e}")
+            text_caption = True
+            logger.warning(f"webtoon-lab 컷{cut.get('cut')} 자막 띠 합성 실패(외부 설명 표시): {e}")
         final_bytes = tmp_path.read_bytes()
         tmp_path.unlink(missing_ok=True)
 
         key = f"media/webtoon-lab/{job_id}.png"
         jobs.s3().put_object(Bucket=bucket, Key=key, Body=final_bytes, ContentType="image/png")
         image_url = f"https://{bucket}.s3.us-east-1.amazonaws.com/{key}"
-        jobs.update_job(job_id, {"status": "done", "image_url": image_url, "bg_url": bg_url, "updated_at": time_utils.now_iso()})
+        jobs.update_job(job_id, {"status": "done", "image_url": image_url, "bg_url": bg_url, "caption": external_caption(cut), "text_caption": text_caption, "updated_at": time_utils.now_iso()})
         audit.log("webtoon-lab-generate-composed-done", {"job_id": job_id, "cut": cut.get("cut")})
         if push:
-            push({"type": "cut_image", "cut": cut.get("cut"), "test_id": cut.get("test_id"), "image_url": image_url, "bg_url": bg_url, "layout": layout, "model": model})
+            push({"type": "cut_image", "cut": cut.get("cut"), "test_id": cut.get("test_id"), "image_url": image_url, "bg_url": bg_url, "layout": layout, "caption": external_caption(cut), "text_caption": text_caption, "model": model})
     except Exception as e:  # noqa: BLE001 — 비동기 invocation 최상위, 안 잡으면 job이 영원히 pending
         logger.exception(f"webtoon-lab composed generate failed: {job_id}")
         jobs.update_job(job_id, {"status": "error", "error": str(e)[:500], "updated_at": time_utils.now_iso()})
@@ -228,12 +206,18 @@ def handle_recompose(body: dict, path_params: dict, query_params: dict) -> dict:
     job_id = uuid.uuid4().hex
     tmp_path = Path(f"/tmp/webtoon-recompose-{job_id}.png")
     tmp_path.write_bytes(bg_bytes)
+    text_caption = False
     try:
-        layout = compose_text.compose(tmp_path, cut, None) or []
+        try:
+            layout = compose_text.compose(tmp_path, cut, None) or []
+        except Exception as e:  # noqa: BLE001 — 원본을 반환하고 설명은 화면에서 표시한다
+            layout = []
+            text_caption = True
+            logger.warning(f"webtoon-lab 재합성 실패(원본·외부 설명 유지): {e}")
         final_bytes = tmp_path.read_bytes()
     finally:
         tmp_path.unlink(missing_ok=True)
     key = f"media/webtoon-lab/{job_id}.png"
     jobs.s3().put_object(Bucket=bucket, Key=key, Body=final_bytes, ContentType="image/png")
     audit.log("webtoon-lab-recompose", {"cut": cut.get("cut"), "bg": bg_key})
-    return response.ok({"image_url": f"https://{bucket}.s3.us-east-1.amazonaws.com/{key}", "layout": layout})
+    return response.ok({"image_url": f"https://{bucket}.s3.us-east-1.amazonaws.com/{key}", "layout": layout, "caption": external_caption(cut), "text_caption": text_caption})

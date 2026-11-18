@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { createPortal } from "react-dom";
 
 /* 웹툰 미리보기(2026-10-02) — 생성한 컷을 실제 서비스 화면(ailens.sedaily.ai)의 웹툰 탭처럼 보여 준다.
    컷을 틈 없이 세로로 이어 붙이고(둥근 모서리·그림자, 실제 갤러리와 같은 모양), 컷마다 자기 비율로 높이를 정한다.
@@ -18,15 +19,15 @@ export function WebtoonPreviewModal({
 }: {
   title: string;
   /** 컷 번호 순으로 정렬된 이미지 URL */
-  images: { index: number; url: string }[];
+  images: { index: number; url: string; caption?: string }[];
   onClose: () => void;
 }) {
   const [widthId, setWidthId] = useState<(typeof WIDTHS)[number]["id"]>("pc");
   const width = WIDTHS.find((w) => w.id === widthId)!.px;
 
-  return (
+  return createPortal(
     <div
-      className="fixed inset-0 z-50 flex items-stretch justify-center bg-black/50 p-3"
+      className="fixed inset-0 z-[60] flex items-stretch justify-center bg-black/50 p-3"
       onClick={(e) => {
         if (e.target === e.currentTarget) onClose();
       }}
@@ -63,7 +64,7 @@ export function WebtoonPreviewModal({
                 style={{
                   display: "flex",
                   flexDirection: "column",
-                  gap: 0,
+                  gap: 48,
                   borderRadius: 18,
                   overflow: "hidden",
                   background: "#fff",
@@ -74,16 +75,18 @@ export function WebtoonPreviewModal({
                   <figure key={im.index} style={{ margin: 0 }}>
                     {/* eslint-disable-next-line @next/next/no-img-element -- 외부(S3) 동적 URL */}
                     <img src={im.url} alt={`컷 ${im.index}`} style={{ display: "block", width: "100%", height: "auto" }} />
+                    {im.caption && <figcaption style={{ padding: "24px 28px 0", textAlign: "center", fontSize: 20, lineHeight: 1.6, wordBreak: "keep-all" }}>{im.caption}</figcaption>}
                   </figure>
                 ))}
               </div>
             )}
             <p className="mt-4 text-center text-[11px] text-[var(--text-faint)]">
-              서비스 화면은 컷을 이렇게 틈 없이 이어서 보여 줍니다 · 컷 {images.length}장
+              설명은 그림을 가리지 않도록 각 컷 아래에 표시합니다 · 컷 {images.length}장
             </p>
           </div>
         </div>
       </div>
-    </div>
+    </div>,
+    document.body,
   );
 }

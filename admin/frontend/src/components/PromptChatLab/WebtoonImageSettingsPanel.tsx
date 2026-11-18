@@ -245,36 +245,9 @@ export const WebtoonImageSettingsPanel = forwardRef<WebtoonImageSettingsPanelHan
           실제 자동 발행이 다음 기사부터 쓸 컷 이미지 모델입니다.
         </p>
       </div>
-      <div>
-        <p className="mb-1.5 text-[11px] font-semibold text-[var(--text-secondary)]">말풍선 얼굴 회피</p>
-        <label className="flex cursor-pointer items-center gap-2 text-[11.5px] text-[var(--text-primary)]">
-          <input
-            type="checkbox"
-            checked={bubbleDetect}
-            onChange={(e) => setBubbleDetect(e.target.checked)}
-            className="cursor-pointer"
-          />
-          {bubbleDetect ? "켜짐" : "꺼짐"}
-        </label>
-        <p className="mt-1.5 text-[11px] leading-relaxed text-[var(--text-faint)]">
-          켜면 AWS Rekognition이 그림 속 인물·얼굴 위치를 찾아, 말풍선이 얼굴을 덮지 않는 자리에 놓고 꼬리를 화자 쪽으로 맞춥니다. 컷 한 장당 약 $0.002(기사 하나 약 $0.016)가 듭니다. 끄면 고정 배치로 돌아가고 비용이 없습니다. 인식에 실패해도 고정 배치로 진행하므로 발행은 막히지 않습니다.
-        </p>
-      </div>
-      <div>
-        <p className="mb-1.5 text-[11px] font-semibold text-[var(--text-secondary)]">웹툰식 말풍선</p>
-        <label className="flex cursor-pointer items-center gap-2 text-[11.5px] text-[var(--text-primary)]">
-          <input
-            type="checkbox"
-            checked={bubbleStyle}
-            onChange={(e) => setBubbleStyle(e.target.checked)}
-            className="cursor-pointer"
-          />
-          {bubbleStyle ? "켜짐" : "꺼짐"}
-        </label>
-        <p className="mt-1.5 text-[11px] leading-relaxed text-[var(--text-faint)]">
-          켜면 네이버 웹툰처럼 얇은 선의 타원 말풍선을 쓰고, 컷 위에 흰 여백을 붙여 말풍선을 거기에 놓습니다(그림을 가리지 않음). 컷 이미지가 3:2보다 세로로 길어집니다. 끄면 기존 스타일입니다. 비용은 없습니다.
-        </p>
-      </div>
+      <p className="text-[11px] leading-relaxed text-[var(--text-faint)]">
+        여러 컷의 만평으로 제작합니다. 말풍선과 이미지 위 글자를 사용하지 않으며, 설명은 그림 아래의 짙은 자막 띠에 표시하며, 다운로드 이미지에도 포함됩니다.
+      </p>
       {publishing && <p className="text-[10.5px] text-[var(--text-faint)]">발행 중...</p>}
     </div>
   );
