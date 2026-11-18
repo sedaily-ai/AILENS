@@ -1,11 +1,11 @@
 argon2-cffi==25.1.0
-PyJWT==2.12.1
+PyJWT==2.15.1
 
 # 홈 "독자 반응"(2026-11-12, shared/bigquery_client.py) — 구글 서비스 계정 토큰을
 # 받으려면 JWT를 RS256으로 서명해야 하고, PyJWT는 RS256에 cryptography가 필요하다.
 # google-cloud-bigquery(grpc·protobuf 포함)는 zip이 커져 쓰지 않는다.
 # cp39-abi3 manylinux2014_x86_64 휠 존재 확인(2026-11-12, Lambda python3.11).
-cryptography==44.0.2
+cryptography==50.0.2
 
 # Lambda 런타임 내장 boto3(1.35.0, 미고정 상태였음)는 Bedrock Converse의
 # cachePoint를 몰라 ParamValidationError로 클라이언트 단에서 막는다
@@ -16,9 +16,13 @@ cryptography==44.0.2
 boto3==1.43.101
 
 # pgvector 접근 (CMS, 2026-07-27). 순수 파이썬이라 Lambda 친화적 — v2 와 동일 핀.
-pg8000==1.31.2
+pg8000==1.31.6
 
 # 웹툰 컷 텍스트 합성(routes/webtoon_lab.py → pipelines/webtoon/compose_text.py,
 # 2026-09-14) — 대사·캡션·내레이션을 PIL로 직접 그려 넣는다. pipelines
 # 쪽에서 실측된 버전과 맞춘다(pipelines/*/requirements.txt).
+# 2026-11-18 보안 점검: 12.3.0 이상은 cp311 리눅스 휠이 manylinux_2_28뿐이라
+# Lambda python3.11(Amazon Linux 2, glibc 2.26)에서 쓸 수 없다. 12.2.0이 마지막으로
+# manylinux2014 휠이 있는 버전 — 올리려면 런타임을 python3.12 이상으로 바꿔야 한다.
+# (파이프라인 컨테이너는 Debian bookworm이라 pipelines/webtoon은 13.0.0 사용)
 Pillow==12.2.0
