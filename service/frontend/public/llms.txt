@@ -52,8 +52,8 @@
 
 ## Optional
 
-- [단어장](https://ailens.sedaily.ai/words): 기사에 나온 경제·시사 용어 해설과 퀴즈
-- [타임라인](https://ailens.sedaily.ai/timeline): 날짜별 경제 이슈의 흐름
+- [용어 해설](https://ailens.sedaily.ai/words): 기사에 나온 경제·시사 용어 1,600여 개를 쉬운 말로 풀이한 사전. 100개씩 나뉘어 있으며 2페이지부터는 /words/page/{n}. 각 용어에 그 용어가 나온 기사 링크가 붙어 있다
+- [타임라인](https://ailens.sedaily.ai/timeline): 1990년부터 오늘까지 날짜를 골라 그날의 경제 이슈를 보는 서비스. 연대별(/timeline/decade/1990s 등)·시대별(/timeline/era/imf-1997 등) 연표와 사건 79개의 연대기(/timeline/chronicle)가 있다
 - [게임](https://ailens.sedaily.ai/games): 가볍게 즐기는 H5 미니게임
 - [서비스 소개](https://ailens.sedaily.ai/onboarding): 읽는 방식에 맞는 형식을 고르는 안내
 - [이용약관](https://ailens.sedaily.ai/terms) · [개인정보처리방침](https://ailens.sedaily.ai/privacy)

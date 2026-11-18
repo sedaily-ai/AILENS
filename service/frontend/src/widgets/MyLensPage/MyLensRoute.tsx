@@ -1,10 +1,13 @@
 import type { Metadata } from 'next';
 import { Suspense } from 'react';
+import { SITE_URL } from '@/shared/constants/site';
 import { MyLensPage } from './MyLensPage';
 
 export const metadata: Metadata = {
   title: '나의 LENS',
   description: '뉴스 열람 분야와 키워드, 저장한 문장과 레터를 연결하는 개인 뉴스 공간.',
+  // noindex 페이지도 canonical은 자기 주소로 둔다(없으면 루트 layout의 홈 canonical을 상속해 "홈이 대표"라는 엇갈린 신호가 된다).
+  alternates: { canonical: `${SITE_URL}/my-lens` },
   robots: { index: false, follow: false },
 };
 

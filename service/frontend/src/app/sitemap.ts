@@ -4,6 +4,7 @@ import { fetchIssueLetterCards, issueLetterPath } from '@/shared/lib/api/issueLe
 import { fetchAllLensPosts, fetchAllVideos, fetchPaperDates, type CmsLens, type CmsVideo } from '@/shared/lib/api/cmsPostsApi';
 import { seoHeadline } from '@ailens/domain';
 import { kstTodayStr } from '@/shared/lib/date/date';
+import { fetchTerms, sliceTermsPage, wordsPagePath } from '@/widgets/WordsPage';
 import { CORE_SITEMAP_ID, sitemapIds } from '@/shared/lib/seo/sitemapIds';
 // 게임 목록은 단일 출처(shared/data/games.ts)에서 가져온다. page 모듈에서 가져오면 FSD 경계를 위반하고 프로덕션 빌드를 막는다.
 import { GAMES } from '@/shared/data/games';
@@ -38,13 +39,13 @@ const STATIC_ROUTES: { path: string; priority: number; changeFrequency: Metadata
   { path: '/international', priority: 0.8, changeFrequency: 'daily', lastModified: '2026-08-17' }, // 국제
   { path: '/culture',       priority: 0.8, changeFrequency: 'daily', lastModified: '2026-08-20' }, // 문화
   { path: '/letter',       priority: 0.8, changeFrequency: 'daily',   lastModified: '2026-10-12' }, // 레터(모아쓰기) 목록 — 정식 오픈
-  { path: '/lens',         priority: 0.7, changeFrequency: 'daily',   lastModified: '2026-08-12' }, // 오늘의 이슈, 4가지 시선 목록
+  { path: '/lens',         priority: 0.7, changeFrequency: 'daily',   lastModified: '2026-11-18' }, // 오늘의 이슈, 4가지 시선 목록
   { path: '/games',        priority: 0.5, changeFrequency: 'monthly', lastModified: '2026-10-05' },
-  { path: '/words',        priority: 0.6, changeFrequency: 'daily',   lastModified: '2026-08-11' }, // 단어장 — 레터 키워드 기반, 매일 갱신
+  { path: '/words',        priority: 0.6, changeFrequency: 'daily',   lastModified: '2026-11-18' }, // 단어장 — 레터 키워드 기반, 매일 갱신
   // 서비스 소개 랜딩이며 푸터 링크 대상이므로 색인 대상이다.
   { path: '/onboarding',   priority: 0.4, changeFrequency: 'daily',   lastModified: '2026-10-13' },
   // 사주(/saju)는 별도 서비스(saju.sedaily.ai)이므로 포함하지 않는다.
-  { path: '/timeline',     priority: 0.7, changeFrequency: 'weekly',  lastModified: '2026-08-12' }, // 입력 화면 — 실제 콘텐츠는 /timeline/{date}
+  { path: '/timeline',     priority: 0.7, changeFrequency: 'weekly',  lastModified: '2026-11-18' }, // 입력 화면 — 실제 콘텐츠는 /timeline/{date}
   // 시대 페이지(연표) — 정적 데이터(shared/data/timelineEras.ts), 시대가 늘면 자동으로 올라간다.
   { path: '/timeline/chronicle', priority: 0.8, changeFrequency: 'monthly' as const, lastModified: '2026-10-04' },
   ...DECADES.map((d) => ({ path: `/timeline/decade/${d.key}`, priority: 0.7, changeFrequency: 'monthly' as const, lastModified: '2026-10-04' })),
@@ -111,6 +112,16 @@ async function coreEntries(): Promise<MetadataRoute.Sitemap> {
       changeFrequency: r.changeFrequency,
       priority: r.priority,
     });
+  }
+
+  // 용어 해설 2페이지부터(/words/page/{n}) — 100개씩 나눈 목록이라 내부 링크로만 발견되던 것을 사이트맵에 올린다. 1페이지는 정적 라우트의 /words다.
+  try {
+    const { totalPages } = sliceTermsPage(await fetchTerms(), 1);
+    for (let n = 2; n <= totalPages; n += 1) {
+      entries.push({ url: `${BASE}${wordsPagePath(n)}`, lastModified: '2026-11-18', changeFrequency: 'daily', priority: 0.4 });
+    }
+  } catch {
+    /* 용어 조회 실패 시 생략 */
   }
 
   // 지난 지면 — 편성된 날짜별 페이지. 이후 바뀌지 않으므로 lastmod는 발행일 오전 7시(KST)로 둔다.

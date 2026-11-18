@@ -7,6 +7,7 @@ import {
   LENS_LIST_TITLE,
   LENS_LIST_DESCRIPTION,
   buildLensJsonLd,
+  buildLensListView,
 } from '../../lensListShared';
 
 // generateStaticParams는 두지 않는다(SSR). 아카이브 뒷장은 방문이 적어 미리 빌드하면 빌드 시간·릴리스 용량만 늘고, [slug] 상세와 달리 <Link> 프리페치 이득이 미미하다.
@@ -67,7 +68,7 @@ export default async function LensListPageN({ params }: { params: Promise<{ n: s
         type="application/ld+json"
         dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }}
       />
-      <LensListClient initialItems={items} initialPage={n} initialHotLetters={hotLetters} />
+      <LensListClient initialView={buildLensListView(items, n)} initialPage={n} initialHotLetters={hotLetters} />
     </>
   );
 }

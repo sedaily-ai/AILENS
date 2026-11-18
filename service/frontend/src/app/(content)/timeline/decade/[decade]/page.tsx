@@ -3,6 +3,7 @@ import { notFound } from 'next/navigation';
 import { ExitPill, DecadeView, SURFACE, GLOBAL_CSS } from '@/features/timeline';
 import { DECADES, getDecadeEvents, isDecadeKey } from '@/shared/data/timelineEvents';
 import { SITE_URL } from '@/shared/constants/site';
+import { pageShareMeta } from '@/shared/lib/seo/meta/pageShare';
 
 // 연대 페이지(/timeline/decade/{1990s|2000s|2010s|2020s}) — 정적 데이터라 빌드 때 전부 만든다.
 export const dynamicParams = false;
@@ -24,7 +25,7 @@ export async function generateMetadata({ params }: { params: Promise<{ decade: s
     description,
     keywords: [`${label} 경제 연표`, `${label} 주요 사건`, '경제 사건', '서울경제', 'AI LENS'],
     alternates: { canonical: url },
-    openGraph: { title, description, url, type: 'article', locale: 'ko_KR', siteName: 'AI LENS — 서울경제' },
+    ...pageShareMeta({ title, description, url, type: 'article' }),
   };
 }
 
