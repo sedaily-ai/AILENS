@@ -3,6 +3,7 @@ import { notFound } from 'next/navigation';
 import { ExitPill, EraView, SURFACE, GLOBAL_CSS } from '@/features/timeline';
 import { ERAS, getEra } from '@/shared/data/timelineEvents';
 import { SITE_URL } from '@/shared/constants/site';
+import { pageShareMeta } from '@/shared/lib/seo/meta/pageShare';
 
 // 시대 페이지(/timeline/era/{slug}) — 정적 데이터라 빌드 때 전부 만든다. 목록에 없는 slug는 404.
 export const dynamicParams = false;
@@ -22,7 +23,7 @@ export async function generateMetadata({ params }: { params: Promise<{ slug: str
     description,
     keywords: [era.title, `${era.title} 연표`, '경제 사건', '서울경제', 'AI LENS'],
     alternates: { canonical: url },
-    openGraph: { title, description, url, type: 'article', locale: 'ko_KR', siteName: 'AI LENS — 서울경제' },
+    ...pageShareMeta({ title, description, url, type: 'article' }),
   };
 }
 

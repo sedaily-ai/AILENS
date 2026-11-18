@@ -86,10 +86,10 @@ function pickShareImages(lens: CmsLens): Promise<ShareImages> {
   return resolveShareImages([abs(pickLensPhoto(lens)), abs(lens.cover_image_url)]);
 }
 
-/** 빵부스러기용 분류 단계. 분류가 없거나 정본 분류 목록에 없으면 null(단계 생략) — 미분류 글 경로 /news 는 목록 페이지가 없어 링크하면 404. */
-function breadcrumbCategory(lens: CmsLens): { name: string; url: string } | null {
+/** 빵부스러기용 분류 단계. 분류가 없거나 정본 분류 목록에 없으면(경로 /news) 분류 목록 대신 전체 최신 목록(/lens)으로 잇는다 — /news 는 목록 페이지가 없어 링크하면 404이고, 단계를 빼면 경로가 2단계로 짧아진다. */
+function breadcrumbCategory(lens: CmsLens): { name: string; url: string } {
   const cat = categoryForDataLabel(lens.category);
-  return cat ? { name: cat.label, url: `${SITE_URL}/${cat.slug}` } : null;
+  return cat ? { name: cat.label, url: `${SITE_URL}/${cat.slug}` } : { name: '최신 뉴스', url: `${SITE_URL}/lens` };
 }
 
 function faqItems(lens: CmsLens) {
@@ -212,11 +212,11 @@ function buildJsonLd(lens: CmsLens, shareImages: ShareImages) {
         : []),
       {
         '@type': 'BreadcrumbList',
-        // AI LENS > {분류} > 기사. 분류가 없으면 단계를 건너뛴다.
+        // AI LENS > {분류 | 최신 뉴스} > 기사. 항상 3단계다.
         itemListElement: [
           { '@type': 'ListItem', position: 1, name: 'AI LENS', item: SITE_URL },
-          ...(category ? [{ '@type': 'ListItem', position: 2, name: category.name, item: category.url }] : []),
-          { '@type': 'ListItem', position: category ? 3 : 2, name: headline, item: url },
+          { '@type': 'ListItem', position: 2, name: category.name, item: category.url },
+          { '@type': 'ListItem', position: 3, name: headline, item: url },
         ],
       },
     ],

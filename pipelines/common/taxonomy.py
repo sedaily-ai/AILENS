@@ -89,19 +89,46 @@ def rule_category(article: dict) -> str | None:
     return None
 
 
-def classify_article(article: dict, headline: str, context: str) -> tuple[str | None, str | None]:
-    """발행할 글의 (대분류, 하위 분류). LLM 한 번 호출, 실패하면 (원문 태그 추정 대분류, None)."""
-    try:
-        sys.path.insert(0, str(Path(__file__).parent))
-        from bedrock_client import call_text  # noqa: lazy — 실패해도 발행이 안 막히게
+# 제목 접두어(부서명) → 대분류. 원문 태그로도 못 정했을 때의 마지막 단서다.
+_HEADLINE_FALLBACK = {
+    "증권": "시그널", "증시": "시그널", "시그널": "시그널",
+    "부동산": "부동산", "경제": "경제", "금융": "금융", "산업": "산업",
+    "정치": "정치", "사회": "사회", "국제": "국제", "세계": "국제",
+    "문화": "문화", "생활": "문화", "스포츠": "문화",
+}
+# 어떤 단서로도 못 정했을 때의 최종값. 분류가 비면 기사 주소가 /news/...가 되어 상단 탭·분류 목록에서 빠지고 빵부스러기 경로가 끊긴다(2026-11 신규 635건 중 4건).
+LAST_RESORT_CATEGORY = "경제"
 
-        user = json.dumps({"제목": headline, "요약": context}, ensure_ascii=False)
-        raw = call_text(build_system(json_array=False), user, model=CLASSIFY_MODEL, max_tokens=120).strip()
-        m = re.search(r"\{.*\}", raw, re.S)
-        obj = json.loads(m.group(0)) if m else {}
-        category, sub = clean(obj.get("category"), obj.get("sub"))
-        if category:
-            return category, sub
-    except Exception as e:  # noqa: BLE001
-        print(f"[classify_article] 분류 실패, 원문 태그로 폴백: {e}")
-    return rule_category(article), None
+
+def _headline_category(headline: str) -> str | None:
+    m = re.match(r"\s*([가-힣]+)\s*[|｜]", headline or "")
+    return _HEADLINE_FALLBACK.get(m.group(1)) if m else None
+
+
+def _ask_llm(headline: str, context: str, force: bool) -> tuple[str | None, str | None]:
+    sys.path.insert(0, str(Path(__file__).parent))
+    from bedrock_client import call_text  # noqa: lazy — 실패해도 발행이 안 막히게
+
+    system = build_system(json_array=False)
+    if force:
+        system += "- 이번에는 null을 쓰지 않는다. 가장 가까운 대분류 하나를 반드시 고르고, 하위 분류는 후보에 없으면 null로 둔다.\n"
+    user = json.dumps({"제목": headline, "요약": context}, ensure_ascii=False)
+    raw = call_text(system, user, model=CLASSIFY_MODEL, max_tokens=120).strip()
+    m = re.search(r"\{.*\}", raw, re.S)
+    obj = json.loads(m.group(0)) if m else {}
+    return clean(obj.get("category"), obj.get("sub"))
+
+
+def classify_article(article: dict, headline: str, context: str) -> tuple[str | None, str | None]:
+    """발행할 글의 (대분류, 하위 분류). 대분류는 항상 채운다(하위 분류는 비어도 된다).
+
+    순서: LLM(null 허용) → LLM(null 금지 재질문) → 원문 태그 → 제목 접두어 → LAST_RESORT_CATEGORY.
+    호출이 실패해도 발행은 막지 않는다."""
+    for force in (False, True):
+        try:
+            category, sub = _ask_llm(headline, context, force)
+            if category:
+                return category, sub
+        except Exception as e:  # noqa: BLE001
+            print(f"[classify_article] 분류 실패(force={force}): {e}")
+    return rule_category(article) or _headline_category(headline) or LAST_RESORT_CATEGORY, None

@@ -1,12 +1,13 @@
 'use client';
 
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
 import { Header } from '@/widgets/Header';
 import { SearchOverlay } from '@/shared/ui/search/SearchOverlay';
 import { buildHeaderTabs } from '@/shared/lib/headerTabs';
 import { LightbulbIcon } from '@/shared/ui/icons/HandDrawnIcons';
-import type { Term } from './words';
+import { Pager } from '@/shared/ui/list/Pager';
+import { fetchTerms, wordsPagePath, type Term } from './words';
 
 // /letters 아카이브와 같은 톤(아이콘 배지 + 서리프 타이틀 + 옅은 테두리 카드). 용어는 분류가 없어 이 페이지가 쓰던 앰버 하나로 통일하고,
 // "해설" 의미에 맞는 LightbulbIcon 하나만 재사용한다.
@@ -14,20 +15,45 @@ const ACCENT = '#d97706';
 
 // page.tsx(서버)가 미리 가져온 initialTerms를 받아 처음부터 실제 목록을 렌더한다(크롤러에도 빈 페이지가 아니다). 이 컴포넌트는 검색 인터랙션(입력·필터링)만 담당한다.
 // widgets/FeedPage/FeedPage.tsx와 같은 형태로, page.tsx는 라우팅·메타데이터·서버 데이터 페칭만 맡고 구현은 widgets에 둔다. URL은 /words다.
-export function WordsPage({ initialTerms }: { initialTerms: Term[] }) {
+export function WordsPage({
+  initialTerms,
+  currentPage,
+  totalPages,
+  totalCount,
+}: {
+  initialTerms: Term[];
+  currentPage: number;
+  totalPages: number;
+  totalCount: number;
+}) {
   const [showSearch, setShowSearch] = useState(false);
   const [query, setQuery] = useState('');
+  // 서버는 이 페이지 몫(100개)만 내려준다. 검색은 전체가 필요해서 입력을 시작할 때 한 번만 전체 목록을 가져온다.
+  const [allTerms, setAllTerms] = useState<Term[] | null>(null);
+  const searching = query.trim() !== '';
+
+  useEffect(() => {
+    if (!searching || allTerms) return;
+    let cancelled = false;
+    fetchTerms()
+      .then((rows) => {
+        if (!cancelled) setAllTerms(rows);
+      })
+      .catch(() => {});
+    return () => {
+      cancelled = true;
+    };
+  }, [searching, allTerms]);
 
   const filtered = useMemo(() => {
     const q = query.trim();
     if (!q) return initialTerms;
-    return initialTerms.filter((t) => t.term.includes(q) || t.explain.includes(q));
-  }, [initialTerms, query]);
+    return (allTerms ?? initialTerms).filter((t) => t.term.includes(q) || t.explain.includes(q));
+  }, [initialTerms, allTerms, query]);
 
   return (
     <div className="min-h-screen" style={{ background: '#fdfcfa' }}>
-      {/* 'feed' 탭은 상단 nav에 없다(headerTabs.ts 참조). 이 페이지에는 강조할 대응 탭이 없다. */}
-      <Header searchOpen={showSearch} onSearch={() => setShowSearch((open) => !open)} tabs={buildHeaderTabs()} frosted />
+      <Header searchOpen={showSearch} onSearch={() => setShowSearch((open) => !open)} tabs={buildHeaderTabs('words')} frosted />
       <SearchOverlay open={showSearch} onClose={() => setShowSearch(false)} />
 
       {/* /letters 아카이브와 같은 헤더 톤. 그라데이션 배경·그림자 아이콘박스 없이 회색 대문자 eyebrow + 서리프 타이틀만 둔다. */}
@@ -84,7 +110,9 @@ export function WordsPage({ initialTerms }: { initialTerms: Term[] }) {
         </div>
 
         {filtered.length > 0 && (
-          <p style={{ fontSize: 12.5, color: '#9ca3af', marginBottom: 14 }}>총 {filtered.length}개</p>
+          <p style={{ fontSize: 12.5, color: '#9ca3af', marginBottom: 14 }}>
+            {searching ? `검색 결과 ${filtered.length}개` : `총 ${totalCount}개 · ${currentPage}/${totalPages}페이지`}
+          </p>
         )}
 
         {filtered.length === 0 && (
@@ -95,55 +123,48 @@ export function WordsPage({ initialTerms }: { initialTerms: Term[] }) {
 
         {filtered.length > 0 && (
           <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+            {/* 용어가 1,600개를 넘어 줄마다 같은 SVG·인라인 스타일을 반복하면 HTML이 3MB까지 커졌다(2026-11-18).
+                아이콘은 <symbol> 한 번 + <use>로, 반복 스타일은 클래스 한 벌로 묶는다. 겉모습은 그대로다. */}
+            <style>{`
+              .wd-row { padding: 14px 16px; border: 1px solid #f1f1f0; }
+              .wd-ico { width: 44px; height: 44px; border-radius: 50%; flex-shrink: 0; background: ${ACCENT}14; display: flex; align-items: center; justify-content: center; }
+              .wd-term { font-family: "Noto Serif KR", serif; font-size: 15.5px; letter-spacing: -0.01em; margin-bottom: 4px; }
+              .wd-exp { font-size: 13px; color: #78716c; margin: 0; line-height: 1.55; }
+            `}</style>
+            <svg width="0" height="0" style={{ position: 'absolute' }} aria-hidden focusable="false">
+              <symbol id="wd-bulb" viewBox="0 0 96 96">
+                <LightbulbIcon accent={ACCENT} />
+              </symbol>
+            </svg>
             {filtered.map((t) => {
-              const rowClass = 'flex items-center gap-4 rounded-2xl transition-colors hover:bg-gray-50';
-              const rowStyle = { padding: '14px 16px', border: '1px solid #f1f1f0' };
+              const rowClass = 'wd-row flex items-center gap-4 rounded-2xl transition-colors hover:bg-gray-50';
               const inner = (
                 <>
-                  <span
-                    style={{
-                      width: 44,
-                      height: 44,
-                      borderRadius: '50%',
-                      flexShrink: 0,
-                      background: `${ACCENT}14`,
-                      display: 'flex',
-                      alignItems: 'center',
-                      justifyContent: 'center',
-                    }}
-                  >
-                    <LightbulbIcon accent={ACCENT} className="w-7 h-7" />
+                  <span className="wd-ico" aria-hidden>
+                    <svg className="w-7 h-7" fill="none">
+                      <use href="#wd-bulb" />
+                    </svg>
                   </span>
                   <div style={{ minWidth: 0, flex: 1 }}>
-                    <p
-                      className="font-medium text-gray-900"
-                      style={{
-                        fontFamily: '"Noto Serif KR", serif',
-                        fontSize: 15.5,
-                        letterSpacing: '-0.01em',
-                        marginBottom: 4,
-                      }}
-                    >
-                      {t.term}
-                    </p>
-                    {t.explain && (
-                      <p style={{ fontSize: 13, color: '#78716c', margin: 0, lineHeight: 1.55 }}>{t.explain}</p>
-                    )}
+                    <p className="wd-term font-medium text-gray-900">{t.term}</p>
+                    {t.explain && <p className="wd-exp">{t.explain}</p>}
                   </div>
                 </>
               );
               return t.href ? (
-                <Link key={t.term} href={t.href} className={rowClass} style={rowStyle}>
+                <Link key={t.term} href={t.href} className={rowClass}>
                   {inner}
                 </Link>
               ) : (
-                <div key={t.term} className={rowClass} style={rowStyle}>
+                <div key={t.term} className={rowClass}>
                   {inner}
                 </div>
               );
             })}
           </div>
         )}
+
+        {!searching && <Pager currentPage={currentPage} totalPages={totalPages} hrefFor={wordsPagePath} />}
       </main>
     </div>
   );

@@ -9,6 +9,7 @@ const TEXT_MUTED = '#6b7280';
 import { DECADES, EVENTS, getDecadeEvents } from '@/shared/data/timelineEvents';
 import { formatEventDate } from '@/shared/lib/date/timelineDates';
 import { SITE_URL } from '@/shared/constants/site';
+import { pageShareMeta } from '@/shared/lib/seo/meta/pageShare';
 
 // 연대기 탐험(/timeline/chronicle) — 1990년부터 지금까지 사건을 가로 연표로 훑는 인터랙티브 페이지.
 // 크롤러와 스크린리더를 위해 모든 사건을 아래에 일반 목록으로도 싣는다(JS 없이 읽히는 본문).
@@ -21,7 +22,7 @@ export const metadata: Metadata = {
   description: DESCRIPTION,
   keywords: ['한국 경제 연대기', '경제 사건 연표', 'IMF 외환위기 연표', '글로벌 금융위기', '서울경제', 'AI LENS'],
   alternates: { canonical: URL },
-  openGraph: { title: TITLE, description: DESCRIPTION, url: URL, type: 'website', locale: 'ko_KR', siteName: 'AI LENS — 서울경제' },
+  ...pageShareMeta({ title: TITLE, description: DESCRIPTION, url: URL }),
 };
 
 // 연대 묶음을 넓은 화면에서 2열(1990·2000년대 / 2010·2020년대)로 놓는다. 한 열 약 540px ≈ 14px 한글 38자라 한 줄 길이 기준(25~40자)에 맞는다.

@@ -40,3 +40,18 @@ export async function fetchTerms(): Promise<Term[]> {
   );
   return dedupeTerms([...all, ...articleTerms]);
 }
+
+// 용어가 1,600개를 넘어 한 페이지에 전부 그리면 HTML이 1.5MB를 넘는다. 서버는 100개씩 나눠 /words, /words/page/{n}으로 내보낸다(2026-11-18).
+// 검색은 전체 목록이 필요하므로 클라이언트가 입력을 시작할 때 fetchTerms()로 한 번만 가져온다.
+export const WORDS_PAGE_SIZE = 100;
+
+export function sliceTermsPage(terms: Term[], page: number) {
+  const totalPages = Math.max(1, Math.ceil(terms.length / WORDS_PAGE_SIZE));
+  const currentPage = Math.min(Math.max(1, Math.floor(page) || 1), totalPages);
+  const items = terms.slice((currentPage - 1) * WORDS_PAGE_SIZE, currentPage * WORDS_PAGE_SIZE);
+  return { items, currentPage, totalPages, totalCount: terms.length };
+}
+
+export function wordsPagePath(n: number): string {
+  return n <= 1 ? '/words' : `/words/page/${n}`;
+}

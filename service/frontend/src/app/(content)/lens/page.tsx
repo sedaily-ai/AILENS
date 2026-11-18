@@ -2,7 +2,7 @@ import type { Metadata } from 'next';
 import { fetchLensPosts } from '@/shared/lib/api/cmsPostsApi';
 import { fetchFollowingLetters } from '@/shared/lib/api/todayLettersApi';
 import { LensListClient } from './LensListClient';
-import { SITE_URL, LENS_LIST_TITLE as TITLE, LENS_LIST_DESCRIPTION as DESCRIPTION, buildLensJsonLd } from './lensListShared';
+import { SITE_URL, LENS_LIST_TITLE as TITLE, LENS_LIST_DESCRIPTION as DESCRIPTION, buildLensJsonLd, buildLensListView } from './lensListShared';
 
 export const metadata: Metadata = {
   title: TITLE,
@@ -43,7 +43,7 @@ export default async function LensListPage() {
         type="application/ld+json"
         dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }}
       />
-      <LensListClient initialItems={items} initialPage={1} initialHotLetters={hotLetters} />
+      <LensListClient initialView={buildLensListView(items, 1)} initialPage={1} initialHotLetters={hotLetters} />
     </>
   );
 }

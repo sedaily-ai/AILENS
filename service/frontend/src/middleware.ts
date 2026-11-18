@@ -4,7 +4,7 @@ import { NextResponse, type NextRequest } from 'next/server';
 // 각 page/[n]/page.tsx에서 next/navigation의 redirect()를 호출하면 Next.js가 "Dynamic API" 사용으로 인식해 라우트 전체를 캐시 불가(no-store)로 만들며,
 // export const revalidate를 명시해도 무시된다. 미들웨어(React 렌더링 파이프라인 밖)에서 처리하면 페이지 컴포넌트에 redirect() 호출이 남지 않아 ISR 캐시(revalidate:300)를 받는다.
 const PAGE_N_BASES = new Set([
-  'lens',
+  'lens', 'words',
   'markets', 'property', 'economy', 'finance', 'industry', 'politics', 'national', 'international', 'culture',
 ]);
 
@@ -41,6 +41,7 @@ export const config = {
   matcher: [
     '/lens',
     '/lens/page/:n',
+    '/words/page/:n',
     '/markets/page/:n', '/property/page/:n', '/economy/page/:n', '/finance/page/:n', '/industry/page/:n',
     '/politics/page/:n', '/national/page/:n', '/international/page/:n', '/culture/page/:n',
   ],
