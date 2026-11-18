@@ -2,7 +2,7 @@
 # video/generate_script.py -> npm run render 흐름이 프로세스 경계를 넘지 않도록
 # Node(Remotion 렌더)와 Python(나머지)을 한 이미지에 둔다.
 # 시스템 의존성은 Remotion 공식 Docker 문서(https://www.remotion.dev/docs/docker)를 따른다.
-FROM node:20-bookworm
+FROM node:22-bookworm
 
 RUN apt-get update && apt-get install -y --no-install-recommends \
     ffmpeg \
