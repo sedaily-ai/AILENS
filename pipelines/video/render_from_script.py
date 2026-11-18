@@ -276,16 +276,26 @@ def main() -> None:
         sys.exit(1)
 
 
-def render_and_upload(s3, job_id: str, script: dict, work_dir: Path, settings_override: dict | None = None) -> bool:
+def render_and_upload(s3, job_id: str, script: dict, work_dir: Path, settings_override: dict | None = None,
+                      *, plan: list | None = None, composition: str | None = None, out_name: str = "video.mp4") -> bool:
     """검증을 마친 각본을 렌더해 media/video-lab/{job_id}.mp4·.jpg로 올린다. 실패하면 .error.json을 올리고 False.
-    CMS 영상 랩(main)과 PRISM 일괄 제작(prism_batch.run)이 같이 쓴다."""
-    script_path = work_dir / "script.json"
+    CMS 영상 랩(main)과 PRISM 일괄 제작(prism_batch.run)이 같이 쓴다.
+    plan(장면 계획, doc_plan.py)을 주면 다큐 화면 틀(composition: DocHorizontal|DocVertical)로 렌더한다(2026-11-18).
+    out_name으로 work_dir 안 결과 파일 이름을 바꿀 수 있다(같은 편의 롱폼·쇼츠를 한 폴더에서 만들 때)."""
+    stem = Path(out_name).stem
+    pre = "" if out_name == "video.mp4" else f"{stem}."  # 기본값이면 예전 파일 이름(script.json·thumb.jpg) 그대로
+    script_path = work_dir / f"{pre}script.json"
     script_path.write_text(json.dumps(script, ensure_ascii=False), encoding="utf-8")
+    plan_args: list[str] = []
+    if plan is not None:
+        plan_path = work_dir / f"{pre}plan.json"
+        plan_path.write_text(json.dumps(plan, ensure_ascii=False), encoding="utf-8")
+        plan_args = ["--plan", str(plan_path.resolve()), "--composition", composition or "DocHorizontal"]
 
     # PRISM 디자인 각본은 PRISM 음성 설정(prism-settings, 영어 성우)을, 그 밖은 LENS 영상 설정을 읽는다.
     settings_category = video_settings.settings_category_for(script)
     settings = video_settings.get_render_settings(settings_override, settings_category)  # admin CMS에서 fresh 조회(캐시 없음), --settings-override가 있으면 그 위에 덮어씀
-    mp4_path = work_dir / "video.mp4"
+    mp4_path = work_dir / out_name
     print(
         f"렌더 시작... (settings={settings_category}, provider={settings['provider']}, voice={settings['voice']}, "
         f"engine={settings['engine']}, language={settings['language']}, format={settings['format']})"
@@ -303,6 +313,7 @@ def render_and_upload(s3, job_id: str, script: dict, work_dir: Path, settings_ov
             "--output", str(mp4_path.resolve()),
             "--voice", settings["voice"],
             "--job-id", job_id,
+            *plan_args,
         ],
         cwd=str(VIDEO_DIR),
         s3=s3,
@@ -313,7 +324,7 @@ def render_and_upload(s3, job_id: str, script: dict, work_dir: Path, settings_ov
         _upload_error(s3, job_id, f"렌더 실패(returncode={returncode}): {output[-1000:]}")
         return False
 
-    thumb_path = work_dir / "thumb.jpg"
+    thumb_path = work_dir / f"{pre}thumb.jpg"
     subprocess.run(
         ["ffmpeg", "-y", "-ss", "2", "-i", str(mp4_path), "-frames:v", "1", str(thumb_path)],
         capture_output=True,

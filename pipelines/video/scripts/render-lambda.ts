@@ -16,13 +16,22 @@ import { paperDurationInFrames } from '../src/paper/PaperVideo';
 import { prismDurationInFrames } from '../src/prism/PrismVideo';
 import { resolveScriptAudio } from '../src/lib/resolveAudio';
 import { scriptDurationInFrames } from '../src/compositions/NewsVideo';
+import { docDurationInFrames, verticalDurationInFrames, cutFrames, H_TIMING, V_TIMING, DOC_FPS } from '../src/doc/timing';
 import { DEFAULT_VOICE } from '../src/lib/tts';
 import type { VoiceId } from '@aws-sdk/client-polly';
 import { parseArgs } from '../src/lib/cliArgs';
 
 const USAGE =
   '사용법: npm run render:lambda -- --input <script.json> --format <vertical|horizontal> --output <out.mp4> ' +
-  '--job-id <id> [--voice <voiceName>]';
+  '--job-id <id> [--voice <voiceName>] [--plan <plan.json> --composition <DocHorizontal|DocVertical>]';
+
+// 다큐(인포그래픽) 화면 틀(2026-11-18). --plan(장면 계획, doc_plan.py가 만듦)을 주면 대본 테마와 상관없이
+// 이 틀로 렌더한다. 주지 않으면 지금까지와 똑같이 테마별 기본 컴포지션을 쓴다.
+const DOC_COMPOSITIONS = {
+  DocHorizontal: { width: 1920, height: 1080, frames: docDurationInFrames },
+  DocVertical: { width: 1080, height: 1920, frames: verticalDurationInFrames },
+} as const;
+type DocCompositionId = keyof typeof DOC_COMPOSITIONS;
 
 // 단일 Fargate 컨테이너 렌더(render.ts)는 코어 수 한계를 못 벗어나 Remotion Lambda로 렌더한다.
 // 아래 상수(REGION, FUNCTION_NAME, SERVE_URL)는 `npx remotion lambda functions deploy` /
@@ -34,6 +43,10 @@ const REGION = 'us-east-1' as const;
 const FUNCTION_NAME = 'remotion-render-4-0-513-mem4096mb-disk2048mb-180sec';
 const SERVE_URL =
   'https://remotionlambda-useast1-criescup5q.s3.us-east-1.amazonaws.com/sites/ailens-video-lab/index.html';
+// 다큐 틀은 별도 사이트에서 렌더한다(2026-11-18) — 이 사이트를 다시 배포해도 기존 PRISM 렌더(SERVE_URL)는 영향이 없다.
+//   npx remotion lambda sites create src/index.ts --site-name=ailens-video-lab-doc --region=us-east-1
+const SERVE_URL_DOC =
+  'https://remotionlambda-useast1-criescup5q.s3.us-east-1.amazonaws.com/sites/ailens-video-lab-doc/index.html';
 const MEDIA_BUCKET = process.env.CMS_MEDIA_BUCKET ?? 'sedaily-mbti-cms-media-dev';
 const FPS = 30;
 const POLL_INTERVAL_MS = 2000;
@@ -62,7 +75,12 @@ async function loadScript(inputPath: string) {
 
 async function main() {
   const args = parseArgs(process.argv.slice(2));
-  const { input, format, output, voice: voiceName } = args;
+  const { input, format, output, voice: voiceName, plan: planPath } = args;
+  const docId = (args.composition ?? 'DocHorizontal') as DocCompositionId;
+  if (planPath && !(docId in DOC_COMPOSITIONS)) {
+    throw new Error(`--composition은 DocHorizontal 또는 DocVertical이어야 합니다 (입력값: "${args.composition}")`);
+  }
+  const plan = planPath ? JSON.parse(await readFile(path.resolve(planPath), 'utf-8')) : null;
   const jobId = args['job-id'];
 
   if (!input || !output || !format || !jobId) {
@@ -90,8 +108,17 @@ async function main() {
   });
 
   // 각본 design.theme가 'paper'면 종이 질감 컴포지션(가로형 고정), 아니면 지금처럼 형식별 기본 컴포지션.
-  const { id: compositionId, width, height } = compositionFor(resolved, format);
-  const totalFrames = isPrismTheme(resolved)
+  const base = compositionFor(resolved, format);
+  const doc = plan ? DOC_COMPOSITIONS[docId] : null;
+  const compositionId = doc ? docId : base.id;
+  const width = doc ? doc.width : base.width;
+  const height = doc ? doc.height : base.height;
+  if (plan && plan.length !== resolved.cuts.length) {
+    throw new Error(`장면 계획 수(${plan.length})와 컷 수(${resolved.cuts.length})가 다릅니다`);
+  }
+  const totalFrames = doc
+    ? doc.frames(resolved)
+    : isPrismTheme(resolved)
     ? prismDurationInFrames(resolved, FPS)
     : isPaperTheme(resolved)
       ? paperDurationInFrames(resolved, FPS)
@@ -101,9 +128,9 @@ async function main() {
   const { renderId, bucketName } = await renderMediaOnLambda({
     region: REGION,
     functionName: FUNCTION_NAME,
-    serveUrl: SERVE_URL,
+    serveUrl: plan ? SERVE_URL_DOC : SERVE_URL,
     composition: compositionId,
-    inputProps: { script: resolved },
+    inputProps: plan ? { script: resolved, plan } : { script: resolved },
     codec: 'h264',
     privacy: 'no-acl',
   });
@@ -143,6 +170,18 @@ async function main() {
       break;
     }
     await new Promise((resolve) => setTimeout(resolve, POLL_INTERVAL_MS));
+  }
+
+  // 다큐 틀이면 컷별 시작 시각(초)을 옆에 남긴다 — 유튜브 설명글 챕터(0:00 …)를 만들 때 쓴다(2026-11-18).
+  if (doc) {
+    const t = docId === 'DocVertical' ? V_TIMING : H_TIMING;
+    let f = 0;
+    const starts = resolved.cuts.map((_, i) => {
+      const s = f / DOC_FPS;
+      f += cutFrames(resolved, i, t);
+      return Math.round(s * 100) / 100;
+    });
+    await writeFile(path.resolve(output) + '.timing.json', JSON.stringify({ starts, total: f / DOC_FPS }));
   }
 
   console.log(`완료: ${path.resolve(output)}`);
