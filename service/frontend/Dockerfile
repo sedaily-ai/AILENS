@@ -12,7 +12,7 @@
 #
 # 2026-09-04 — EC2+PM2 배포에서 ECS Fargate 멀티스테이지로 전환(사유는 git 히스토리).
 
-FROM node:20-bookworm AS builder
+FROM node:22-bookworm AS builder
 WORKDIR /repo
 
 # 1) 워크스페이스 매니페스트만 먼저 복사해 의존성 레이어를 캐시한다.
@@ -42,7 +42,7 @@ RUN --mount=type=cache,target=/repo/service/frontend/.next/cache \
 
 # ---
 
-FROM node:20-bookworm-slim AS runner
+FROM node:22-bookworm-slim AS runner
 WORKDIR /app
 
 ENV NODE_ENV=production
