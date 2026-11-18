@@ -4,6 +4,8 @@ import { NewsVideo, scriptDurationInFrames } from './compositions/NewsVideo';
 import { parseNewsScript, FORMAT_DIMENSIONS, COMPOSITION_ID, PAPER_COMPOSITION_ID, PRISM_COMPOSITION_ID } from './lib/schema';
 import { PaperVideo, paperDurationInFrames } from './paper/PaperVideo';
 import { PrismVideo, prismDurationInFrames } from './prism/PrismVideo';
+import { DocVideo, docDurationInFrames, type DocProps } from './doc/DocVideo';
+import { DocVerticalVideo, verticalDurationInFrames, type VProps } from './doc/DocVertical';
 import { ensureKoreanFontLoaded } from './lib/fonts';
 import sampleJson from '../data/sample.json';
 
@@ -62,6 +64,30 @@ export const RemotionRoot: React.FC = () => {
         defaultProps={{ script: { ...sampleScript, design: { theme: 'prism' as const } } }}
         calculateMetadata={async ({ props }) => ({
           durationInFrames: prismDurationInFrames(props.script, FPS),
+        })}
+      />
+      <Composition
+        id="DocHorizontal"
+        component={DocVideo}
+        fps={FPS}
+        width={FORMAT_DIMENSIONS.horizontal.width}
+        height={FORMAT_DIMENSIONS.horizontal.height}
+        durationInFrames={docDurationInFrames(sampleScript)}
+        defaultProps={{ script: sampleScript, plan: [] } as DocProps}
+        calculateMetadata={async ({ props }) => ({
+          durationInFrames: docDurationInFrames(props.script),
+        })}
+      />
+      <Composition
+        id="DocVertical"
+        component={DocVerticalVideo}
+        fps={FPS}
+        width={FORMAT_DIMENSIONS.vertical.width}
+        height={FORMAT_DIMENSIONS.vertical.height}
+        durationInFrames={verticalDurationInFrames(sampleScript)}
+        defaultProps={{ script: sampleScript, plan: [] } as VProps}
+        calculateMetadata={async ({ props }) => ({
+          durationInFrames: verticalDurationInFrames(props.script),
         })}
       />
     </>

@@ -70,6 +70,90 @@ def metadata_from_script(script_text: str, fallback_title: str) -> dict:
     return {"title": title or fallback_title[:_TITLE_MAX], "description": description, "tags": tags}
 
 
+# ── v2 설명글(2026-11-18) — 영문 유튜브 v2(SEO·GEO 템플릿 적용 3편)와 같은 구성 ─────────────────────
+# 요약 → (롱폼) 챕터 → 출처 → AI PRISM 소개·AI 제작 고지 → 한국어판·영문판 링크 → 해시태그 줄.
+# 쇼츠는 챕터 대신 본편 링크. 제목·태그는 metadata_from_script 그대로(대본 Block D).
+_EDITION_LINKS = "Korean edition: https://www.sedaily.com\nEnglish edition: https://en.sedaily.com"
+_BRAND_TAG = "SeoulEconomicDaily"
+_SKIP_HASHTAGS = {"aiprism", "seouleconomicdaily", "wanifra", "shorts"}
+_CHAPTER_MIN_SEC = 10.0  # 유튜브 챕터 조건: 0:00 시작, 3개 이상, 각 10초 이상
+
+
+def _mmss(sec: float) -> str:
+    sec = int(sec)
+    return f"{sec // 60}:{sec % 60:02d}"
+
+
+def _cut_label(cut: dict, skip: set[str] | None = None) -> str:
+    """챕터 이름 — 모건스탠리 편처럼 내용·숫자가 보이게. 숫자 컷은 "설명: 숫자", 그 밖은 화면 문구.
+    날짜 컷·그룹 이름(skip)은 빈 문자열(챕터로 쓰지 않음)."""
+    st = cut.get("style") or {}
+    if st.get("scene") == "date":
+        return ""
+    cap = cut.get("caption")
+    cap_text = cap if isinstance(cap, str) else " ".join(str(p.get("text", "")).strip() for p in (cap or []))
+    k = st.get("kicker") if isinstance(st.get("kicker"), str) else ""
+    if k and k.strip().lower() in (skip or set()):
+        k = ""
+    if cut.get("type") in ("stat", "donut", "compare") and cap_text:
+        text = f"{k.strip()}: {cap_text}" if k else cap_text
+    else:
+        text = cap_text or k
+    text = " ".join(text.replace("<", "").replace(">", "").split()).rstrip(".,:;")
+    return text[:60]
+
+
+def chapters_from_timing(script: dict, starts: list[float], total: float, max_chapters: int = 7) -> str:
+    """컷 시작 시각으로 챕터 줄을 만든다. 조건(3개 이상, 각 10초 이상)을 못 맞추면 빈 문자열."""
+    cuts = script.get("cuts", [])
+    if not cuts or len(starts) != len(cuts) or total < _CHAPTER_MIN_SEC * 3:
+        return ""
+    target = max(_CHAPTER_MIN_SEC + 5, total / max_chapters)
+    skip = {str(script.get(k, "")).strip().lower() for k in ("keyword", "brand")} - {""}
+    marks: list[tuple[float, str]] = [(0.0, _cut_label(cuts[0], skip) or "Intro")]
+    for i in range(1, len(cuts)):
+        if cuts[i].get("type") == "closing":
+            break
+        t = starts[i]
+        if t - marks[-1][0] >= target and total - t >= _CHAPTER_MIN_SEC:
+            label = _cut_label(cuts[i], skip)
+            if label and label.lower() != marks[-1][1].lower():
+                marks.append((t, label))
+    if len(marks) < 3:
+        return ""
+    return "\n".join(f"{_mmss(t)} {label}" for t, label in marks)
+
+
+def _hashtag_line(tags: list[str], n: int = 4) -> str:
+    picked = [t for t in tags if t.lower() not in _SKIP_HASHTAGS][:n]
+    return " ".join(f"#{t}" for t in picked + [_BRAND_TAG])
+
+
+_INVEST_NOTE = "This video is for information only and is not investment advice."
+
+
+def v2_description(script_text: str, tags: list[str], *, chapters: str = "", full_video_url: str = "", shorts: bool = False,
+                   investment: bool = False) -> str:
+    """investment=True(주식·글로벌 투자자·개인투자자 그룹)면 투자 고지 한 줄을 넣는다(모건스탠리 편과 같음)."""
+    block = script_text[script_text.find("Block D"):] if "Block D" in script_text else script_text
+    labels = ("Episode Title", "Episode Description", "Sources", "About AI PRISM", "Tags", "Publish Date (KST)")
+    sources = _section(block, "Sources", labels[3:])
+    parts = [
+        _section(block, "Episode Description", labels[2:]),
+        f"Full video: {full_video_url}" if shorts and full_video_url else "",
+        chapters if not shorts else "",
+        ("Sources:\n" + sources) if sources else "",
+        _section(block, "About AI PRISM", labels[4:]),
+        _INVEST_NOTE if investment else "",
+        _EDITION_LINKS,
+        _hashtag_line(tags) + (f" {_SHORTS_TAG}" if shorts else ""),
+    ]
+    text = "\n\n".join(p for p in parts if p).replace("<", "").replace(">", "")
+    if shorts:
+        text = f"{_SHORTS_TAG}\n\n{text}"
+    return text[:_DESCRIPTION_MAX]
+
+
 _SHORTS_TAG = "#Shorts"
 
 

@@ -40,6 +40,8 @@ from generate_script import (  # noqa: E402
 from render_from_script import _extract_render_script, _fill_missing_top_level, render_and_upload  # noqa: E402
 import video_settings  # noqa: E402
 import prism_notify  # noqa: E402
+import doc_plan  # noqa: E402
+import seo_description  # noqa: E402
 import shorts_compose  # noqa: E402
 import youtube_upload  # noqa: E402
 from youtube_upload import shorts_metadata  # noqa: E402
@@ -54,6 +56,8 @@ GROUPS = {
 _WEEKDAYS = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"]
 _SCRIPT_CATEGORY = "prism"
 _SCENE_CATEGORY = "prism-scene"
+# 투자 고지("not investment advice")를 설명글에 넣는 그룹 — SG4 Global Investors, SG6 Retail Investors, SG8 Stock Investors.
+_INVEST_TYPES = {"SG4", "SG6", "SG8"}
 _MAX_TOKENS = 8000  # CMS PRISM 탭과 같다(admin/backend/routes/prompts.py::_CATEGORY_BEDROCK["prism"])
 # 대본·장면 모델은 bedrock_models 별칭으로 따로 둔다 — 작업 정의 환경변수 BEDROCK_MODEL_PRISM_SCRIPT /
 # BEDROCK_MODEL_PRISM_SCENE 로 이미지 재빌드 없이 바꿀 수 있다.
@@ -257,12 +261,48 @@ def _run(s3, work_dir: Path, *, batch_id: str, item_id: str, job_id: str, articl
     # 건수를 같은 이름으로 넘기면 위 목록을 덮어써 완료 알림이 죽는다(int + list). 목록은 status에 이미 있다.
     report("render", cuts=len(script["cuts"]))
     print(f"[prism-batch] {item_id} — 렌더 ({len(script['cuts'])}컷)")
-    if not render_and_upload(s3, job_id, script, work_dir, _voice_override(type_code)):
+    # 화면 틀(2026-11-18) — PRISM_LAYOUT=doc(기본)이면 영문 유튜브 v2와 같은 다큐(인포그래픽) 틀, classic이면 기존 PRISM 틀.
+    # 대본·장면 JSON·음성 설정은 두 틀이 같고, doc은 장면 JSON을 doc_plan으로 화면 계획만 바꿔 렌더한다.
+    doc_layout = os.environ.get("PRISM_LAYOUT", "doc") == "doc"
+    plan = None
+    if doc_layout:
+        try:
+            plan = doc_plan.build_plan(script)
+        except Exception as e:  # noqa: BLE001
+            print(f"[prism-batch] 다큐 틀 변환 실패 — 기존 틀로 렌더: {e!r}")
+            doc_layout = False
+    status["layout"] = "doc" if doc_layout else "classic"
+    if not render_and_upload(s3, job_id, script, work_dir, _voice_override(type_code), plan=plan, composition="DocHorizontal"):
         return fail("렌더 실패 — 자세한 내용은 영상 진행 상태를 확인하세요")
 
     # 유튜브 자동 공개 — 채널 연결 정보(시크릿)가 있을 때만. 업로드가 실패해도 영상은 이미 만들어졌으므로
     # 편 자체는 완료로 두고 화면에 실패 이유를 보여준다(내려받아 직접 올리면 된다). 다시 시도하면 중복 업로드가 된다.
     meta = youtube_upload.metadata_from_script(script_text, title or script.get("title") or display_name)
+    # v2 설명글(2026-11-18) — 요약·챕터·출처·AI 고지·한국어판/영문판 링크·해시태그. 실패하면 기존 설명글 그대로.
+    try:
+        chapters = ""
+        timing_path = work_dir / "video.mp4.timing.json"
+        if timing_path.exists():
+            timing = json.loads(timing_path.read_text(encoding="utf-8"))
+            chapters = youtube_upload.chapters_from_timing(script, timing["starts"], timing["total"])
+        meta["description"] = youtube_upload.v2_description(script_text, meta["tags"], chapters=chapters,
+                                                            investment=type_code in _INVEST_TYPES)
+    except Exception as e:  # noqa: BLE001
+        chapters = ""
+        print(f"[prism-batch] v2 설명글 실패 — 기존 설명글 사용: {e!r}")
+    # 마케팅팀 SEO·GEO 템플릿 설명글(2026-11-18) — 통과하면 위 v2 설명글을 대신한다. 검사에 걸리거나 실패하면 v2 그대로.
+    seo_call = lambda system, user: call_text(system, user, model=_SCRIPT_MODEL, max_tokens=1500)  # noqa: E731
+    seo_kwargs = dict(title=meta["title"], date_label=f"{day.strftime('%b')} {day.day}, {day.year}", script_text=script_text,
+                      article_text=article, investment=type_code in _INVEST_TYPES)
+    try:
+        desc, problems = seo_description.build(seo_call, shorts=False, chapters=chapters, **seo_kwargs)
+        if desc:
+            meta["description"] = desc
+            status["description"] = "seo-template"
+        else:
+            print(f"[prism-batch] SEO 설명글 검사 실패 — v2 설명글 사용: {problems[:5]}")
+    except Exception as e:  # noqa: BLE001
+        print(f"[prism-batch] SEO 설명글 실패 — v2 설명글 사용: {e!r}")
     creds = youtube_upload.load_credentials()
     if creds:
         report("upload")
@@ -295,14 +335,36 @@ def _run(s3, work_dir: Path, *, batch_id: str, item_id: str, job_id: str, articl
         report("shorts")
         shorts_path = work_dir / "video_shorts.mp4"
         try:
-            shorts_compose.compose(work_dir / "video.mp4", shorts_path, meta["title"])
+            if doc_layout:
+                # 다큐 틀 쇼츠 — 롱폼을 세로 틀에 끼우지 않고, 훅·숫자 컷만 골라 세로 화면으로 따로 렌더한다(약 50초).
+                short_script, short_plan = doc_plan.build_shorts(script)
+                if not render_and_upload(s3, f"{job_id}-shorts", short_script, work_dir, _voice_override(type_code),
+                                         plan=short_plan, composition="DocVertical", out_name="video_shorts.mp4"):
+                    raise RuntimeError("세로 렌더 실패")
+            else:
+                shorts_compose.compose(work_dir / "video.mp4", shorts_path, meta["title"])
         except Exception as e:  # noqa: BLE001
             print(f"[prism-batch] 쇼츠 합성 실패: {e}")
             status["youtube_shorts_error"] = str(e)[:500]
         else:
             report("upload")
             try:
-                video_id = youtube_upload.upload(shorts_path, shorts_metadata(meta), creds)
+                smeta = shorts_metadata(meta)
+                try:
+                    smeta["description"] = youtube_upload.v2_description(
+                        script_text, meta["tags"], shorts=True, full_video_url=status.get("youtube_url", ""),
+                        investment=type_code in _INVEST_TYPES)
+                except Exception as e:  # noqa: BLE001
+                    print(f"[prism-batch] 쇼츠 v2 설명글 실패 — 기존 설명글 사용: {e!r}")
+                try:
+                    sdesc, sproblems = seo_description.build(seo_call, shorts=True, **seo_kwargs)
+                    if sdesc:
+                        smeta["description"] = sdesc
+                    else:
+                        print(f"[prism-batch] 쇼츠 SEO 설명글 검사 실패 — v2 사용: {sproblems[:5]}")
+                except Exception as e:  # noqa: BLE001
+                    print(f"[prism-batch] 쇼츠 SEO 설명글 실패 — v2 사용: {e!r}")
+                video_id = youtube_upload.upload(shorts_path, smeta, creds)
                 status["youtube_shorts_url"] = f"https://www.youtube.com/shorts/{video_id}"
                 print(f"[prism-batch] {item_id} — 유튜브 쇼츠 업로드 {status['youtube_shorts_url']}")
             except Exception as e:  # noqa: BLE001
