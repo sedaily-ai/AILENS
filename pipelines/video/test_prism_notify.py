@@ -83,3 +83,23 @@ def test_dailymotion_shorts_upload_is_after_compose_and_independent_of_youtube_r
     assert "if dm_creds:" in source[yt:dm]
     between = source[yt:dm]
     assert "except Exception" in between  # 유튜브 쇼츠의 except가 데일리모션 호출 앞에서 닫힌다
+
+
+def test_paper_items_get_section_headings():
+    """지면 영상(PG)이 섞이면 [PRISM]/[지면] 소제목으로 나눈다(2026-11-18)."""
+    rows = [
+        ({"type": "SG1", "group": "Students & Grads", "recording_date": "2026-11-19"}, {"stage": "done", "youtube_url": "https://y/1"}),
+        ({"type": "PG1", "group": "Front Page Daily", "recording_date": "2026-11-19"}, {"stage": "error", "message": "실패"}),
+    ]
+    desc = prism_notify.build_message("b", rows)["content"]["description"].split("\n")
+    assert desc[0] == "*[PRISM]* 1편 중 1편 성공"
+    assert desc[1].startswith("✅ Students & Grads")
+    assert desc[2] == ""
+    assert desc[3] == "*[지면]* 1편 중 0편 성공"
+    assert desc[4].startswith("❌ Front Page Daily")
+
+
+def test_no_headings_without_paper_items():
+    rows = [({"type": "SG1", "group": "Students & Grads", "recording_date": "2026-11-19"}, {"stage": "done", "youtube_url": "https://y/1"})]
+    desc = prism_notify.build_message("b", rows)["content"]["description"]
+    assert "[PRISM]" not in desc and "[지면]" not in desc

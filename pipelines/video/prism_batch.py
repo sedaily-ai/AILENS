@@ -108,6 +108,110 @@ def _voice_override(type_code: str) -> dict | None:
     return {"provider": "polly", "voice": voice, "engine": engine}
 
 
+# 지면 영상(PG1~PG4) 자동 제작(2026-11-18) — 입력 txt는 섹션 첫 면의 TOP 기사 + 같은 면 기사 1개(prism_paper.py).
+# 수동 영상(약 2분, TOP 중심, 두 번째는 "Separately," 한두 문장)에 맞추려고 대본 요청에 덧붙인다.
+# 마케팅팀 지침(CMS prism)은 그대로 두고 지면 편에만 붙인다. 시험(11/17·18)에서 덧붙이기 전 대본은 370~640단어(2:16~4:24)였다.
+_PAPER_TYPES = {"PG1", "PG2", "PG3", "PG4"}
+_PAPER_NOTE = """
+
+[지면 영상 추가 지시]
+- 첫 번째 기사가 그 지면의 TOP 기사다. 이 영상의 주인공은 TOP 기사 하나다.
+- Episode Title은 TOP 기사 하나로만 짓는다. 두 기사를 ";"나 "and"로 나열하지 않는다. 날짜·시리즈 꼬리를 뺀 제목 부분은 영어 60자 이내로 쓴다(유튜브 제목 100자 제한).
+- 두 번째 기사는 SO WHAT 바로 앞에 "Separately,"로 시작하는 2~3문장으로만 다룬다.
+- 섹션별 문장 수 규칙은 지키되 문장을 짧게 쓴다. EL Script 낭독 부분(오디오 태그 제외)은 영어 260~320단어로 맞춘다(약 2분).
+"""
+
+
+def paper_title(raw: str, day: dt.date, display_name: str) -> str:
+    """지면 편 유튜브 제목을 지침 모양 '<제목> | November 17 2026 | Front Page Daily'로 맞춘다(2026-11-18 시험:
+    1면 편 2개가 시리즈 꼬리를 빠뜨렸고, 날짜에 쉼표를 넣은 편도 있었다). 두 기사를 ';'로 나열했으면 앞(TOP)만 남긴다.
+    100자를 넘으면 꼬리가 아니라 제목 쪽을 줄인다."""
+    head = raw.split("|")[0].split(";")[0].strip() or display_name
+    tail = f" | {day:%B} {day.day} {day.year} | {display_name}"
+    room = youtube_upload._TITLE_MAX - len(tail)
+    if len(head) > room:
+        cut = head[:room].rsplit(" ", 1)[0] if " " in head[:room] else head[:room]
+        head = cut.rstrip(" ,;:-—")  # 단어 중간에서 끊지 않는다
+    return head + tail
+
+
+def _amount_feedback(flags: list[str]) -> str:
+    listed = "\n".join(f"- {f}" for f in flags[:8])
+    return (
+        "\n\n[금액 재확인 요청]\n직전 대본의 아래 원화 금액은 입력 기사 어느 금액과도 맞지 않았습니다.\n"
+        f"{listed}\n"
+        "입력 기사의 한국어 금액을 단위 그대로 다시 환산하세요(만 원 = 10 thousand won, 억 원 = 100 million won, "
+        "조 원 = 1 trillion won. 예: 4405만 원 = 44.05 million won, 2959억 원 = 295.9 billion won). "
+        "주가(1주당 가격)를 시가총액으로 바꾸지 마세요. 기사에 없는 금액은 쓰지 마세요. 나머지 지침과 출력 형식은 그대로 지킵니다."
+    )
+
+
+def _write_script(script_guide: str, user_message: str, display_name: str) -> str | None:
+    """대본 작성 → 지침 형식이면 대본, 형식이 두 번 다 이상하면 None."""
+    script_text = call_text(script_guide, user_message, model=_SCRIPT_MODEL, max_tokens=_MAX_TOKENS)
+    if _looks_like_script(script_text, display_name):
+        return script_text
+    print(f"[prism-batch] 대본 형식 이상 — 1회 재요청. 앞부분: {script_text[:200]!r}")
+    script_text = call_text(
+        script_guide,
+        user_message + "\n\n(TYPE·RECORDING DATE·WEEKDAY는 위에 있습니다. 질문하지 말고 지침의 출력 형식대로 바로 생성하세요.)",
+        model=_SCRIPT_MODEL, max_tokens=_MAX_TOKENS,
+    )
+    if _looks_like_script(script_text, display_name):
+        return script_text
+    print(f"[prism-batch] 대본 형식 이상(재요청 후) — 앞부분: {script_text[:300]!r}")
+    return None
+
+
+def _make_scene(scene_guide: str, script_text: str) -> tuple[dict | None, str]:
+    """대본 → 검증을 통과한 장면 JSON(못 만들면 None)과 마지막 문제 설명."""
+    scene_message = f"[입력 기사]\n{script_text}"
+    problem = ""
+    last_candidate: dict | None = None
+    for attempt in (1, 2):
+        raw = call_text(scene_guide, scene_message + problem, model=_SCENE_MODEL, max_tokens=_MAX_TOKENS)
+        try:
+            candidate = _extract_render_script(raw)
+        except (ValueError, json.JSONDecodeError) as e:
+            problem = f"\n\n(직전 응답에서 JSON을 찾지 못했습니다: {e}. JSON 하나만 출력하세요.)"
+            continue
+        _fill_missing_top_level(candidate)
+        # PRISM 디자인·성우 설정은 각본의 design.theme으로 갈린다. 프롬프트가 빠뜨려도 PRISM으로 렌더되게 코드로 고정한다.
+        candidate["design"] = {**(candidate.get("design") or {}), "theme": "prism"}
+        candidate, applied = fix_script(candidate)
+        for line in applied:
+            print(f"[자동수정] {line}")
+        errors = validate_script(candidate)
+        if not errors:
+            return candidate, ""
+        last_candidate = candidate
+        print(f"[prism-batch] 장면 검증 실패 {len(errors)}건(시도 {attempt})")
+        problem = "\n\n(직전 JSON의 문제 — 고쳐서 JSON 하나만 다시 출력하세요:\n" + "\n".join(f"- {x}" for x in errors) + ")"
+    # 재요청까지 실패했고 남은 문제가 "수치 빈 stat 컷"뿐이면 그 컷만 글자 컷으로 바꿔 계속 만든다(2026-11-05,
+    # 자동 제작은 실패하면 사람이 [다시 시도]를 눌러야 한다). 다른 문제가 남으면 실패.
+    if last_candidate is not None:
+        demoted = demote_incomplete_stats(last_candidate)
+        if demoted and not validate_script(last_candidate):
+            for line in demoted:
+                print(f"[자동수정] {line}")
+            return last_candidate, ""
+    return None, problem
+
+
+def _safe_number_issues(script: dict, article: str) -> list[str]:
+    try:
+        return number_issues(script, article)
+    except Exception as e:  # noqa: BLE001 — 검수 오류로 영상이 멈추면 안 된다
+        print(f"[prism-batch] [검수] 금액 검수 건너뜀: {e!r}")
+        return []
+
+
+def _save_script(s3, batch_id: str, item_id: str, script_text: str) -> None:
+    s3.put_object(
+        Bucket=CMS_MEDIA_BUCKET, Key=f"media/prism-batch/{batch_id}/{item_id}.script.txt",
+        Body=script_text.encode("utf-8"), ContentType="text/plain; charset=utf-8",
+    )
+
 def run(s3, work_dir: Path, *, batch_id: str, item_id: str, job_id: str, article_key: str,
         type_code: str, recording_date: str) -> bool:
     try:
@@ -173,90 +277,73 @@ def _run(s3, work_dir: Path, *, batch_id: str, item_id: str, job_id: str, articl
     article = article_path.read_text(encoding="utf-8-sig")
     header = f"[TYPE: {type_code}]\n[RECORDING DATE: {day.isoformat()}]\n[WEEKDAY: {_WEEKDAYS[day.weekday()]}]\n"
     user_message = f"[입력 기사]\n{header}{article}"
+    if type_code in _PAPER_TYPES:
+        user_message += _PAPER_NOTE
     print(f"[prism-batch] {item_id} {type_code} {display_name} {day} — 대본 작성")
 
     try:
         script_guide = ddb_prompt.load_prompt(_SCRIPT_CATEGORY)
-        script_text = call_text(script_guide, user_message, model=_SCRIPT_MODEL, max_tokens=_MAX_TOKENS)
-        if not _looks_like_script(script_text, display_name):
-            print(f"[prism-batch] 대본 형식 이상 — 1회 재요청. 앞부분: {script_text[:200]!r}")
-            script_text = call_text(
-                script_guide,
-                user_message + "\n\n(TYPE·RECORDING DATE·WEEKDAY는 위에 있습니다. 질문하지 말고 지침의 출력 형식대로 바로 생성하세요.)",
-                model=_SCRIPT_MODEL, max_tokens=_MAX_TOKENS,
-            )
-            if not _looks_like_script(script_text, display_name):
-                print(f"[prism-batch] 대본 형식 이상(재요청 후) — 앞부분: {script_text[:300]!r}")
-                return fail("대본 작성 응답이 지침 형식이 아닙니다(EL Script 제목이나 고정 아웃트로 없음) — 다시 시도해 주세요")
+        scene_guide = ddb_prompt.load_prompt(_SCENE_CATEGORY)
+    except Exception as e:  # noqa: BLE001
+        return fail(f"프롬프트 읽기 실패: {e}")
+    try:
+        script_text = _write_script(script_guide, user_message, display_name)
     except Exception as e:  # noqa: BLE001
         return fail(f"대본 작성 실패: {e}")
+    if script_text is None:
+        return fail("대본 작성 응답이 지침 형식이 아닙니다(EL Script 제목이나 고정 아웃트로 없음) — 다시 시도해 주세요")
 
-    s3.put_object(
-        Bucket=CMS_MEDIA_BUCKET, Key=f"media/prism-batch/{batch_id}/{item_id}.script.txt",
-        Body=script_text.encode("utf-8"), ContentType="text/plain; charset=utf-8",
-    )
+    _save_script(s3, batch_id, item_id, script_text)
     title = _episode_title(script_text)
     report("scene", title=title)
     print(f"[prism-batch] {item_id} — 장면 나누기 ({title})")
-
     try:
-        scene_guide = ddb_prompt.load_prompt(_SCENE_CATEGORY)
-        scene_message = f"[입력 기사]\n{script_text}"
-        problem = ""
-        script: dict | None = None
-        last_candidate: dict | None = None
-        for attempt in (1, 2):
-            raw = call_text(scene_guide, scene_message + problem, model=_SCENE_MODEL, max_tokens=_MAX_TOKENS)
-            try:
-                candidate = _extract_render_script(raw)
-            except (ValueError, json.JSONDecodeError) as e:
-                problem = f"\n\n(직전 응답에서 JSON을 찾지 못했습니다: {e}. JSON 하나만 출력하세요.)"
-                continue
-            _fill_missing_top_level(candidate)
-            # PRISM 디자인·성우 설정은 각본의 design.theme으로 갈린다. 프롬프트가 빠뜨려도 PRISM으로 렌더되게 코드로 고정한다.
-            candidate["design"] = {**(candidate.get("design") or {}), "theme": "prism"}
-            candidate, applied = fix_script(candidate)
-            for line in applied:
-                print(f"[자동수정] {line}")
-            errors = validate_script(candidate)
-            if not errors:
-                script = candidate
-                break
-            last_candidate = candidate
-            print(f"[prism-batch] 장면 검증 실패 {len(errors)}건(시도 {attempt})")
-            problem = "\n\n(직전 JSON의 문제 — 고쳐서 JSON 하나만 다시 출력하세요:\n" + "\n".join(f"- {x}" for x in errors) + ")"
-        # 재요청까지 실패했고 남은 문제가 "수치 빈 stat 컷"뿐이면 그 컷만 글자 컷으로 바꿔 계속 만든다(2026-11-05,
-        # 자동 제작은 실패하면 사람이 [다시 시도]를 눌러야 한다). 다른 문제가 남으면 지금처럼 실패.
-        if script is None and last_candidate is not None:
-            demoted = demote_incomplete_stats(last_candidate)
-            if demoted and not validate_script(last_candidate):
-                for line in demoted:
-                    print(f"[자동수정] {line}")
-                script = last_candidate
-        if script is None:
-            return fail("장면 변환 결과가 두 번 모두 검증을 통과하지 못했습니다" + (f": {problem.strip()[:500]}" if problem else ""))
+        script, problem = _make_scene(scene_guide, script_text)
     except Exception as e:  # noqa: BLE001
         return fail(f"장면 나누기 실패: {e}")
+    if script is None:
+        return fail("장면 변환 결과가 두 번 모두 검증을 통과하지 못했습니다" + (f": {problem.strip()[:500]}" if problem else ""))
 
     # 날짜·숫자 검수(2026-11-05) — 녹화일/원문과 어긋나는 날짜·금액을 로그·상태에 남긴다. 렌더를 막지는 않는다
     # (PRISM은 바로 공개라, 확실한 오류는 슬랙·로그로 사람이 보고, 영상 자체는 나간다).
     # 검수는 참고용이라 검수 코드 오류로 영상이 멈추면 안 된다(2026-11-07·09 주식 편이 이것으로 멈춤).
+    number_flags = _safe_number_issues(script, article)
+    # 금액 표시가 있으면 대본을 한 번 다시 쓴다(2026-11-18). 고친 검수로 최근 표시 4건(11/12·11/16)과 지면 시험 1건이
+    # 모두 실제 10배·단위 오류였다. 정답 값은 알려 주지 않고(코드가 어느 원문 금액과 짝인지 모른다) 문제 금액만 알린다.
+    # 다시 쓴 쪽의 표시가 더 적을 때만 바꾼다 — 나빠지면 처음 것을 그대로 쓴다.
+    if number_flags:
+        print(f"[prism-batch] 금액 표시 {len(number_flags)}건 — 대본 1회 다시 쓰기")
+        report("script", title=title, rewrite="amount")
+        try:
+            retry_text = _write_script(script_guide, user_message + _amount_feedback(number_flags), display_name)
+            retry_script = _make_scene(scene_guide, retry_text)[0] if retry_text else None
+        except Exception as e:  # noqa: BLE001
+            print(f"[prism-batch] 다시 쓰기 실패 — 처음 대본 사용: {e!r}")
+            retry_script = None
+        if retry_script is not None:
+            retry_flags = _safe_number_issues(retry_script, article)
+            print(f"[prism-batch] 다시 쓴 대본 금액 표시 {len(retry_flags)}건(처음 {len(number_flags)}건)")
+            if len(retry_flags) < len(number_flags):
+                script_text, script, number_flags = retry_text, retry_script, retry_flags
+                _save_script(s3, batch_id, item_id, script_text)
+                title = _episode_title(script_text)
+                status["amount_rewrite"] = "adopted"
+            else:
+                status["amount_rewrite"] = "kept-original"
+        else:
+            status["amount_rewrite"] = "failed"
     try:
         date_flags = date_issues(script, article, recording_date=recording_date)
     except Exception as e:  # noqa: BLE001
         print(f"[prism-batch] [검수] 날짜 검수 건너뜀: {e!r}")
         date_flags = []
-    try:
-        number_flags = number_issues(script, article)
-    except Exception as e:  # noqa: BLE001
-        print(f"[prism-batch] [검수] 금액 검수 건너뜀: {e!r}")
-        number_flags = []
     for line in date_flags + number_flags:
         print(f"[prism-batch] [검수] {line}")
     if date_flags:
         status["date_flags"] = date_flags[:20]
     if number_flags:
         status["number_flags"] = number_flags[:20]
+    status["title"] = title
 
     # 건수를 같은 이름으로 넘기면 위 목록을 덮어써 완료 알림이 죽는다(int + list). 목록은 status에 이미 있다.
     report("render", cuts=len(script["cuts"]))
@@ -278,6 +365,9 @@ def _run(s3, work_dir: Path, *, batch_id: str, item_id: str, job_id: str, articl
     # 유튜브 자동 공개 — 채널 연결 정보(시크릿)가 있을 때만. 업로드가 실패해도 영상은 이미 만들어졌으므로
     # 편 자체는 완료로 두고 화면에 실패 이유를 보여준다(내려받아 직접 올리면 된다). 다시 시도하면 중복 업로드가 된다.
     meta = youtube_upload.metadata_from_script(script_text, title or script.get("title") or display_name)
+    if type_code in _PAPER_TYPES:
+        meta["title"] = paper_title(meta["title"], day, display_name)
+        status["title"] = meta["title"]
     # v2 설명글(2026-11-18) — 요약·챕터·출처·AI 고지·한국어판/영문판 링크·해시태그. 실패하면 기존 설명글 그대로.
     try:
         chapters = ""
@@ -331,7 +421,11 @@ def _run(s3, work_dir: Path, *, batch_id: str, item_id: str, job_id: str, articl
     # 렌더를 다시 하지 않고, 가로 업로드가 모두 끝난 뒤에 돌아서 가로 공개를 늦추지 않는다. 합성이나 업로드가
     # 실패해도 가로 영상·편 완료에는 영향이 없다. 쇼츠는 세로 영상에 #Shorts를 붙여 올리면 유튜브가 분류한다.
     # 데일리모션에도 같은 세로 영상을 올린다(#Shorts 없는 원래 제목). 유튜브와 데일리모션은 서로 독립 — 한쪽이 실패해도 다른 쪽은 올린다.
-    if os.environ.get("PRISM_SHORTS", "0") == "1" and creds:
+    # 시험 모드(2026-11-19) — PRISM_REVIEW_ONLY=1이면 유튜브 연결 없이도 쇼츠까지 렌더하고 업로드는 하지 않는다.
+    # 제목·설명글은 {item}.meta.json에 남겨 사람이 확인한다(업로드를 끄면 설명글을 볼 곳이 없었다).
+    review_only = os.environ.get("PRISM_REVIEW_ONLY") == "1"
+    review = {"title": meta["title"], "description": meta["description"], "tags": meta["tags"]}
+    if os.environ.get("PRISM_SHORTS", "0") == "1" and (creds or review_only):
         report("shorts")
         shorts_path = work_dir / "video_shorts.mp4"
         try:
@@ -364,6 +458,9 @@ def _run(s3, work_dir: Path, *, batch_id: str, item_id: str, job_id: str, articl
                         print(f"[prism-batch] 쇼츠 SEO 설명글 검사 실패 — v2 사용: {sproblems[:5]}")
                 except Exception as e:  # noqa: BLE001
                     print(f"[prism-batch] 쇼츠 SEO 설명글 실패 — v2 사용: {e!r}")
+                review["shorts"] = {"title": smeta.get("title"), "description": smeta.get("description")}
+                if not creds:
+                    raise RuntimeError("시험 모드 — 쇼츠 업로드 안 함")
                 video_id = youtube_upload.upload(shorts_path, smeta, creds)
                 status["youtube_shorts_url"] = f"https://www.youtube.com/shorts/{video_id}"
                 print(f"[prism-batch] {item_id} — 유튜브 쇼츠 업로드 {status['youtube_shorts_url']}")
@@ -379,6 +476,10 @@ def _run(s3, work_dir: Path, *, batch_id: str, item_id: str, job_id: str, articl
                     print(f"[prism-batch] 데일리모션 쇼츠 실패: {e}")
                     status["dailymotion_shorts_error"] = str(e)[:500]
 
+    try:
+        _put_json(s3, f"media/prism-batch/{batch_id}/{item_id}.meta.json", review)
+    except Exception as e:  # noqa: BLE001
+        print(f"[prism-batch] 제목·설명글 기록 실패(무시): {e}")
     report("done")
     print(f"[prism-batch] {item_id} — 완료")
     return True

@@ -122,6 +122,7 @@ cp "$SCRIPT_DIR/../../pipelines/common/webtoon_image_prompt.py" "$SCRIPT_DIR/../
 cp "$JSON_EXTRACT_MODULE" "$BUILD_DIR/"    # pipelines/common/json_extract.py (위 주석 참고)
 cp "$BEDROCK_CLIENT_MODULE" "$COMPOSE_TEXT_MODULE" "$REKOGNITION_PEOPLE_MODULE" "$DDB_PROMPT_MODULE" "$WEBTOON_PROMPTS_MODULE" "$PODCAST_VOICE_MODULE" "$ELEVENLABS_TTS_MODULE" "$VIDEO_SETTINGS_MODULE" "$GOOGLE_TTS_MODULE" "$BUILD_DIR/"
 cp "$PRISM_AUTO_MODULE" "$BUILD_DIR/"
+cp "$SCRIPT_DIR/../../pipelines/video/prism_paper.py" "$BUILD_DIR/"   # 2026-11-19 지면 영상(PG1~PG4) 기사 고르기 — prism_schedule이 부른다
 cp "$DISCOVERY_MODULE" "$BUILD_DIR/discovery_pipeline.py"
 # 2026-11-06 — 태스크가 못 보낸 완료 알림을 자동 제작이 대신 보낸다(prism_schedule._notify_if_batch_done).
 cp "$SCRIPT_DIR/../../pipelines/video/prism_notify.py" "$SCRIPT_DIR/../../pipelines/common/config.py" "$BUILD_DIR/"

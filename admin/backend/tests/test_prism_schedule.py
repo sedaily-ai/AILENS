@@ -24,10 +24,17 @@ def _result(xml_group: str, **extra) -> dict:
 @pytest.fixture
 def env(monkeypatch):
     box = {"state": None, "results": [], "runs": [], "alerts": [], "puts": [], "created": [], "status": {},
-           "tasks": {}, "notified": [], "sleeps": [], "fail_run": set()}
+           "tasks": {}, "notified": [], "sleeps": [], "fail_run": set(), "paper": [], "paper_calls": 0}
     monkeypatch.setattr(prism_schedule, "_read_state", lambda day: box["state"])
     monkeypatch.setattr(prism_schedule, "_write_state", lambda day, state: box.__setitem__("state", state))
     monkeypatch.setattr(prism_schedule, "_collect", lambda day: (box["results"], GROUPS))
+
+    def collect_paper(day):
+        box["paper_calls"] += 1
+        if box["paper"] == "boom":
+            raise RuntimeError("XML 없음")
+        return box["paper"]
+    monkeypatch.setattr(prism_schedule, "_collect_paper", collect_paper)
     monkeypatch.setattr(prism_schedule, "_alert", lambda day, lines, batch_id=None: box["alerts"].append(lines))
     monkeypatch.setattr(prism_schedule, "_notify_if_batch_done", lambda b: box["notified"].append(b))
     monkeypatch.setattr(prism_schedule, "_describe_task", lambda arn: box["tasks"].get(arn))
@@ -282,3 +289,67 @@ def test_run_item_raises_on_failures_list(monkeypatch):
     item = {"item_id": "01", "file_name": "f", "type": "SG1", "recording_date": "2026-11-06", "input_key": "k", "job_id": "j"}
     assert prism_batch.start_item("b", item) is None
     assert writes[-1]["stage"] == "error" and "RESOURCE:ENI" in writes[-1]["message"]
+
+
+# ── 지면 영상(PG1~PG4, 2026-11-19) — PRISM 첫 묶음에 같이, 토요일은 12시에 지면만 ─────────────────
+
+def _paper(label: str, code: str, **extra) -> dict:
+    return {"type": code, "label": label, "file_name": f"1106_{label}.txt", "recording_date": "2026-11-06",
+            "text": "제목: 지면", "page": 1, **extra}
+
+
+PAPER4 = [_paper("1면", "PG1"), _paper("증권", "PG2"), _paper("산업", "PG3"), _paper("금융지면", "PG4")]
+
+
+def test_paper_joins_first_prism_batch(env):
+    env["results"] = [_result(g) for g in GROUPS]
+    env["paper"] = PAPER4
+    prism_schedule.run(at(10, 5))
+    assert len(env["created"]) == 1
+    _, items, _ = env["created"][0]
+    assert [i["type"] for i in items][-4:] == ["PG1", "PG2", "PG3", "PG4"] and len(items) == 12
+    assert env["state"]["closed"] is True and env["state"]["paper_done"] is True
+    # 다음 호출에서 지면을 또 만들지 않는다
+    prism_schedule.run(at(10, 10))
+    assert env["paper_calls"] == 1 and len(env["created"]) == 1
+
+
+def test_paper_waits_until_prism_ready(env):
+    env["results"] = [_result("캠퍼스 뉴스")]
+    env["paper"] = PAPER4
+    prism_schedule.run(at(10, 5))
+    assert env["created"] == [] and env["paper_calls"] == 0
+
+
+def test_paper_skipped_section_goes_to_notes(env):
+    env["results"] = [_result(g) for g in GROUPS]
+    env["paper"] = PAPER4[:3] + [{"type": "PG4", "label": "금융지면", "page": 9, "skipped": "9면에 쓸 기사가 2개 미만"}]
+    prism_schedule.run(at(10, 5))
+    _, items, notes = env["created"][0]
+    assert len(items) == 11 and any("Finance Daily" in n and "건너뛰었어요" in n for n in notes)
+
+
+def test_paper_failure_does_not_block_prism(env):
+    env["results"] = [_result(g) for g in GROUPS]
+    env["paper"] = "boom"
+    prism_schedule.run(at(10, 5))
+    _, items, notes = env["created"][0]
+    assert len(items) == 8 and any("기사 모으기 실패" in n for n in notes)
+
+
+def test_saturday_paper_alone_at_noon_and_no_missing_alert(env):
+    env["paper"] = PAPER4
+    prism_schedule.run(at(11, 55, day=7))
+    assert env["created"] == []
+    prism_schedule.run(at(12, 0, day=7))
+    assert len(env["created"]) == 1 and [i["type"] for i in env["created"][0][1]] == ["PG1", "PG2", "PG3", "PG4"]
+    prism_schedule.run(at(16, 0, day=7))
+    assert env["alerts"] == []  # 토요일 PRISM 없음은 알리지 않는다(지면 편 때문에 알림이 가면 안 된다)
+
+
+def test_sunday_no_paper_notes(env):
+    env["results"] = [_result(g) for g in GROUPS]
+    env["paper"] = [{"type": c, "label": l, "skipped": "섹션 첫 면을 찾지 못함"} for l, c in (("1면", "PG1"), ("증권", "PG2"), ("산업", "PG3"), ("금융지면", "PG4"))]
+    prism_schedule.run(at(10, 5, day=8))
+    _, items, notes = env["created"][0]
+    assert len(items) == 8 and not any("건너뛰었어요" in n for n in (notes or []))
