@@ -117,6 +117,30 @@ def _collect(day: dt.date) -> tuple[list[dict], dict]:
     return prism_auto.collect(day), prism_auto.XML_GROUPS
 
 
+def _collect_paper(day: dt.date) -> list[dict]:
+    """지면 영상(PG1~PG4, 2026-11-19) — 그날 신문 섹션 첫 면의 TOP + 같은 면 기사 1개(pipelines/video/prism_paper.py).
+    두 번째 기사는 Haiku가 고른다(이 Lambda 역할에 이미 호출 권한이 있다)."""
+    import prism_paper  # deploy-admin-api.sh가 zip 루트에 복사한다
+    return prism_paper.collect(day, call=prism_paper.bedrock_chooser())
+
+
+def _paper_rows(day: dt.date) -> tuple[list[dict], list[str]]:
+    """지면 편 → (묶음에 넣을 편, 참고 문구). 실패해도 PRISM 편은 만들어야 하므로 예외를 삼킨다."""
+    try:
+        results = _collect_paper(day)
+    except Exception as e:  # noqa: BLE001
+        logger.exception("PRISM 지면 기사 모으기 실패")
+        return [], [f"지면 영상: 기사 모으기 실패로 오늘은 만들지 않았어요({str(e)[:120]})"]
+    todo, notes = [], []
+    for r in results:
+        if r.get("skipped"):
+            if day.weekday() != 6:  # 일요일은 신문이 없다 — 알리지 않는다
+                notes.append(f"{prism_batch.GROUPS[r['type']]}: {r['skipped']} — 건너뛰었어요")
+            continue
+        todo.append({**r, "xml_group": f"지면:{r['label']}"})
+    return todo, notes
+
+
 def _notify_if_batch_done(batch_id: str) -> None:
     """태스크가 못 보낸 완료 알림을 대신 보낸다. 시험 모드면 보내지 않는다. 실패해도 다음 호출이 다시 본다."""
     if _test_mode():
@@ -311,14 +335,26 @@ def _plan(day: dt.date, state: dict, now: dt.datetime) -> str | None:
 
     batch_id = None
     # 첫 묶음은 8개가 다 모이거나 12시가 돼야 만든다. 그 뒤로는 올라오는 대로 추가한다.
+    # 지면 4편(2026-11-19 사용자 결정: PRISM과 한 묶음·알림 한 통)은 첫 묶음에 같이 넣는다. 토요일처럼 PRISM이 없는 날은
+    # 12시에 지면만 따로 만든다. 하루 한 번만(paper_done).
+    want_paper = not state.get("paper_done") and (
+        (todo and (not missing_groups or past_first)) or past_first)
+    paper_todo, paper_notes = _paper_rows(day) if want_paper else ([], [])
+    if want_paper:
+        state["paper_done"] = True
     if todo and (not missing_groups or past_first):
         # 참고 문구는 이번 묶음에 든 편 것만(앞 묶음에 이미 붙은 문구를 되풀이하지 않게).
         noted = [r for r in results if r in todo or (not r["type"] and not made_groups)]
-        batch_id = _make_batch(state, todo, _notes_for(noted, missing_groups, last))
+        batch_id = _make_batch(state, todo + paper_todo, _notes_for(noted, missing_groups, last) + paper_notes)
+    elif paper_todo or paper_notes:
+        batch_id = _make_batch(state, paper_todo, paper_notes) if paper_todo else None
+        if not paper_todo and paper_notes and day.weekday() != 6:
+            _alert(day, paper_notes)
     if not missing_groups and all(r["xml_group"] in {i["xml_group"] for i in state.get("items", [])} or not r["type"] for r in results):
         state.update(closed=True, closed_at=now.isoformat(timespec="seconds"), missing_groups=[])
     elif last:
-        count = len(state.get("items", []))
+        # 지면 편은 세지 않는다 — 토요일(PRISM 없음)에 지면만 만들었다고 "8그룹 안 올라옴" 알림이 가면 안 된다.
+        count = sum(1 for i in state.get("items", []) if not str(i.get("xml_group", "")).startswith("지면:"))
         # 토·일은 쉬는 날이 잦아 0건이어도 알리지 않는다
         _close(day, state, now, count=count, missing_groups=missing_groups, quiet_if_none=day.weekday() >= 5)
     return batch_id

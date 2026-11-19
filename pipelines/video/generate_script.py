@@ -482,14 +482,21 @@ def _korean_amounts(article: str) -> set[float]:
     단위 글자 기준으로 끊으므로 콤마의 영향을 받지 않는다. 숫자는 반드시 숫자로 시작해야 한다 — 쉼표만
     잡으면('텍사스, 조지아'·'있고, 조건') int('')로 제작 전체가 멈췄다(2026-11-07·09 주식)."""
     vals: set[float] = set()
-    for m in re.finditer(r"(\d[\d,]*)\s*조\s*(\d[\d,]*)?\s*억?", article):
-        jo = int(m.group(1).replace(",", ""))
-        eok = int((m.group(2) or "0").replace(",", "")) if m.group(2) else 0
-        vals.add(float(jo * 10**12 + eok * 10**8))
-    for m in re.finditer(r"(\d[\d,]*)\s*억", article):
-        vals.add(float(int(m.group(1).replace(",", "")) * 10**8))
-    for m in re.finditer(r"(\d[\d,]*)\s*만", article):
-        vals.add(float(int(m.group(1).replace(",", "")) * 10**4))
+    num = r"\d[\d,]*(?:\.\d+)?"  # 소수점도 받는다 — '2.96조'를 '96조'로 읽어 멀쩡한 대본을 표시했다(2026-11-18)
+
+    def _f(s: str) -> float:
+        return float(s.replace(",", ""))
+
+    # 한 금액 안의 조·억·만을 합친 값 — '2억 2375만 원'(=223.75 million)을 2억·2375만으로만 따로 읽어
+    # 부동산 편이 자주 잘못 표시됐다(2026-11-18 확인, 최근 109편 중 표시 10편 대부분). 따로 읽은 값도 그대로 남긴다.
+    for m in re.finditer(rf"(?:({num})\s*조)?\s*(?:({num})\s*억)?\s*(?:({num})\s*만)?", article):
+        jo, eok, man = m.group(1), m.group(2), m.group(3)
+        if not (jo or eok or man):
+            continue
+        vals.add((_f(jo) if jo else 0) * 10**12 + (_f(eok) if eok else 0) * 10**8 + (_f(man) if man else 0) * 10**4)
+    for unit, mult in (("조", 10**12), ("억", 10**8), ("만", 10**4)):
+        for m in re.finditer(rf"({num})\s*{unit}", article):
+            vals.add(_f(m.group(1)) * mult)
     return vals
 
 

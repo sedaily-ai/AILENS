@@ -50,45 +50,79 @@ def _one_line(text: str, limit: int) -> str:
     return text if len(text) <= limit else text[: limit - 1] + "…"
 
 
+def _is_paper(item: dict) -> bool:
+    """지면 영상(PG1~PG4, 2026-11-18 자동 제작 추가)인지."""
+    return str(item.get("type") or "").startswith("PG")
+
+
 def build_message(batch_id: str, rows: list[tuple[dict, dict]], notes: list[str] | None = None) -> dict:
     ok = sum(1 for _, s in rows if s.get("stage") == "done")
     date = rows[0][0].get("recording_date", "")
     mm_dd = f"{int(date[5:7])}/{int(date[8:10])}" if len(date) == 10 else date
     lines = []
     flagged: list[tuple[str, list[str]]] = []  # (그룹, 검수 플래그 목록) — 아래 상세 블록용
-    for item, s in rows:
-        group = item.get("group") or item.get("type")
-        # 날짜·숫자 검수 플래그(prism_batch가 status에 기록). 완료/실패와 무관하게 모은다.
-        checks = (s.get("date_flags") or []) + (s.get("number_flags") or [])
-        if checks:
-            flagged.append((group, checks))
-        check_tag = f" 🔎검수 {len(checks)}건" if checks else ""
-        if s.get("stage") == "done":
-            # 2026-11-05 데일리모션 추가 — 올라간 곳은 링크, 못 올린 곳은 이유. 둘 다 올라가면 ✅.
-            links, problems = [], []
-            for key, name in (("youtube", "유튜브"), ("dailymotion", "데일리모션")):
-                if s.get(f"{key}_url"):
-                    links.append(f"<{s[f'{key}_url']}|{name}>")
-                elif s.get(f"{key}_error"):
-                    problems.append(f"{name} 미업로드({_one_line(s[f'{key}_error'], 60)})")
-            # 유튜브 쇼츠(세로) — 업로드를 시도한 편(url 또는 error가 있는 편)만 표시한다. 기본(꺼짐)이면 아무것도 안 붙는다.
-            if s.get("youtube_shorts_url"):
-                links.append(f"<{s['youtube_shorts_url']}|쇼츠>")
-            elif s.get("youtube_shorts_error"):
-                problems.append(f"쇼츠 미업로드({_one_line(s['youtube_shorts_error'], 60)})")
-            # 데일리모션 쇼츠 — 올리려 한 편(url 또는 error가 있는 편)만 표시한다.
-            if s.get("dailymotion_shorts_url"):
-                links.append(f"<{s['dailymotion_shorts_url']}|데일리모션 쇼츠>")
-            elif s.get("dailymotion_shorts_error"):
-                problems.append(f"데일리모션 쇼츠 미업로드({_one_line(s['dailymotion_shorts_error'], 60)})")
-            if not s.get("youtube_url") and not problems:
-                problems = ["유튜브 미업로드"]  # 시크릿이 없어 시도조차 안 한 경우
-            if problems:
-                lines.append(f"⚠️ {group} — 영상 완료, {' · '.join(links + problems)}{check_tag}")
-            else:
-                lines.append(f"✅ {group} — {' · '.join(links)}{check_tag}")
+    # 지면 영상이 섞인 묶음은 소제목으로 나눈다(사용자 요청 2026-11-18: 한 묶음·알림 한 통, [PRISM]/[지면] 분류).
+    # 지면 편이 없으면 소제목 없이 예전 모양 그대로.
+    if any(_is_paper(item) for item, _ in rows):
+        sections = [("PRISM", [r for r in rows if not _is_paper(r[0])]), ("지면", [r for r in rows if _is_paper(r[0])])]
+    else:
+        sections = [("", rows)]
+    for heading, section_rows in sections:
+        if heading:
+            if not section_rows:
+                continue
+            done = sum(1 for _, s in section_rows if s.get("stage") == "done")
+            if lines:
+                lines.append("")
+            lines.append(f"*[{heading}]* {len(section_rows)}편 중 {done}편 성공")
+        for item, s in section_rows:
+            _append_row(lines, flagged, item, s)
+    if sections[0][0]:
+        lines.append("")  # 소제목을 쓴 경우 마지막 묶음과 CMS 링크 사이를 띄운다
+    _append_footer(lines, flagged, batch_id, notes)
+    return {"version": "1.0", "source": "custom", "content": {
+        "textType": "client-markdown",
+        "title": f"🎬 AI PRISM 제작 완료 ({mm_dd}, {len(rows)}편 중 {ok}편 성공)",
+        "description": "\n".join(lines),
+    }}
+
+
+def _append_row(lines: list[str], flagged: list[tuple[str, list[str]]], item: dict, s: dict) -> None:
+    group = item.get("group") or item.get("type")
+    # 날짜·숫자 검수 플래그(prism_batch가 status에 기록). 완료/실패와 무관하게 모은다.
+    checks = (s.get("date_flags") or []) + (s.get("number_flags") or [])
+    if checks:
+        flagged.append((group, checks))
+    check_tag = f" 🔎검수 {len(checks)}건" if checks else ""
+    if s.get("stage") == "done":
+        # 2026-11-05 데일리모션 추가 — 올라간 곳은 링크, 못 올린 곳은 이유. 둘 다 올라가면 ✅.
+        links, problems = [], []
+        for key, name in (("youtube", "유튜브"), ("dailymotion", "데일리모션")):
+            if s.get(f"{key}_url"):
+                links.append(f"<{s[f'{key}_url']}|{name}>")
+            elif s.get(f"{key}_error"):
+                problems.append(f"{name} 미업로드({_one_line(s[f'{key}_error'], 60)})")
+        # 유튜브 쇼츠(세로) — 업로드를 시도한 편(url 또는 error가 있는 편)만 표시한다. 기본(꺼짐)이면 아무것도 안 붙는다.
+        if s.get("youtube_shorts_url"):
+            links.append(f"<{s['youtube_shorts_url']}|쇼츠>")
+        elif s.get("youtube_shorts_error"):
+            problems.append(f"쇼츠 미업로드({_one_line(s['youtube_shorts_error'], 60)})")
+        # 데일리모션 쇼츠 — 올리려 한 편(url 또는 error가 있는 편)만 표시한다.
+        if s.get("dailymotion_shorts_url"):
+            links.append(f"<{s['dailymotion_shorts_url']}|데일리모션 쇼츠>")
+        elif s.get("dailymotion_shorts_error"):
+            problems.append(f"데일리모션 쇼츠 미업로드({_one_line(s['dailymotion_shorts_error'], 60)})")
+        if not s.get("youtube_url") and not problems:
+            problems = ["유튜브 미업로드"]  # 시크릿이 없어 시도조차 안 한 경우
+        if problems:
+            lines.append(f"⚠️ {group} — 영상 완료, {' · '.join(links + problems)}{check_tag}")
         else:
-            lines.append(f"❌ {group} — {_one_line(s.get('message') or '실패', 100)}")
+            lines.append(f"✅ {group} — {' · '.join(links)}{check_tag}")
+    else:
+        lines.append(f"❌ {group} — {_one_line(s.get('message') or '실패', 100)}")
+
+
+def _append_footer(lines: list[str], flagged: list[tuple[str, list[str]]], batch_id: str, notes: list[str] | None) -> None:
     lines.append(f"<{CMS_URL}/prism-batch?batch={batch_id}|CMS에서 보기>")
     # 자동 제작이 남긴 참고 사항(routes/prism_schedule.py — 빠진 그룹·같은 그룹 2건 등). 사용자 요청(2026-11-06):
     # 따로 보내지 말고 완료 알림 끝에, "확인 필요"는 자극적이니 "참고"로.
@@ -103,11 +137,6 @@ def build_message(batch_id: str, rows: list[tuple[dict, dict]], notes: list[str]
                 lines.append(f"  • {group}: {_one_line(c, 110)}")
             if len(checks) > 3:
                 lines.append(f"  • {group}: 외 {len(checks) - 3}건")
-    return {"version": "1.0", "source": "custom", "content": {
-        "textType": "client-markdown",
-        "title": f"🎬 AI PRISM 제작 완료 ({mm_dd}, {len(rows)}편 중 {ok}편 성공)",
-        "description": "\n".join(lines),
-    }}
 
 
 def notify_if_batch_done(s3, batch_id: str) -> None:

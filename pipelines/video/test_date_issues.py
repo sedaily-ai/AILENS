@@ -148,3 +148,22 @@ def test_amount_comma_before_unit_char_does_not_crash():
     s = _script("The company posted 215.9 billion won in annual revenue.")
     article = "“텍사스, 조지아, 오하이오에 짓는다.” 만기 전에 상환받을 수 있고, 조건에 못 미치면, 만약 2159억 원을 기록했다."
     assert number_issues(s, article) == []
+
+
+def test_amount_eok_man_combined_is_clean():
+    # 2026-11-18: 부동산 편 '2억 2375만 원' → '223.75 million won'을 2억과만 비교해 잘못 표시했다.
+    s = _script("The average deposit reached 223.75 million won.")
+    assert number_issues(s, "평균 보증금은 2억 2375만 원이었다.") == []
+
+
+def test_amount_decimal_jo_is_clean():
+    # '2.96조'를 '96조'로 읽던 문제.
+    s = _script("Investment totaled 2.96 trillion won.")
+    assert number_issues(s, "투자액은 2.96조 원이었다.") == []
+
+
+def test_amount_share_price_as_market_cap_flagged():
+    # 2026-11-18 지면 1면 시험: 원문 'SK하이닉스 112만 원'(주가)이 '112 trillion won'(시가총액)으로 바뀌었다.
+    s = _script("SK Hynix dropped 7.89 percent to 112 trillion won in market value terms.")
+    issues = number_issues(s, "SK하이닉스는 7.89% 급락한 112만 원을 기록했다.")
+    assert any("112 trillion won" in x for x in issues)
