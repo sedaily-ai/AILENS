@@ -17,6 +17,7 @@ export type HeaderTabKey =
   | 'culture'
   | 'letter'
   | 'words'
+  | 'timemachine'
   | 'timeline'
   | 'games'
   | 'archive';
@@ -61,6 +62,8 @@ export function buildHeaderTabs(active?: HeaderTabKey): HeaderTab[] {
     { key: 'letter', label: '레터', href: '/letter', active: active === 'letter', tier: 'core' as const },
     // 용어 탭(2026-11-18): 레터·기사에 나온 경제 용어 모음(/words). 그동안 푸터 '단어장' 링크로만 들어갈 수 있어 상단 줄에 둔다.
     { key: 'words', label: '용어', href: '/words', active: active === 'words', tier: 'core' as const },
+    // 타임머신 탭(2026-11-20): 발행된 타임머신 인터랙티브 콘텐츠 목록(/timemachine). 콘텐츠 정의는 widgets/TimemachinePage/contents.ts.
+    { key: 'timemachine', label: '타임머신', href: '/timemachine', active: active === 'timemachine', tier: 'core' as const },
     // 부가 기능 탭(tier 'more')은 Header.tsx의 "더보기" 드롭다운으로 묶인다.
     // '내 서랍' 탭은 노출하지 않는다. 서랍은 나의 LENS(/my-lens?tab=archive)에 있다. 옛 홈 서랍 주소(/?tab=archive)는 FeedPage가 그리로 보낸다.
     // 타임라인은 `/timeline`을 가리킨다. 옛 `/timemachine`(유명인·투자 시뮬레이션)은 직접 URL로만 남긴다.
