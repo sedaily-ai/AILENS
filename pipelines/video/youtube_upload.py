@@ -26,6 +26,8 @@ SECRET_ID = os.environ.get("PRISM_YOUTUBE_SECRET_ID", "ai-labs/prism-youtube")
 _TOKEN_URL = "https://oauth2.googleapis.com/token"
 _UPLOAD_URL = "https://www.googleapis.com/upload/youtube/v3/videos?uploadType=resumable&part=snippet,status"
 _NEWS_CATEGORY_ID = "25"  # News & Politics
+_THUMBNAIL_URL = "https://www.googleapis.com/upload/youtube/v3/thumbnails/set?videoId={video_id}&uploadType=media"
+_THUMBNAIL_MAX_BYTES = 2 * 1024 * 1024  # YouTube thumbnails.set 상한(2MB)
 _TITLE_MAX = 100  # YouTube 제목 상한
 _DESCRIPTION_MAX = 4900  # 상한 5,000바이트 — 영어 위주라 글자 수로 여유를 둔다
 _TAGS_MAX_CHARS = 450  # 태그 합계 상한 500자
@@ -205,3 +207,28 @@ def upload(mp4_path: Path, meta: dict, creds: dict) -> str:
             return json.loads(res.read())["id"]
     except urllib.error.HTTPError as e:
         raise RuntimeError(f"YouTube {e.code}: {e.read().decode('utf-8', 'replace')[:500]}") from e
+
+
+def set_thumbnail(video_id: str, thumb_path: Path, creds: dict) -> None:
+    """영상에 썸네일 이미지를 단다(thumbnails.set, JPEG/PNG). 실패하면 예외(HTTP 응답 본문 포함).
+
+    올린 영상은 그대로 두고 썸네일만 못 단 경우다 — 부르는 쪽(prism_batch)이 경고 로그·상태만 남기고
+    영상 제작은 완료로 둔다(채널 권한 미인증·이미지 용량 초과 등으로 흔히 실패한다).
+    '맞춤 썸네일' 권한이 없는 채널이면 403이 온다 — 그때는 유튜브가 영상 중간 프레임을 쓴다.
+    """
+    data = Path(thumb_path).read_bytes()
+    if not data:
+        raise RuntimeError(f"썸네일 파일이 비었습니다: {thumb_path}")
+    if len(data) > _THUMBNAIL_MAX_BYTES:
+        raise RuntimeError(f"썸네일이 2MB를 넘습니다({len(data)} bytes): {thumb_path}")
+    content_type = "image/png" if Path(thumb_path).suffix.lower() == ".png" else "image/jpeg"
+    token = _access_token(creds)
+    req = urllib.request.Request(
+        _THUMBNAIL_URL.format(video_id=urllib.parse.quote(video_id, safe="")), data=data, method="POST",
+        headers={"Authorization": f"Bearer {token}", "Content-Type": content_type, "Content-Length": str(len(data))},
+    )
+    try:
+        with urllib.request.urlopen(req, timeout=120) as res:
+            res.read()
+    except urllib.error.HTTPError as e:
+        raise RuntimeError(f"YouTube 썸네일 {e.code}: {e.read().decode('utf-8', 'replace')[:500]}") from e

@@ -7,7 +7,8 @@
 저장은 전부 S3 media/prism-batch/ (DB 테이블 없음, 영상 랩과 같은 방식):
   {batch_id}/input/{NN}.txt       기사 원본(브라우저가 서명 URL로 직접 PUT)
   {batch_id}/manifest.json        이 라우트가 쓴다 — 파일 이름·그룹·날짜·job_id
-  {batch_id}/{NN}.status.json     태스크가 쓴다 — stage(queued/script/scene/render/upload/done/error), youtube_url
+  {batch_id}/{NN}.status.json     태스크가 쓴다 — stage(queued/script/scene/render/upload/done/error), youtube_url,
+                                  youtube_thumbnail(기사 사진 썸네일: photo/none/None), youtube_thumbnail_error
   {batch_id}/{NN}.script.txt      태스크가 쓴다 — 영어 대본(EL Script + Block D)
   index.json                      최근 배치 목록(화면의 "지난 제작")
 admin Lambda는 이 버킷에 GetObject 권한이 없어(routes/video_lab.py 참고) 읽기는 공개 URL GET으로 한다.
@@ -253,6 +254,9 @@ def handle_get(body: dict, path_params: dict, query_params: dict) -> dict:
         item = {**item, "job_id": status.get("job_id") or item.get("job_id")}
         row = {**item, "stage": status.get("stage"), "message": status.get("message"), "title": status.get("title"),
                "youtube_url": status.get("youtube_url"), "youtube_error": status.get("youtube_error"),
+               # 기사 사진 썸네일(2026-11-23) — "photo"(기사 사진으로 설정) | "none"(사진 없음) | None(업로드 전)
+               "youtube_thumbnail": status.get("youtube_thumbnail"),
+               "youtube_thumbnail_error": status.get("youtube_thumbnail_error"),
                "dailymotion_url": status.get("dailymotion_url"), "dailymotion_error": status.get("dailymotion_error")}
         if row["stage"] in ("scene", "render", "done"):  # 대본은 장면 단계에 들어갈 때 저장된다
             row["script_url"] = f"{base}/{_PREFIX}/{batch_id}/{item['item_id']}.script.txt"

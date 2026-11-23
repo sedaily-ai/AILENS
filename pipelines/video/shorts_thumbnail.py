@@ -1,7 +1,8 @@
-"""PRISM 쇼츠 썸네일 이미지 — 기사 사진 + 제목 (2026-11-17).
+"""PRISM 썸네일 이미지 — 기사 사진 + 제목 (2026-11-17, 롱폼 2026-11-23).
 
-영상은 건드리지 않고 별도 이미지(1080x1920 JPEG)만 만든다. 폰 유튜브 앱·스튜디오에서 수동으로 올리거나,
-이후 thumbnails.set API 연결에 그대로 쓴다. 제목 나누기·글꼴·팔레트는 shorts_compose와 같은 것을 쓴다.
+영상은 건드리지 않고 별도 이미지(쇼츠 1080x1920·롱폼 1280x720 JPEG)만 만든다. 롱폼(1280x720)은 prism_batch가
+유튜브 업로드 뒤 thumbnails.set으로 달고, 쇼츠용은 유튜브 스튜디오에서 올리거나 같은 방식으로 단다.
+제목 나누기·글꼴·팔레트는 shorts_compose와 같은 것을 쓴다.
 
 사진 사용 권한은 이 모듈이 판단하지 않는다 — 호출하는 쪽이 자사 사진만 넘길지 정한다.
 """
@@ -126,46 +127,60 @@ def make_from_url(photo_url: str, title: str, out: Path) -> None:
 
 # ── 가로(롱폼) 썸네일 1280x720 ─────────────────────────────────────────────
 WIDE_W, WIDE_H = 1280, 720
-WIDE_MAX_UPSCALE = 1.25     # 사진을 이 배율보다 크게 늘리지 않는다(뭉개짐 방지). 모자라는 곳은 흐린 배경
-WIDE_TEXT_X = 690
-WIDE_TITLE_SIZE = 76
-WIDE_TITLE_LINE_H = 96
-WIDE_TITLE_WRAP = 12
-WIDE_SHADE_LEFT = 0.38      # 이 지점부터 오른쪽으로 점점 어둡게
-WIDE_SHADE_STEPS = 30
+WIDE_TEXT_X = 660           # 제목 왼쪽 끝 — 사진은 왼쪽 660px까지 보이고 오른쪽은 그림자·글자
+WIDE_TAG_SIZE = 40
+WIDE_SHADE_LEFT = 0.22      # 이 지점부터 오른쪽으로 점점 어둡게(선형 그라데이션)
+WIDE_SHADE_MAX = 0.90       # 오른쪽 끝에서 검정이 덮는 정도 — 제목 자리(왼쪽 끝)에서 35%쯤
+WIDE_LINE_GAP = 1.22        # 줄 높이 = 글자 크기 × 이 값
+# (글자 크기, 한 줄 글자 수, 최대 줄 수) — 위에서부터 제목이 다 들어가는 첫 크기를 쓴다(2026-11-23).
+# 75자짜리 지면 제목은 64px에서 꼬리가 잘려 없어졌고, 58px이면 6줄로 들어간다.
+WIDE_TITLE_LADDER = ((64, 15, 5), (58, 17, 6), (52, 19, 6))
+
+
+def _wrap(title: str, width: int) -> list[str]:
+    head = title.split(" | ")[0]  # 지면 편 제목의 날짜·시리즈 꼬리(' | November 17 2026 | Front Page Daily')는 썸네일에 넣지 않는다
+    return textwrap.wrap(" ".join(head.split()), width=width, break_long_words=True) or [""]
+
+
+def wide_title(text: str) -> tuple[list[str], int, int]:
+    """제목 → (줄들, 글자 크기, 줄 높이). 다 들어가는 가장 큰 크기를 고르고, 끝까지 넘치면 …로 줄인다."""
+    for size, wrap, max_lines in WIDE_TITLE_LADDER:
+        lines = _wrap(text, wrap)
+        if len(lines) <= max_lines:
+            return lines, size, round(size * WIDE_LINE_GAP)
+    wrap, max_lines = WIDE_TITLE_LADDER[-1][1], WIDE_TITLE_LADDER[-1][2]
+    lines = _wrap(text, wrap)[:max_lines]
+    lines[-1] = lines[-1][: wrap - 1].rstrip() + "…"
+    size = WIDE_TITLE_LADDER[-1][0]
+    return lines, size, round(size * WIDE_LINE_GAP)
 
 
 def wide_wrap_title(title: str) -> list[str]:
-    title = title.split(" | ")[0]
-    lines = textwrap.wrap(" ".join(title.split()), width=WIDE_TITLE_WRAP, break_long_words=True) or [""]
-    if len(lines) > 4:
-        lines = lines[:4]
-        lines[-1] = lines[-1][: WIDE_TITLE_WRAP - 1].rstrip() + "…"
-    return lines
+    """제목 → 썸네일에 들어갈 줄들(크기 결정은 wide_title)."""
+    return wide_title(title)[0]
 
 
-def build_wide_args(photo: Path, out: Path, title_files: list[Path], tag_file: Path, size: tuple[int, int]) -> list[str]:
-    w, h = size
-    s = min(WIDE_H / h, WIDE_MAX_UPSCALE)
-    fg_w, fg_h = round(w * s / 2) * 2, round(h * s / 2) * 2
-    fg_x = 0 if fg_w >= 900 else 50
-    fg_y = (WIDE_H - fg_h) // 2
+def build_wide_args(photo: Path, out: Path, title_files: list[Path], tag_file: Path, size: tuple[int, int],
+                    title_size: int = WIDE_TITLE_LADDER[0][0], line_h: int | None = None) -> list[str]:
+    """사진을 화면 가득(cover) 깔고 오른쪽에 그림자를 얹은 뒤 영문 제목을 왼쪽 정렬로 넣는다.
+
+    사진을 높이에 맞춰 넣고 남는 자리를 흐린 배경으로 채우던 예전 방식은 사진·배경 경계선이 눈에 보였다(2026-11-23 시험).
+    size(원본 사진 크기)는 호출부 호환용으로만 받는다 — 가로·세로 어느 쪽이든 가운데를 잘라 1280x720을 채운다."""
+    line_h = line_h or round(title_size * WIDE_LINE_GAP)
     n = len(title_files)
-    top = (WIDE_H - n * WIDE_TITLE_LINE_H) // 2 + 20
-    shade = ",".join(
-        f"drawbox=x=iw*{WIDE_SHADE_LEFT + (1 - WIDE_SHADE_LEFT) * k / WIDE_SHADE_STEPS:.4f}:y=0:w=iw:h=ih:color=black@0.04:t=fill"
-        for k in range(WIDE_SHADE_STEPS)
-    )
+    top = (WIDE_H - n * line_h) // 2 + 24
+    tag_y = max(36, top - 74)
     draws = [
-        _drawtext(tf, WIDE_TITLE_SIZE, sc.TITLE_COLOR, str(WIDE_TEXT_X), top + i * WIDE_TITLE_LINE_H)
+        _drawtext(tf, title_size, sc.TITLE_COLOR, str(WIDE_TEXT_X), top + i * line_h)
         for i, tf in enumerate(title_files)
     ]
-    draws.append(_drawtext(tag_file, 44, sc.ACCENT_COLOR, str(WIDE_TEXT_X), 50))
+    draws.append(_drawtext(tag_file, WIDE_TAG_SIZE, sc.ACCENT_COLOR, str(WIDE_TEXT_X), tag_y))
+    left, ramp = WIDE_SHADE_LEFT, 1 - WIDE_SHADE_LEFT
+    alpha = f"'clip(255*{WIDE_SHADE_MAX}*((X/{WIDE_W}-{left})/{ramp}),0,255)'"  # 오른쪽으로 갈수록 짙어지는 알파
     graph = (
-        f"[0:v]split[a][b];"
-        f"[a]scale={WIDE_W}:{WIDE_H}:force_original_aspect_ratio=increase,crop={WIDE_W}:{WIDE_H},gblur=sigma=40,eq=brightness=-0.2[bg];"
-        f"[b]scale={fg_w}:{fg_h}:flags=lanczos[fg];"
-        f"[bg][fg]overlay={fg_x}:{fg_y},{shade},{','.join(draws)}[out]"
+        f"[0:v]scale={WIDE_W}:{WIDE_H}:force_original_aspect_ratio=increase:flags=lanczos,crop={WIDE_W}:{WIDE_H}[bg];"
+        f"color=c=black:s={WIDE_W}x{WIDE_H}:d=1,format=rgba,geq=r=0:g=0:b=0:a={alpha}[shade];"
+        f"[bg][shade]overlay=0:0:format=auto,{','.join(draws)}[out]"
     )
     return ["ffmpeg", "-y", "-i", str(photo), "-filter_complex", graph, "-map", "[out]", "-frames:v", "1", "-q:v", "1", str(out)]
 
@@ -174,15 +189,17 @@ def make_wide(photo: Path, title: str, out: Path) -> None:
     """photo + title → 가로 1280x720 JPEG(롱폼 썸네일). 실패하면 RuntimeError."""
     if not sc.FONT.exists():
         raise RuntimeError(f"글꼴 파일이 없습니다: {sc.FONT}")
+    lines, title_size, line_h = wide_title(title)
     with tempfile.TemporaryDirectory() as tmp:
         files = []
-        for i, line in enumerate(wide_wrap_title(title)):
+        for i, line in enumerate(lines):
             f = Path(tmp) / f"t{i}.txt"
             f.write_text(line, encoding="utf-8")
             files.append(f)
         tag = Path(tmp) / "tag.txt"
         tag.write_text("AI PRISM", encoding="utf-8")
-        result = subprocess.run(build_wide_args(photo, out, files, tag, photo_size(photo)), capture_output=True, text=True)
+        result = subprocess.run(build_wide_args(photo, out, files, tag, photo_size(photo), title_size, line_h),
+                                capture_output=True, text=True)
     if result.returncode != 0 or not out.exists():
         raise RuntimeError(f"가로 썸네일 합성 실패(returncode={result.returncode}): {result.stderr[-500:]}")
 

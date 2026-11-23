@@ -117,13 +117,18 @@ def _paper(article: dict) -> str:
 def _article_block(raw: ET.Element) -> str:
     a = discovery._parse_item(raw)
     categories = ", ".join(c.split(",")[0] for c in a["categories"] if c)
+    # 기사 사진 주소(2026-11-23) — 유튜브 썸네일 배경으로 쓴다(pipelines/video/article_photo.py가 읽는다).
+    # 사진이 없는 기사(대부분의 온라인 기사)는 줄 자체를 넣지 않는다. 줄 모양("사진: 주소")은
+    # 이 파일이 admin Lambda zip에 flat 복사되므로 다른 모듈을 import하지 않고 여기서 만든다.
+    photo = f"사진: {a['photo_url']}\n" if a.get("photo_url") else ""
     return (
         f"제목: {html.unescape(a['title'])}\n"
         f"기자: {_text(raw, 'author')}\n"
         f"날짜: {a['date']} {a['time']}\n"
         f"지면: {_paper(a)}\n"
         f"카테고리: {categories}\n"
-        f"URL: {a['url'] or ''}\n\n"
+        f"URL: {a['url'] or ''}\n"
+        f"{photo}\n"
         f"{a['content']}\n"
     )
 
