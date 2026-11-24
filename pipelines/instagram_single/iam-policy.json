@@ -1,0 +1,64 @@
+{
+ "Version": "2012-10-17",
+ "Statement": [
+  {
+   "Sid": "UploadImage",
+   "Effect": "Allow",
+   "Action": "s3:PutObject",
+   "Resource": "arn:aws:s3:::sedaily-mbti-cms-media-dev/media/instagram/single/*"
+  },
+  {
+   "Sid": "PostedState",
+   "Effect": "Allow",
+   "Action": [
+    "s3:GetObject",
+    "s3:PutObject"
+   ],
+   "Resource": "arn:aws:s3:::sedaily-mbti-cms-media-dev/instagram/single_posted.json"
+  },
+  {
+   "Sid": "StateListForNoSuchKey",
+   "Effect": "Allow",
+   "Action": "s3:ListBucket",
+   "Resource": "arn:aws:s3:::sedaily-mbti-cms-media-dev",
+   "Condition": {
+    "StringLike": {
+     "s3:prefix": "instagram/*"
+    }
+   }
+  },
+  {
+   "Sid": "Token",
+   "Effect": "Allow",
+   "Action": "ssm:GetParameter",
+   "Resource": "arn:aws:ssm:us-east-1:887078546492:parameter/sedaily-lens/instagram/token"
+  },
+  {
+   "Sid": "SlackNotify",
+   "Effect": "Allow",
+   "Action": "sns:Publish",
+   "Resource": "arn:aws:sns:us-east-1:887078546492:ailens-ops-alerts"
+  },
+  {
+   "Sid": "BedrockProfile",
+   "Effect": "Allow",
+   "Action": "bedrock:InvokeModel",
+   "Resource": "arn:aws:bedrock:us-east-1:887078546492:application-inference-profile/68xb0y0mjeip"
+  },
+  {
+   "Sid": "BedrockModels",
+   "Effect": "Allow",
+   "Action": "bedrock:InvokeModel",
+   "Resource": [
+    "arn:aws:bedrock:us-east-1::foundation-model/anthropic.claude-sonnet-5",
+    "arn:aws:bedrock:us-east-2::foundation-model/anthropic.claude-sonnet-5",
+    "arn:aws:bedrock:us-west-2::foundation-model/anthropic.claude-sonnet-5"
+   ],
+   "Condition": {
+    "StringLike": {
+     "bedrock:InferenceProfileArn": "arn:aws:bedrock:us-east-1:887078546492:application-inference-profile/68xb0y0mjeip"
+    }
+   }
+  }
+ ]
+}

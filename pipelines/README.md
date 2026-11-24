@@ -25,6 +25,7 @@ Bedrock 이미지 모델(배경) + PIL(텍스트 합성) 조합으로 기본값�
 | `frontpage_auto/` | Python(엔트리) | DDB write + S3 미디어 | **실가동 중** — 지면 1면 기사를 매일 07:00 KST 1회 자동으로 4포맷 발행(EventBridge). letters/podcast/webtoon/video의 `run_article()`을 그대로 호출 |
 | `mustknow_auto/` | Python(엔트리) | DDB write + S3 미디어 | **실가동 중** — 지면특별코너 4탭(전체/증권/산업/시그널) + 일반 필수뉴스를 하루 6회(08/12/15/18/21/23시 KST) 자동 채점·발행. `classify.py`가 Bedrock Sonnet 5로 배치 채점(20건씩), 임계값(일반 7.0/특별탭 8.0) 넘는 기사만 발행 |
 | `instagram_auto/` | Python(Lambda) | 인스타 게시물 + S3 JPEG | **실가동 중**(2026-11-21~) — 그날 1면 기사 웹툰을 매일 08:00 KST 인스타 `@lens.sedaily`에 10장 캐러셀(표지+8컷+마무리)로 게시, Slack `#03_lens-alarm` 알림. 발행 파이프라인과 독립(공개 API만 읽음) |
+| `instagram_single/` | Python(Lambda) | 인스타 게시물 + S3 JPEG | **실가동 중**(2026-11-24~) — 그날 1면 기사 1건씩 09·12·15·18시 KST 인스타 `@lens.sedaily`에 사진 1장 + 본문형 캡션(국문 채널 형식)으로 게시, 제목·캡션은 Bedrock Sonnet 5. 국문 채널 확장 전 시험 운영. Slack `#03_lens-alarm` 알림 |
 | `common/` | Python | — | `ddb_prompt.py`(프롬프트 로드), `bedrock_client.py`(Bedrock Claude 호출, 2026-08-22 신설), `openai_client.py`(웹툰 이미지 생성 전용으로 축소), `text_utils.py`(코드블록 벗기기) |
 
 ## discovery/ — 지면 특별 코너 후보 분류
