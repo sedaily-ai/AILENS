@@ -9,6 +9,8 @@ render_from_script.py가 --prism-article-s3-key를 받으면 이 모듈의 run()
   "누락 시 한 줄만 질문"). 사람이 없는 일괄 제작이라 코드가 파일 이름에서 정한 값으로 이 머리줄을 붙인다.
   요일도 AI가 아니라 여기서 계산한다(지침 "Claude 임의 계산 금지").
 - 렌더 뒤 채널 연결 정보가 있으면 유튜브(youtube_upload.py)·데일리모션(dailymotion_upload.py)에 올린다. 없으면 영상까지만 만든다.
+  기사에 보도사진이 있으면(article.txt 머리줄 "사진: 주소") 사진 + 영문 제목으로 만든 썸네일을 올린 영상에 단다
+  (thumbnails.set, 2026-11-23 — 유튜브가 잡는 영상 중간 프레임 대신). 썸네일이 실패하여도 영상은 완료로 둔다.
 - 묶음의 마지막 편이 끝나면 슬랙에 요약을 한 번 보낸다(prism_notify.py, Amazon Q Developer 경유).
 - 진행 상황은 media/prism-batch/{batch_id}/{item_id}.status.json에 덮어쓴다. 렌더 단계 진행률·mp4·실패는
   CMS 영상 랩과 같은 media/video-lab/{job_id}.* 를 쓴다(render_from_script.render_and_upload) — 화면은 기존
@@ -43,6 +45,8 @@ import prism_notify  # noqa: E402
 import doc_plan  # noqa: E402
 import seo_description  # noqa: E402
 import shorts_compose  # noqa: E402
+import shorts_thumbnail  # noqa: E402
+import article_photo  # noqa: E402
 import youtube_upload  # noqa: E402
 from youtube_upload import shorts_metadata  # noqa: E402
 import dailymotion_upload  # noqa: E402
@@ -198,6 +202,36 @@ def _make_scene(scene_guide: str, script_text: str) -> tuple[dict | None, str]:
     return None, problem
 
 
+def _set_photo_thumbnail(work_dir: Path, video_id: str, title: str, photo_url: str | None, creds: dict,
+                        status: dict, *, shorts: bool = False) -> None:
+    """기사 보도사진 + 영문 제목 → 유튜브 썸네일(2026-11-23).
+
+    유튜브가 영상 중간 프레임(한국어 지면 캡처·차트)을 썸네일로 잡아 조회수가 붙지 않던 문제를 푸는 게 목적이다.
+    그림은 shorts_thumbnail이 ffmpeg로 만든다(롱폼 1280x720, 쇼츠 1080x1920).
+    실패해도 영상 업로드는 이미 끝났으므로 예외를 밖으로 내보내지 않고 경고 로그와 상태만 남긴다
+    (맞춤 썸네일 권한이 없는 채널은 403을 준다 — 그때는 유튜브가 중간 프레임을 쓴다).
+    """
+    field = "youtube_shorts_thumbnail" if shorts else "youtube_thumbnail"
+    label = "쇼츠 썸네일" if shorts else "썸네일"
+    if not photo_url:
+        status[field] = "none"
+        print(f"[prism-batch] 기사 사진이 없어 {label}은 유튜브 기본(중간 프레임)")
+        return
+    out = work_dir / ("video_shorts_thumb.jpg" if shorts else "video_thumb.jpg")
+    try:
+        if shorts:
+            shorts_thumbnail.make_from_url(photo_url, title, out)
+        else:
+            shorts_thumbnail.make_wide_from_url(photo_url, title, out)
+        youtube_upload.set_thumbnail(video_id, out, creds)
+    except Exception as e:  # noqa: BLE001 — 썸네일 실패가 영상 결과를 바꾸면 안 된다
+        print(f"[prism-batch] {label} 설정 실패 — 영상은 그대로: {e}")
+        status[f"{field}_error"] = str(e)[:500]
+        return
+    status[field] = "photo"
+    print(f"[prism-batch] {label} — 기사 사진으로 설정({out.name})")
+
+
 def _safe_number_issues(script: dict, article: str) -> list[str]:
     try:
         return number_issues(script, article)
@@ -274,7 +308,11 @@ def _run(s3, work_dir: Path, *, batch_id: str, item_id: str, job_id: str, articl
     report("script")
     article_path = work_dir / "article.txt"
     s3.download_file(CMS_MEDIA_BUCKET, article_key, str(article_path))
-    article = article_path.read_text(encoding="utf-8-sig")
+    article_raw = article_path.read_text(encoding="utf-8-sig")
+    # 기사 사진(2026-11-23) — txt 머리줄의 “사진: 주소”. 썸네일 배경으로 쓴다. 대본 AI·검수에는 이 줄을 빼고 넘긴다
+    # (주소 속 숫자가 금액·날짜 검수에 섞이지 않게, 모델이 사진 주소를 본문 사실로 읽지 않게).
+    photo_url = article_photo.primary_photo_url(article_raw)
+    article = article_photo.strip_photo_lines(article_raw)
     header = f"[TYPE: {type_code}]\n[RECORDING DATE: {day.isoformat()}]\n[WEEKDAY: {_WEEKDAYS[day.weekday()]}]\n"
     user_message = f"[입력 기사]\n{header}{article}"
     if type_code in _PAPER_TYPES:
@@ -394,15 +432,19 @@ def _run(s3, work_dir: Path, *, batch_id: str, item_id: str, job_id: str, articl
     except Exception as e:  # noqa: BLE001
         print(f"[prism-batch] SEO 설명글 실패 — v2 설명글 사용: {e!r}")
     creds = youtube_upload.load_credentials()
+    youtube_video_id = None
     if creds:
         report("upload")
         try:
-            video_id = youtube_upload.upload(work_dir / "video.mp4", meta, creds)
-            status["youtube_url"] = f"https://www.youtube.com/watch?v={video_id}"
+            youtube_video_id = youtube_upload.upload(work_dir / "video.mp4", meta, creds)
+            status["youtube_url"] = f"https://www.youtube.com/watch?v={youtube_video_id}"
             print(f"[prism-batch] {item_id} — 유튜브 업로드 {status['youtube_url']}")
         except Exception as e:  # noqa: BLE001
             print(f"[prism-batch] 유튜브 업로드 실패: {e}")
             status["youtube_error"] = str(e)[:500]
+        # 기사 보도사진 썸네일(2026-11-23) — 올린 영상에만 달 수 있으므로 업로드 성공 뒤에.
+        if youtube_video_id:
+            _set_photo_thumbnail(work_dir, youtube_video_id, meta["title"], photo_url, creds, status)
 
     # 데일리모션 자동 공개(2026-11-05) — 유튜브와 같은 제목·설명·태그. 유튜브와 같이 실패해도 편은 완료로 둔다.
     dm_creds = dailymotion_upload.load_credentials()
@@ -464,6 +506,8 @@ def _run(s3, work_dir: Path, *, batch_id: str, item_id: str, job_id: str, articl
                 video_id = youtube_upload.upload(shorts_path, smeta, creds)
                 status["youtube_shorts_url"] = f"https://www.youtube.com/shorts/{video_id}"
                 print(f"[prism-batch] {item_id} — 유튜브 쇼츠 업로드 {status['youtube_shorts_url']}")
+                # 쇼츠도 기사 사진 썸네일(2026-11-23, 1080x1920). 제목은 #Shorts를 뗀 롱폼 제목을 쓴다.
+                _set_photo_thumbnail(work_dir, video_id, meta["title"], photo_url, creds, status, shorts=True)
             except Exception as e:  # noqa: BLE001
                 print(f"[prism-batch] 유튜브 쇼츠 실패: {e}")
                 status["youtube_shorts_error"] = str(e)[:500]
