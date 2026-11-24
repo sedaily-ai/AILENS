@@ -47,9 +47,12 @@ MODEL_ID = os.environ["MODEL_ID"]                                      # LENS �
 MAX_PER_DAY = int(os.environ.get("MAX_PER_DAY", "4"))
 
 FONT = HERE / "fonts" / "Pretendard-ExtraBold.otf"
+FONT_SEMI = HERE / "fonts" / "Pretendard-SemiBold.otf"
 LOGO = HERE / "lens-logo.png"
 W, H = 1080, 1350
-BLUE = (91, 141, 239)
+GREEN = (130, 250, 5)                      # 🌱 카드뉴스와 같은 형광 연두(마케팅팀 피드백 11/24)
+SAFE_W = 900                               # 프로필 격자(3:4)는 4:5 사진 양옆을 34px씩 자름 → 글자는 가운데 900px 안에
+WEEKDAY = "월화수목금토일"
 UA = {"User-Agent": "Mozilla/5.0 (sedaily-lens-instagram)"}
 
 s3 = boto3.client("s3")
@@ -185,7 +188,7 @@ def write_copy(post: dict, photo: Image.Image, caption_src: str) -> dict:
 
 # ── 3. 이미지 ───────────────────────────────────────────────────────
 
-def make_image(photo: Image.Image, t1: str, t2: str, focus_x: float) -> Image.Image:
+def make_image(photo: Image.Image, t1: str, t2: str, focus_x: float, date: str) -> Image.Image:
     s = max(W / photo.width, H / photo.height)
     if photo.width / photo.height > 2:         # 여러 명이 나란히 선 긴 사진 → 조금 더 당겨 옆 사람·경계선 제외
         s *= 1.15
@@ -201,14 +204,19 @@ def make_image(photo: Image.Image, t1: str, t2: str, focus_x: float) -> Image.Im
     d = ImageDraw.Draw(im)
     logo = Image.open(LOGO).convert("RGBA").resize((92, 92), Image.LANCZOS)
     im.paste(logo, (W - 92 - 44, 44), logo)
-    size = 128
-    while size > 70 and max(d.textlength(t, font=ImageFont.truetype(str(FONT), size)) for t in (t1, t2)) > W - 70:
-        size -= 3
+    size = 104
+    while size > 60 and max(d.textlength(t, font=ImageFont.truetype(str(FONT), size)) for t in (t1, t2)) > SAFE_W:
+        size -= 2
     f = ImageFont.truetype(str(FONT), size)
-    y2 = H - 95 - size
-    y1 = y2 - size - int(size * 0.22)
-    for txt, yy, col in ((t1, y1, "white"), (t2, y2, BLUE)):
+    y2 = H - 100 - size
+    y1 = y2 - size - int(size * 0.24)
+    for txt, yy, col in ((t1, y1, "white"), (t2, y2, GREEN)):
         d.text((W // 2, yy), txt, font=f, fill=col, anchor="mt", stroke_width=2, stroke_fill=(0, 0, 0))
+    # 날짜(매일 올라가므로 제목 위에 작게)
+    ymd = datetime.strptime(date, "%Y-%m-%d")
+    fd = ImageFont.truetype(str(FONT_SEMI), 32)
+    d.text((W // 2, y1 - 26), f"{ymd.year}.{ymd.month:02d}.{ymd.day:02d} ({WEEKDAY[ymd.weekday()]})",
+           font=fd, fill=(205, 210, 218), anchor="mb")
     return im
 
 
@@ -279,7 +287,7 @@ def lambda_handler(event, context):
         g = write_copy(post, photo, cap_src)
         fx = min(1.0, max(0.0, float(g.get("focus_x", 0.5))))
         buf = io.BytesIO()
-        make_image(photo, g["title1"].strip(), g["title2"].strip(), fx).save(buf, "JPEG", quality=92)
+        make_image(photo, g["title1"].strip(), g["title2"].strip(), fx, date).save(buf, "JPEG", quality=92)
         credit = photo_credit(cap_src)
         caption = (g["caption"].strip() + "\n\n" + (credit + "\n" if credit else "") + "원문: 서울경제신문\n\n"
                    + " ".join("#" + h.lstrip("#").replace(" ", "") for h in g.get("hashtags", [])))[:2200]
