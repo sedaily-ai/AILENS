@@ -14,6 +14,7 @@
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@400;500;700;800&family=Noto+Serif+KR:wght@300;400;600;700&display=swap">
 <link rel="stylesheet" href="style.css">
+<link rel="stylesheet" href="review-r4.css">
 </head>
 <body>
 <a class="skip" href="#main">본문으로 건너뛰기</a>
@@ -21,18 +22,30 @@
 <header class="topbar" role="banner">
   <a class="brand" href="#top">AI LENS</a>
   <span class="tag">INTERACTIVE</span>
-  <span class="count" aria-hidden="true"><b id="cur">01</b> / 07</span>
+  <span class="count" id="count" aria-hidden="true" style="visibility:hidden"><b id="cur">01</b> / 07</span>
   <button class="menu-btn" id="menu" aria-expanded="false" aria-controls="toc">목차</button>
   <div class="progress" aria-hidden="true"><i id="bar"></i></div>
 </header>
 <nav class="toc" id="toc" aria-label="장 목차" hidden>
+  <p class="toc-h">이야기 목차</p>
+  <a class="toc-all" href="#story-index">맨 앞 차례로 이동</a>
+  <p class="toc-g">조선시대 부정행위</p>
   <ol>
     <li><a href="#ch1" data-ch="1"><span>01</span>출제자가 문제를 흘린 날</a></li>
     <li><a href="#ch2" data-ch="2"><span>02</span>시험이 벼슬길이 되자 부정도 따라붙었다</a></li>
     <li><a href="#ch3" data-ch="3"><span>03</span>합격한 뒤에 다시 쓰게 하라</a></li>
+  </ol>
+  <p class="toc-g">AI 시대 이전의 부정</p>
+  <ol>
     <li><a href="#ch4" data-ch="4"><span>04</span>고시원에 모인 학생 예순 명, 다수결로 만든 &#39;정답&#39;</a></li>
+  </ol>
+  <p class="toc-g">AI 시대 이후의 부정</p>
+  <ol>
     <li><a href="#ch5" data-ch="5"><span>05</span>160문항 중 한 문제만 틀린 사람</a></li>
     <li><a href="#ch6" data-ch="6"><span>06</span>정답보다 &#39;누가 풀었나&#39;가 문제다</a></li>
+  </ol>
+  <p class="toc-g">결론</p>
+  <ol>
     <li><a href="#ch7" data-ch="7"><span>07</span>정직이 손해가 되지 않으려면</a></li>
   </ol>
 </nav>
@@ -48,9 +61,48 @@
       <h1>답은 누가 썼나</h1>
       <p class="sub">조선 과거장에서 AI 수능까지, 시험 부정의 468년</p>
       <p class="meta">AI LENS 레터 | 2026.11.19 | 수능일</p>
-      <a class="cue" href="#ch1">스크롤하여 이야기 시작</a>
+      <a class="cue" href="#story-index">이야기 목차 보기</a>
     </div>
   </header>
+
+  <nav class="story-index" id="story-index" aria-labelledby="story-index-h">
+    <div class="si-inner">
+      <p class="si-eyebrow">STORY INDEX</p>
+      <div class="si-head">
+        <h2 id="story-index-h" class="si-h">한눈에 보는 시험 부정의 역사</h2>
+        <p class="si-sub">관심 있으신 장으로 바로 이동해 보세요.</p>
+      </div>
+      <div class="si-groups">
+        <section class="si-group" aria-label="조선시대 부정행위">
+          <div class="si-g-head"><span class="si-g-no">I</span><div><p class="si-g-label">조선시대 부정행위</p><p class="si-g-note">과거제와 공정성</p></div></div>
+          <ol class="si-list">
+            <li><a href="#ch1"><span class="si-no">01</span><span class="si-t"><em>1558년</em><strong>출제자가 문제를 흘린 날</strong></span></a></li>
+            <li><a href="#ch2"><span class="si-no">02</span><span class="si-t"><em>958년부터 조선까지</em><strong>시험이 벼슬길이 되자 부정도 따라붙었다</strong></span></a></li>
+            <li><a href="#ch3"><span class="si-no">03</span><span class="si-t"><em>1749년</em><strong>합격한 뒤에 다시 쓰게 하라</strong></span></a></li>
+          </ol>
+        </section>
+        <section class="si-group" aria-label="AI 시대 이전의 부정">
+          <div class="si-g-head"><span class="si-g-no">II</span><div><p class="si-g-label">AI 시대 이전의 부정</p><p class="si-g-note">2004년 수능</p></div></div>
+          <ol class="si-list">
+            <li><a href="#ch4"><span class="si-no">04</span><span class="si-t"><em>2004년</em><strong>고시원에 모인 학생 예순 명, 다수결로 만든 '정답'</strong></span></a></li>
+          </ol>
+        </section>
+        <section class="si-group" aria-label="AI 시대 이후의 부정">
+          <div class="si-g-head"><span class="si-g-no">III</span><div><p class="si-g-label">AI 시대 이후의 부정</p><p class="si-g-note">2026년 시험과 검증</p></div></div>
+          <ol class="si-list">
+            <li><a href="#ch5"><span class="si-no">05</span><span class="si-t"><em>2026년</em><strong>160문항 중 한 문제만 틀린 사람</strong></span></a></li>
+            <li><a href="#ch6"><span class="si-no">06</span><span class="si-t"><em>2026년</em><strong>정답보다 '누가 풀었나'가 문제다</strong></span></a></li>
+          </ol>
+        </section>
+        <section class="si-group si-end" aria-label="결론">
+          <div class="si-g-head"><span class="si-g-no">IV</span><div><p class="si-g-label">결론</p></div></div>
+          <ol class="si-list">
+            <li><a href="#ch7"><span class="si-no">07</span><span class="si-t"><strong>정직이 손해가 되지 않으려면</strong></span></a></li>
+          </ol>
+        </section>
+      </div>
+    </div>
+  </nav>
 
   <section class="chapter theme-ch1" id="ch1" data-ch="1" aria-labelledby="h-ch1">
     <div class="ch-head" data-r><span class="num" aria-hidden="true">01</span><div><p class="label">서론 &#183; 1558년</p><h2 id="h-ch1">출제자가 문제를 흘린 날</h2></div></div>
@@ -65,7 +117,7 @@
       <p data-r>1558년 겨울, 조선 조정이 시끄러웠다. 과거에 을과 수석으로 붙은 신사헌이 문제를 미리 알고 시험을 쳤다는 소문 때문이다. 『명종실록』은 속사정을 이렇게 전한다. 시험관 정사룡이 책문, 곧 나라의 정책을 묻는 논술 문제의 제목을 정하면서 몰래 신사헌에게 먼저 글을 짓게 했고, 신사헌은 글 잘하는 사람의 손을 빌려 답안을 썼다. 문제가 샌 곳은 시험장 밖이 아니라 출제자의 입이었다.</p>
       <p data-r>물의가 들끓자 감찰을 맡은 대간이 잇달아 상소를 올렸다. 정사룡은 파직됐고, 신사헌의 이름은 합격자 명단에서 지워졌다. 그러나 이야기는 여기서 끝나지 않는다. 신사헌은 당시 권세를 쥔 이량의 심복이었다. 이량이 신사헌의 아들을 시켜 억울함을 호소하게 하자 임금은 사건을 다시 조사하라고 명했고, 신사헌의 급제는 이듬해 되살아났다. 사관은 이 과정을 실록에 또렷이 적어 두었다. 부정이 드러나도 힘 있는 사람 곁에서는 처분이 뒤집힐 수 있었다.</p>
     <div class="wide" data-r>
-      <p class="ui-hint">사건 기록 카드 · 눌러서 원문 문장을 다시 확인하세요</p>
+      <p class="ui-hint">사건 기록 카드 | 눌러서 기사 속 문장과 출처를 확인하세요</p>
       <div class="rec-grid">
         <details class="rec">
           <summary><span class="rec-no">1</span><span class="rec-t">문제가 샌 곳</span></summary>
@@ -177,16 +229,16 @@
     <figcaption>AI로 재구성한 상상도 &#183; 실제 사건 사진이 아닙니다. 등장인물, 전화기 모델, 인원 수는 사실로 간주하지 마세요.</figcaption>
   </figure>
   <figure class="fig mid" data-r>
-    <svg class="art" viewBox="0 0 1200 440" role="img" aria-label="시험장 안의 선수 40명이 신호를 보내면 고시원 방 4개의 중계도우미 60여 명이 답을 모아 다시 보내는 구조를 점으로 나타낸 개념도">
-<rect x="40" y="90" width="330" height="270" rx="10" fill="#10222d" stroke="#5cc0cf" stroke-width="2"/>
-<circle cx="72" cy="130" r="11" fill="#5cc0cf"/><circle cx="108" cy="130" r="11" fill="#5cc0cf"/><circle cx="144" cy="130" r="11" fill="#5cc0cf"/><circle cx="180" cy="130" r="11" fill="#5cc0cf"/><circle cx="216" cy="130" r="11" fill="#5cc0cf"/><circle cx="252" cy="130" r="11" fill="#5cc0cf"/><circle cx="288" cy="130" r="11" fill="#5cc0cf"/><circle cx="324" cy="130" r="11" fill="#5cc0cf"/><circle cx="72" cy="174" r="11" fill="#5cc0cf"/><circle cx="108" cy="174" r="11" fill="#5cc0cf"/><circle cx="144" cy="174" r="11" fill="#5cc0cf"/><circle cx="180" cy="174" r="11" fill="#5cc0cf"/><circle cx="216" cy="174" r="11" fill="#5cc0cf"/><circle cx="252" cy="174" r="11" fill="#5cc0cf"/><circle cx="288" cy="174" r="11" fill="#5cc0cf"/><circle cx="324" cy="174" r="11" fill="#5cc0cf"/><circle cx="72" cy="218" r="11" fill="#5cc0cf"/><circle cx="108" cy="218" r="11" fill="#5cc0cf"/><circle cx="144" cy="218" r="11" fill="#5cc0cf"/><circle cx="180" cy="218" r="11" fill="#5cc0cf"/><circle cx="216" cy="218" r="11" fill="#5cc0cf"/><circle cx="252" cy="218" r="11" fill="#5cc0cf"/><circle cx="288" cy="218" r="11" fill="#5cc0cf"/><circle cx="324" cy="218" r="11" fill="#5cc0cf"/><circle cx="72" cy="262" r="11" fill="#5cc0cf"/><circle cx="108" cy="262" r="11" fill="#5cc0cf"/><circle cx="144" cy="262" r="11" fill="#5cc0cf"/><circle cx="180" cy="262" r="11" fill="#5cc0cf"/><circle cx="216" cy="262" r="11" fill="#5cc0cf"/><circle cx="252" cy="262" r="11" fill="#5cc0cf"/><circle cx="288" cy="262" r="11" fill="#5cc0cf"/><circle cx="324" cy="262" r="11" fill="#5cc0cf"/><circle cx="72" cy="306" r="11" fill="#5cc0cf"/><circle cx="108" cy="306" r="11" fill="#5cc0cf"/><circle cx="144" cy="306" r="11" fill="#5cc0cf"/><circle cx="180" cy="306" r="11" fill="#5cc0cf"/><circle cx="216" cy="306" r="11" fill="#5cc0cf"/><circle cx="252" cy="306" r="11" fill="#5cc0cf"/><circle cx="288" cy="306" r="11" fill="#5cc0cf"/><circle cx="324" cy="306" r="11" fill="#5cc0cf"/>
-<text x="40" y="60" fill="#dfe7ea" font-size="34" font-weight="700">시험장 안 · 선수 40명</text>
-<path d="M392 225h110" stroke="#c4a16b" stroke-width="4" fill="none"/><path d="M490 205l24 20-24 20" stroke="#c4a16b" stroke-width="4" fill="none"/>
-<rect x="540" y="130" width="140" height="190" rx="8" fill="#1a2a35" stroke="#c4a16b" stroke-width="2"/><circle cx="570" cy="165" r="9" fill="#c4a16b"/><circle cx="610" cy="165" r="9" fill="#c4a16b"/><circle cx="650" cy="165" r="9" fill="#c4a16b"/><circle cx="570" cy="196" r="9" fill="#c4a16b"/><circle cx="610" cy="196" r="9" fill="#c4a16b"/><circle cx="650" cy="196" r="9" fill="#c4a16b"/><circle cx="570" cy="227" r="9" fill="#c4a16b"/><circle cx="610" cy="227" r="9" fill="#c4a16b"/><circle cx="650" cy="227" r="9" fill="#c4a16b"/><circle cx="570" cy="258" r="9" fill="#c4a16b"/><circle cx="610" cy="258" r="9" fill="#c4a16b"/><circle cx="650" cy="258" r="9" fill="#c4a16b"/><circle cx="570" cy="289" r="9" fill="#c4a16b"/><circle cx="610" cy="289" r="9" fill="#c4a16b"/><circle cx="650" cy="289" r="9" fill="#c4a16b"/><rect x="700" y="130" width="140" height="190" rx="8" fill="#1a2a35" stroke="#c4a16b" stroke-width="2"/><circle cx="730" cy="165" r="9" fill="#c4a16b"/><circle cx="770" cy="165" r="9" fill="#c4a16b"/><circle cx="810" cy="165" r="9" fill="#c4a16b"/><circle cx="730" cy="196" r="9" fill="#c4a16b"/><circle cx="770" cy="196" r="9" fill="#c4a16b"/><circle cx="810" cy="196" r="9" fill="#c4a16b"/><circle cx="730" cy="227" r="9" fill="#c4a16b"/><circle cx="770" cy="227" r="9" fill="#c4a16b"/><circle cx="810" cy="227" r="9" fill="#c4a16b"/><circle cx="730" cy="258" r="9" fill="#c4a16b"/><circle cx="770" cy="258" r="9" fill="#c4a16b"/><circle cx="810" cy="258" r="9" fill="#c4a16b"/><circle cx="730" cy="289" r="9" fill="#c4a16b"/><circle cx="770" cy="289" r="9" fill="#c4a16b"/><circle cx="810" cy="289" r="9" fill="#c4a16b"/><rect x="860" y="130" width="140" height="190" rx="8" fill="#1a2a35" stroke="#c4a16b" stroke-width="2"/><circle cx="890" cy="165" r="9" fill="#c4a16b"/><circle cx="930" cy="165" r="9" fill="#c4a16b"/><circle cx="970" cy="165" r="9" fill="#c4a16b"/><circle cx="890" cy="196" r="9" fill="#c4a16b"/><circle cx="930" cy="196" r="9" fill="#c4a16b"/><circle cx="970" cy="196" r="9" fill="#c4a16b"/><circle cx="890" cy="227" r="9" fill="#c4a16b"/><circle cx="930" cy="227" r="9" fill="#c4a16b"/><circle cx="970" cy="227" r="9" fill="#c4a16b"/><circle cx="890" cy="258" r="9" fill="#c4a16b"/><circle cx="930" cy="258" r="9" fill="#c4a16b"/><circle cx="970" cy="258" r="9" fill="#c4a16b"/><circle cx="890" cy="289" r="9" fill="#c4a16b"/><circle cx="930" cy="289" r="9" fill="#c4a16b"/><circle cx="970" cy="289" r="9" fill="#c4a16b"/><rect x="1020" y="130" width="140" height="190" rx="8" fill="#1a2a35" stroke="#c4a16b" stroke-width="2"/><circle cx="1050" cy="165" r="9" fill="#c4a16b"/><circle cx="1090" cy="165" r="9" fill="#c4a16b"/><circle cx="1130" cy="165" r="9" fill="#c4a16b"/><circle cx="1050" cy="196" r="9" fill="#c4a16b"/><circle cx="1090" cy="196" r="9" fill="#c4a16b"/><circle cx="1130" cy="196" r="9" fill="#c4a16b"/><circle cx="1050" cy="227" r="9" fill="#c4a16b"/><circle cx="1090" cy="227" r="9" fill="#c4a16b"/><circle cx="1130" cy="227" r="9" fill="#c4a16b"/><circle cx="1050" cy="258" r="9" fill="#c4a16b"/><circle cx="1090" cy="258" r="9" fill="#c4a16b"/><circle cx="1130" cy="258" r="9" fill="#c4a16b"/><circle cx="1050" cy="289" r="9" fill="#c4a16b"/><circle cx="1090" cy="289" r="9" fill="#c4a16b"/><circle cx="1130" cy="289" r="9" fill="#c4a16b"/>
-<text x="540" y="60" fill="#dfe7ea" font-size="34" font-weight="700">고시원 방 4개 · 중계도우미 60여 명</text>
-<text x="540" y="372" fill="#98a8b0" font-size="26">가장 많이 나온 답을 '정답'으로 삼아 되돌려 보냄</text>
-</svg>
-    <figcaption>직접 그린 개념도 · 기사에 나온 숫자(선수 40명, 방 4개, 중계도우미 60여 명)만 표시했습니다. 위 사진은 당시 분위기를 상상한 그림이고, 이 개념도가 실제 전달 구조를 보여 줍니다.</figcaption>
+<div class="r4-diagram" id="case-flow" data-step="0"><div class="r4-diagram-head"><div><p class="r4-label">2004년 수능 사건</p><h3>집단의 답은 왜 정답이 아니었나</h3></div><button type="button" id="r4-play">흐름 재생</button></div>    <svg class="art" viewBox="0 0 1200 440" role="img" aria-label="시험장 안의 선수 40명이 신호를 보내면 고시원 방 4개의 중계도우미 60여 명이 답을 모아 다시 보내는 구조를 점으로 나타낸 개념도">
+<rect x="40" y="90" width="330" height="270" rx="10" fill="#10222d" stroke="#5cc0cf" stroke-width="2" class="r4-stage-left"/>
+<circle cx="72" cy="130" r="11" fill="#5cc0cf" class="r4-stage-left"/><circle cx="108" cy="130" r="11" fill="#5cc0cf" class="r4-stage-left"/><circle cx="144" cy="130" r="11" fill="#5cc0cf" class="r4-stage-left"/><circle cx="180" cy="130" r="11" fill="#5cc0cf" class="r4-stage-left"/><circle cx="216" cy="130" r="11" fill="#5cc0cf" class="r4-stage-left"/><circle cx="252" cy="130" r="11" fill="#5cc0cf" class="r4-stage-left"/><circle cx="288" cy="130" r="11" fill="#5cc0cf" class="r4-stage-left"/><circle cx="324" cy="130" r="11" fill="#5cc0cf" class="r4-stage-left"/><circle cx="72" cy="174" r="11" fill="#5cc0cf" class="r4-stage-left"/><circle cx="108" cy="174" r="11" fill="#5cc0cf" class="r4-stage-left"/><circle cx="144" cy="174" r="11" fill="#5cc0cf" class="r4-stage-left"/><circle cx="180" cy="174" r="11" fill="#5cc0cf" class="r4-stage-left"/><circle cx="216" cy="174" r="11" fill="#5cc0cf" class="r4-stage-left"/><circle cx="252" cy="174" r="11" fill="#5cc0cf" class="r4-stage-left"/><circle cx="288" cy="174" r="11" fill="#5cc0cf" class="r4-stage-left"/><circle cx="324" cy="174" r="11" fill="#5cc0cf" class="r4-stage-left"/><circle cx="72" cy="218" r="11" fill="#5cc0cf" class="r4-stage-left"/><circle cx="108" cy="218" r="11" fill="#5cc0cf" class="r4-stage-left"/><circle cx="144" cy="218" r="11" fill="#5cc0cf" class="r4-stage-left"/><circle cx="180" cy="218" r="11" fill="#5cc0cf" class="r4-stage-left"/><circle cx="216" cy="218" r="11" fill="#5cc0cf" class="r4-stage-left"/><circle cx="252" cy="218" r="11" fill="#5cc0cf" class="r4-stage-left"/><circle cx="288" cy="218" r="11" fill="#5cc0cf" class="r4-stage-left"/><circle cx="324" cy="218" r="11" fill="#5cc0cf" class="r4-stage-left"/><circle cx="72" cy="262" r="11" fill="#5cc0cf" class="r4-stage-left"/><circle cx="108" cy="262" r="11" fill="#5cc0cf" class="r4-stage-left"/><circle cx="144" cy="262" r="11" fill="#5cc0cf" class="r4-stage-left"/><circle cx="180" cy="262" r="11" fill="#5cc0cf" class="r4-stage-left"/><circle cx="216" cy="262" r="11" fill="#5cc0cf" class="r4-stage-left"/><circle cx="252" cy="262" r="11" fill="#5cc0cf" class="r4-stage-left"/><circle cx="288" cy="262" r="11" fill="#5cc0cf" class="r4-stage-left"/><circle cx="324" cy="262" r="11" fill="#5cc0cf" class="r4-stage-left"/><circle cx="72" cy="306" r="11" fill="#5cc0cf" class="r4-stage-left"/><circle cx="108" cy="306" r="11" fill="#5cc0cf" class="r4-stage-left"/><circle cx="144" cy="306" r="11" fill="#5cc0cf" class="r4-stage-left"/><circle cx="180" cy="306" r="11" fill="#5cc0cf" class="r4-stage-left"/><circle cx="216" cy="306" r="11" fill="#5cc0cf" class="r4-stage-left"/><circle cx="252" cy="306" r="11" fill="#5cc0cf" class="r4-stage-left"/><circle cx="288" cy="306" r="11" fill="#5cc0cf" class="r4-stage-left"/><circle cx="324" cy="306" r="11" fill="#5cc0cf" class="r4-stage-left"/>
+<text x="40" y="60" fill="#dfe7ea" font-size="34" font-weight="700" class="r4-stage-left">시험장 안 · 선수 40명</text>
+<path d="M392 225h110" stroke="#c4a16b" stroke-width="4" fill="none" class="r4-stage-middle"/><path d="M490 205l24 20-24 20" stroke="#c4a16b" stroke-width="4" fill="none" class="r4-stage-middle"/>
+<rect x="540" y="130" width="140" height="190" rx="8" fill="#1a2a35" stroke="#c4a16b" stroke-width="2" class="r4-stage-middle"/><circle cx="570" cy="165" r="9" fill="#c4a16b" class="r4-stage-middle"/><circle cx="610" cy="165" r="9" fill="#c4a16b" class="r4-stage-middle"/><circle cx="650" cy="165" r="9" fill="#c4a16b" class="r4-stage-middle"/><circle cx="570" cy="196" r="9" fill="#c4a16b" class="r4-stage-middle"/><circle cx="610" cy="196" r="9" fill="#c4a16b" class="r4-stage-middle"/><circle cx="650" cy="196" r="9" fill="#c4a16b" class="r4-stage-middle"/><circle cx="570" cy="227" r="9" fill="#c4a16b" class="r4-stage-middle"/><circle cx="610" cy="227" r="9" fill="#c4a16b" class="r4-stage-middle"/><circle cx="650" cy="227" r="9" fill="#c4a16b" class="r4-stage-middle"/><circle cx="570" cy="258" r="9" fill="#c4a16b" class="r4-stage-middle"/><circle cx="610" cy="258" r="9" fill="#c4a16b" class="r4-stage-middle"/><circle cx="650" cy="258" r="9" fill="#c4a16b" class="r4-stage-middle"/><circle cx="570" cy="289" r="9" fill="#c4a16b" class="r4-stage-middle"/><circle cx="610" cy="289" r="9" fill="#c4a16b" class="r4-stage-middle"/><circle cx="650" cy="289" r="9" fill="#c4a16b" class="r4-stage-middle"/><rect x="700" y="130" width="140" height="190" rx="8" fill="#1a2a35" stroke="#c4a16b" stroke-width="2" class="r4-stage-middle"/><circle cx="730" cy="165" r="9" fill="#c4a16b" class="r4-stage-middle"/><circle cx="770" cy="165" r="9" fill="#c4a16b" class="r4-stage-middle"/><circle cx="810" cy="165" r="9" fill="#c4a16b" class="r4-stage-middle"/><circle cx="730" cy="196" r="9" fill="#c4a16b" class="r4-stage-middle"/><circle cx="770" cy="196" r="9" fill="#c4a16b" class="r4-stage-middle"/><circle cx="810" cy="196" r="9" fill="#c4a16b" class="r4-stage-middle"/><circle cx="730" cy="227" r="9" fill="#c4a16b" class="r4-stage-middle"/><circle cx="770" cy="227" r="9" fill="#c4a16b" class="r4-stage-middle"/><circle cx="810" cy="227" r="9" fill="#c4a16b" class="r4-stage-middle"/><circle cx="730" cy="258" r="9" fill="#c4a16b" class="r4-stage-middle"/><circle cx="770" cy="258" r="9" fill="#c4a16b" class="r4-stage-middle"/><circle cx="810" cy="258" r="9" fill="#c4a16b" class="r4-stage-middle"/><circle cx="730" cy="289" r="9" fill="#c4a16b" class="r4-stage-middle"/><circle cx="770" cy="289" r="9" fill="#c4a16b" class="r4-stage-middle"/><circle cx="810" cy="289" r="9" fill="#c4a16b" class="r4-stage-middle"/><rect x="860" y="130" width="140" height="190" rx="8" fill="#1a2a35" stroke="#c4a16b" stroke-width="2" class="r4-stage-middle"/><circle cx="890" cy="165" r="9" fill="#c4a16b" class="r4-stage-middle"/><circle cx="930" cy="165" r="9" fill="#c4a16b" class="r4-stage-middle"/><circle cx="970" cy="165" r="9" fill="#c4a16b" class="r4-stage-middle"/><circle cx="890" cy="196" r="9" fill="#c4a16b" class="r4-stage-middle"/><circle cx="930" cy="196" r="9" fill="#c4a16b" class="r4-stage-middle"/><circle cx="970" cy="196" r="9" fill="#c4a16b" class="r4-stage-middle"/><circle cx="890" cy="227" r="9" fill="#c4a16b" class="r4-stage-middle"/><circle cx="930" cy="227" r="9" fill="#c4a16b" class="r4-stage-middle"/><circle cx="970" cy="227" r="9" fill="#c4a16b" class="r4-stage-middle"/><circle cx="890" cy="258" r="9" fill="#c4a16b" class="r4-stage-middle"/><circle cx="930" cy="258" r="9" fill="#c4a16b" class="r4-stage-middle"/><circle cx="970" cy="258" r="9" fill="#c4a16b" class="r4-stage-middle"/><circle cx="890" cy="289" r="9" fill="#c4a16b" class="r4-stage-middle"/><circle cx="930" cy="289" r="9" fill="#c4a16b" class="r4-stage-middle"/><circle cx="970" cy="289" r="9" fill="#c4a16b" class="r4-stage-middle"/><rect x="1020" y="130" width="140" height="190" rx="8" fill="#1a2a35" stroke="#c4a16b" stroke-width="2" class="r4-stage-middle"/><circle cx="1050" cy="165" r="9" fill="#c4a16b" class="r4-stage-middle"/><circle cx="1090" cy="165" r="9" fill="#c4a16b" class="r4-stage-middle"/><circle cx="1130" cy="165" r="9" fill="#c4a16b" class="r4-stage-middle"/><circle cx="1050" cy="196" r="9" fill="#c4a16b" class="r4-stage-middle"/><circle cx="1090" cy="196" r="9" fill="#c4a16b" class="r4-stage-middle"/><circle cx="1130" cy="196" r="9" fill="#c4a16b" class="r4-stage-middle"/><circle cx="1050" cy="227" r="9" fill="#c4a16b" class="r4-stage-middle"/><circle cx="1090" cy="227" r="9" fill="#c4a16b" class="r4-stage-middle"/><circle cx="1130" cy="227" r="9" fill="#c4a16b" class="r4-stage-middle"/><circle cx="1050" cy="258" r="9" fill="#c4a16b" class="r4-stage-middle"/><circle cx="1090" cy="258" r="9" fill="#c4a16b" class="r4-stage-middle"/><circle cx="1130" cy="258" r="9" fill="#c4a16b" class="r4-stage-middle"/><circle cx="1050" cy="289" r="9" fill="#c4a16b" class="r4-stage-middle"/><circle cx="1090" cy="289" r="9" fill="#c4a16b" class="r4-stage-middle"/><circle cx="1130" cy="289" r="9" fill="#c4a16b" class="r4-stage-middle"/>
+<text x="540" y="60" fill="#dfe7ea" font-size="34" font-weight="700" class="r4-stage-middle">고시원 방 4개 · 중계도우미 60여 명</text>
+<text x="540" y="372" fill="#98a8b0" font-size="26" class="r4-stage-result">가장 많이 나온 답을 '정답'으로 삼아 되돌려 보냄</text>
+</svg><div class="r4-steps" aria-label="개념도 단계"><button type="button" data-step="1" aria-pressed="false">01 시험장</button><button type="button" data-step="2" aria-pressed="false">02 집계</button><button type="button" data-step="3" aria-pressed="false">03 결과</button></div><p id="r4-flow-text" role="status" aria-live="polite">당시 보도에 등장하는 집단과 집계의 관계를 표시했습니다. 흐름 재생 또는 각 단계를 눌러 보세요.</p><p class="r4-diagram-note">인원과 방 수는 기사 기준입니다. 각 방의 점 배치는 설명을 위한 도식이며 실제 인원 배분이나 통신 경로를 재현하지 않습니다.</p></div>
+    <figcaption>직접 그린 개념도 · 기사에 나온 숫자(선수 40명, 방 4개, 중계도우미 60여 명)만 표시했습니다. 위 사진은 당시 분위기를 상상한 그림이며, 개념도는 보도에 나온 집단과 집계 관계를 설명하기 위해 단순화한 것입니다.</figcaption>
   </figure>
     <div class="prose">
       <p data-r>2004년 11월 17일 수능날, 광주의 한 고시원에 방 네 개가 마련됐다. 방 안에는 &#39;중계도우미&#39;로 불린 고등학생과 대학생 60여 명이 모여 있었다. 같은 시각 시험장 안에는 휴대전화를 몰래 들고 들어간 수험생 40명이 있었다. 수사 과정에서 이들은 &#39;선수&#39;로 불렸다.</p>
@@ -220,7 +272,7 @@
       <div class="out" id="demo-out" role="status" aria-live="polite"></div>
     </section></div>
       <p data-r>눈여겨볼 점은 이 &#39;정답&#39;이 정답이 아니라 다수가 고른 답이었다는 것이다. 다수가 틀린 답을 골라도 그 답이 정답처럼 되돌아가는 구조였다. 일은 곧 틀어졌다. 중계도우미로 일한 한 학생은 2교시부터 일부 선수가 답을 보내오지 않아 엉망이 됐다고 말했다. 답을 받지 못한 수험생이 항의 전화를 걸어 오기도 했다. 이 학생은 두 달 전 선배가 높은 점수를 받을 수 있다고 권해 죄책감 없이 가담했고, 이렇게 무서운 일인 줄 몰랐다며 뒤늦게 후회했다. 사건은 수능의 유효성 시비와 재시험 논란으로 번졌다.</p>
-      <p data-r>교육부는 휴대전화 전파차단기와 금속탐지기를 들이고 감독관을 늘리며 부정행위자의 응시를 3년 제한하는 방안을 추진하겠다고 밝혔다. 재시험은 없고 정직하게 시험을 친 학생에게 불이익이 없게 하겠다는 말도 함께 나왔다. 12월 1일 기준으로 가담 혐의자는 전국 280여 명으로 불어났다. 응시 제한은 이듬해 국회 교육위원회에서 1년으로 하는 고등교육법 개정안으로 가결됐다.</p>
+      <p data-r>교육부는 휴대전화 전파차단기와 금속탐지기를 들이고 감독관을 늘리며 부정행위자의 응시를 3년 제한하는 방안을 추진하겠다고 밝혔다. 재시험은 없고 정직하게 시험을 친 학생에게 불이익이 없게 하겠다는 말도 함께 나왔다. 12월 1일 기준으로 가담 혐의자는 전국 280여 명으로 불어났다. 이듬해인 2005년 11월 3일, 국회 교육위원회는 수능 부정행위자의 해당 시험을 무효로 하고 1년간 응시를 제한하는 고등교육법 개정안을 가결했다.</p>
       <p class="pull" data-r>사람 예순 명이 방 네 개에 나눠 앉아야 했던 일이 있었다. 22년 뒤에는 어떻게 됐을까.</p>
     </div>
   </section>
@@ -230,7 +282,7 @@
   <figure class="fig full" data-r>
     <picture>
       <source media="(max-width:700px)" srcset="assets/img/ch5_m.jpg">
-      <img src="assets/img/ch5.jpg" width="1800" height="700" loading="lazy" alt="초소형 카메라와 AI 아이콘이 뜬 스마트폰이 시험지 옆에 놓인 장면. AI로 만든 상징 이미지.">
+      <img src="assets/img/ch5.jpg" width="1800" height="700" loading="lazy" alt="초소형 카메라와 GPT 로고가 뜬 스마트폰이 시험지 옆에 놓인 장면. AI로 만든 상징 이미지.">
     </picture>
     <figcaption>AI로 만든 상징 이미지 · 실제 사건 사진이나 증거가 아닙니다</figcaption>
   </figure>
@@ -338,11 +390,12 @@
 
 <footer class="foot">
   <div>
-    <p>AI LENS 인터랙티브 초안 · 2026.11.19 오전 기준 · 편집 승인 전 시제품입니다.</p>
+    <p>AI LENS 인터랙티브 | 2026.11.19 발행</p>
     <p>이 페이지의 삽화는 AI로 만든 재구성·상징 이미지이며 실제 사건 사진이 아닙니다.</p>
-    <p>글은 AI LENS 레터 최종 원고(2026.11.19)를 그대로 옮겼습니다. 수치와 수사·행정처분의 진행 상태는 기준 시각 이후 달라질 수 있습니다.</p>
+    <p>AI LENS 레터(2026.11.19)를 바탕으로 구성했습니다. 수치와 수사·행정처분 진행 상태는 2026.11.19 오전 기준이며 이후 달라질 수 있습니다.</p>
   </div>
 </footer>
 <script src="app.js" defer></script>
+<script src="review-r4.js" defer></script>
 </body>
 </html>

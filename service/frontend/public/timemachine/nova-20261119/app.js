@@ -33,15 +33,31 @@
 
   var chapters = $$('.chapter');
   var tocLinks = $$('#toc a');
+  var countEl = $('#count');
   function setChapter(n) {
     if (cur) cur.textContent = ('0' + n).slice(-2);
-    tocLinks.forEach(function (a) { a.classList.toggle('on', a.getAttribute('data-ch') === String(n)); });
+    if (countEl) countEl.style.visibility = 'visible';
+    tocLinks.forEach(function (a) {
+      var on = a.getAttribute('data-ch') === String(n);
+      a.classList.toggle('on', on);
+      if (on) a.setAttribute('aria-current', 'location'); else a.removeAttribute('aria-current');
+    });
+  }
+  /* 표지와 목차 구간에서는 장 번호를 숨긴다 */
+  function clearChapter() {
+    if (countEl) countEl.style.visibility = 'hidden';
+    tocLinks.forEach(function (a) { a.classList.remove('on'); a.removeAttribute('aria-current'); });
   }
   if ('IntersectionObserver' in window) {
     var chObs = new IntersectionObserver(function (es) {
       es.forEach(function (e) { if (e.isIntersecting) setChapter(e.target.getAttribute('data-ch')); });
     }, { rootMargin: '-45% 0px -50% 0px' });
     chapters.forEach(function (c) { chObs.observe(c); });
+    var preObs = new IntersectionObserver(function (es) {
+      es.forEach(function (e) { if (e.isIntersecting) clearChapter(); });
+    }, { rootMargin: '-45% 0px -50% 0px' });
+    var preEls = [$('#top'), $('#story-index')];
+    preEls.forEach(function (el) { if (el) preObs.observe(el); });
 
     /* ---------- 등장 효과 (움직임 줄이기 설정이면 건너뜀) ---------- */
     if (!reduce) {
@@ -72,6 +88,7 @@
     if (!toc || toc.hidden) return;
     toc.hidden = true;
     btn.setAttribute('aria-expanded', 'false');
+    btn.textContent = '목차';
     if (focusBtn) btn.focus();
   }
   if (btn && toc) {
@@ -79,6 +96,7 @@
       var open = toc.hidden;
       toc.hidden = !open;
       btn.setAttribute('aria-expanded', String(open));
+      btn.textContent = open ? '닫기' : '목차';
       if (open) { var a = $('a', toc); if (a) a.focus(); }
     });
     toc.addEventListener('click', function (e) { if (e.target.closest('a')) closeToc(false); });
