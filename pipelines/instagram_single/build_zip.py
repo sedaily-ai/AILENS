@@ -18,7 +18,8 @@ HERE = Path(__file__).resolve().parent
 ROOT = HERE.parents[1]
 BUILD = HERE / "build"
 PKG = BUILD / "pkg"
-FONT = ROOT / "apps" / "mobile" / "assets" / "fonts" / "Pretendard-ExtraBold.otf"
+FONT_DIR = ROOT / "apps" / "mobile" / "assets" / "fonts"
+FONTS = ["Pretendard-ExtraBold.otf", "Pretendard-SemiBold.otf"]   # 제목 / 날짜
 LOGO = ROOT / "service" / "frontend" / "public" / "icon-512.png"
 
 
@@ -33,7 +34,8 @@ def main() -> None:
         with zipfile.ZipFile(whl) as z:
             z.extractall(PKG)
     shutil.copy2(HERE / "lambda_function.py", PKG / "lambda_function.py")
-    shutil.copy2(FONT, PKG / "fonts" / FONT.name)
+    for f in FONTS:
+        shutil.copy2(FONT_DIR / f, PKG / "fonts" / f)
     shutil.copy2(LOGO, PKG / "lens-logo.png")
 
     out = BUILD / "function.zip"
