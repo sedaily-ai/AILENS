@@ -50,7 +50,7 @@ FONT = HERE / "fonts" / "Pretendard-ExtraBold.otf"
 FONT_SEMI = HERE / "fonts" / "Pretendard-SemiBold.otf"
 LOGO = HERE / "lens-logo.png"
 W, H = 1080, 1350
-GREEN = (130, 250, 5)                      # 🌱 카드뉴스와 같은 형광 연두(마케팅팀 피드백 11/24)
+BLUE = (91, 141, 239)                      # 둘째 줄 강조색 — 11/24 형광 연두에서 원래 파란색으로 되돌림(11/26)
 SAFE_W = 900                               # 프로필 격자(3:4)는 4:5 사진 양옆을 34px씩 자름 → 글자는 가운데 900px 안에
 WEEKDAY = "월화수목금토일"
 UA = {"User-Agent": "Mozilla/5.0 (sedaily-lens-instagram)"}
@@ -125,6 +125,19 @@ def photo_credit(caption: str) -> str:
     return "사진=" + re.sub(r"^사진(제공)?=", "", m.group(1).replace(" ", ""))
 
 
+HANJA = {"李": "이", "尹": "윤", "文": "문", "朴": "박", "金": "김", "韓": "한", "美": "미", "中": "중", "日": "일",
+         "北": "북", "靑": "청", "與": "여", "野": "야", "檢": "검", "黃": "황", "英": "영", "獨": "독", "露": "러",
+         "故": "고", "前": "전", "現": "현", "新": "신", "對": "대", "佛": "프", "伊": "이", "印": "인"}
+
+
+def no_hanja(t: str) -> str:
+    """제목 글꼴(Pretendard)에 한자가 없어 네모로 깨진다 → 신문에 자주 쓰는 한자는 한글로, 나머지가 남으면 실패."""
+    t = "".join(HANJA.get(c, c) for c in t)
+    if re.search(r"[一-鿿㐀-䶿豈-﫿]", t):
+        raise RuntimeError(f"제목에 한자가 남음: {t}")
+    return t
+
+
 # ── 2. 글(AI) ───────────────────────────────────────────────────────
 
 PROMPT = """아래는 서울경제 1면 기사를 AI LENS가 정리한 내용과, 게시물에 쓸 기사 사진(첨부)·사진 설명이다.
@@ -132,9 +145,11 @@ PROMPT = """아래는 서울경제 1면 기사를 AI LENS가 정리한 내용과
 
 [이미지 제목] 사진 아래 크게 들어가는 2줄. 각 줄 공백 포함 14자 이내. 피드에서 손가락이 멈추게 하는 SNS 뉴스 썸네일 말투.
 - 1줄은 상황·인물, 2줄은 핵심 숫자·반전·궁금증.
-- 예시 톤: "5000피 붕괴에도 / 靑 \\"증시 충격 일시적\\"", "미워도 삼전닉스! / 배당 잔치 열렸다 ㄷㄷ", "전기세 내다가 / 개인정보 다 털렸다?", "토스 북미까지 진출 / 이번엔 캐나다 뚫는다"
+- 예시 톤: "5000피 붕괴에도 / 청와대 \\"증시 충격 일시적\\"", "미워도 삼전닉스! / 배당 잔치 열렸다 ㄷㄷ", "전기세 내다가 / 개인정보 다 털렸다?", "토스 북미까지 진출 / 이번엔 캐나다 뚫는다"
 - 짧은 인용("..."), 물음표, ㄷㄷ 허용. 이모지 금지.
+- 한자 쓰지 말 것(글꼴에 없어 네모로 깨짐). 李→이 대통령, 靑→청와대, 美→미국, 中→중국처럼 한글로.
 - 사실을 과장·왜곡하지 말 것. 줄이다가 뜻이 바뀌면 안 된다(예: '첫 여성'을 '65년 만의 여성'으로 줄이면 예전에도 있었던 것처럼 읽힌다 → 금지).
+- 기사 속 서로 다른 대상·조치를 한 문장으로 합치지 말 것. 1줄의 주어·상황과 2줄의 결과는 기사에서 실제로 이어진 내용이어야 한다(예: 내신 부정행위는 '퇴학', 국가자격시험 부정행위는 '징역 5년'인데 "시험때 스마트워치 / 퇴학+징역 5년"으로 쓰면 한 사람이 둘 다 받는 것처럼 읽힌다 → 금지).
 
 [사진 자르기] 사진은 세로 4:5로 잘린다. 사진 설명을 근거로, 제목에서 말하는 주인공이 사진 가로 어디에 있는지 focus_x(0=왼쪽 끝, 1=오른쪽 끝)로 답하라.
 - 사진 설명에 "왼쪽부터" 같은 순서가 있으면 그 순서로 위치를 정한다. 얼굴로 사람을 알아보려 하지 말 것.
@@ -210,7 +225,7 @@ def make_image(photo: Image.Image, t1: str, t2: str, focus_x: float, date: str) 
     f = ImageFont.truetype(str(FONT), size)
     y2 = H - 100 - size
     y1 = y2 - size - int(size * 0.24)
-    for txt, yy, col in ((t1, y1, "white"), (t2, y2, GREEN)):
+    for txt, yy, col in ((t1, y1, "white"), (t2, y2, BLUE)):
         d.text((W // 2, yy), txt, font=f, fill=col, anchor="mt", stroke_width=2, stroke_fill=(0, 0, 0))
     # 날짜(매일 올라가므로 제목 위에 작게)
     ymd = datetime.strptime(date, "%Y-%m-%d")
@@ -285,7 +300,8 @@ def lambda_handler(event, context):
         photo = Image.open(io.BytesIO(http_bytes(url))).convert("RGB")
         cap_src = photo_caption(post.get("source_url", ""), url) if post.get("photo_image_url") else ""
         g = write_copy(post, photo, cap_src)
-        fx = min(1.0, max(0.0, float(g.get("focus_x", 0.5))))
+        g["title1"], g["title2"] = no_hanja(g["title1"].strip()), no_hanja(g["title2"].strip())
+        fx =min(1.0, max(0.0, float(g.get("focus_x", 0.5))))
         buf = io.BytesIO()
         make_image(photo, g["title1"].strip(), g["title2"].strip(), fx, date).save(buf, "JPEG", quality=92)
         credit = photo_credit(cap_src)
