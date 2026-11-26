@@ -46,6 +46,11 @@ import shorts_compose  # noqa: E402
 import youtube_upload  # noqa: E402
 from youtube_upload import shorts_metadata  # noqa: E402
 import dailymotion_upload  # noqa: E402
+try:  # 썸네일 모듈이 깨져도 영상 제작은 계속한다(2026-11-25)
+    import prism_thumbnail  # noqa: E402
+except Exception as _thumb_err:  # noqa: BLE001
+    print(f"[prism-batch] 썸네일 모듈 불러오기 실패 — 썸네일 없이 진행: {_thumb_err!r}")
+    prism_thumbnail = None
 
 # 지침(대본 작성 프롬프트)의 "12개 카테고리 개요" 표와 같은 코드·이름. 화면(PrismBatchPage)과 서버 라우트도 같은 표를 쓴다.
 GROUPS = {
@@ -404,6 +409,21 @@ def _run(s3, work_dir: Path, *, batch_id: str, item_id: str, job_id: str, articl
             print(f"[prism-batch] 유튜브 업로드 실패: {e}")
             status["youtube_error"] = str(e)[:500]
 
+    # 썸네일 자동(2026-11-25, prism_thumbnail.py) — 기사 사진 + 큰 문구. 가로 영상이 올라간 뒤 만들어 가로에 지정하고,
+    # 세로판은 쇼츠를 올린 뒤 지정한다. 만들기·지정이 실패해도 유튜브 기본 썸네일로 남고 편은 완료된다.
+    thumbs = None
+    if creds and status.get("youtube_url") and prism_thumbnail is not None:
+        thumbs = prism_thumbnail.make(s3, work_dir, article=article, script_text=script_text,
+                                      title=meta["title"], day=day, job_id=job_id)
+        if thumbs:
+            status["thumbnail_text"] = f"{thumbs['hook'].get('kicker', '')} / {thumbs['hook'].get('headline', '')}"
+            try:
+                youtube_upload.set_thumbnail(status["youtube_url"].rsplit("=", 1)[-1], thumbs["h"], creds)
+                status["thumbnail"] = "set"
+            except Exception as e:  # noqa: BLE001
+                print(f"[prism-batch] 썸네일 지정 실패(무시): {e}")
+                status["thumbnail_error"] = str(e)[:300]
+
     # 데일리모션 자동 공개(2026-11-05) — 유튜브와 같은 제목·설명·태그. 유튜브와 같이 실패해도 편은 완료로 둔다.
     dm_creds = dailymotion_upload.load_credentials()
     if dm_creds:
@@ -464,6 +484,13 @@ def _run(s3, work_dir: Path, *, batch_id: str, item_id: str, job_id: str, articl
                 video_id = youtube_upload.upload(shorts_path, smeta, creds)
                 status["youtube_shorts_url"] = f"https://www.youtube.com/shorts/{video_id}"
                 print(f"[prism-batch] {item_id} — 유튜브 쇼츠 업로드 {status['youtube_shorts_url']}")
+                if thumbs:
+                    try:
+                        youtube_upload.set_thumbnail(video_id, thumbs["v"], creds)
+                        status["shorts_thumbnail"] = "set"
+                    except Exception as e:  # noqa: BLE001
+                        print(f"[prism-batch] 쇼츠 썸네일 지정 실패(무시): {e}")
+                        status["shorts_thumbnail_error"] = str(e)[:300]
             except Exception as e:  # noqa: BLE001
                 print(f"[prism-batch] 유튜브 쇼츠 실패: {e}")
                 status["youtube_shorts_error"] = str(e)[:500]
