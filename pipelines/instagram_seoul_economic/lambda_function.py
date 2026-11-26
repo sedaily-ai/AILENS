@@ -65,7 +65,7 @@ LOGO = HERE / "sedaily-logo-white.png"     # sedaily.com의 로고(SVG, 흰색�
 W, H = 1080, 1350
 BLUE = (91, 141, 239)
 SAFE_W = 900                               # 프로필 격자(3:4)는 4:5 사진 양옆을 34px씩 자름 → 글자는 가운데 900px 안에
-LOGO_H = 50                                 # 11/26 40→50(조금 더 크게)
+LOGO_H = 65                                 # 11/26 40→65(크게)
 WEEKDAY = "월화수목금토일"
 UA = {"User-Agent": "Mozilla/5.0 (sedaily-instagram)"}
 
@@ -377,7 +377,7 @@ def make_image(photo: Image.Image, t1: str, t2: str, focus_x: float, date: str) 
     while size > 60 and max(d.textlength(t, font=ImageFont.truetype(str(FONT), size)) for t in (t1, t2)) > SAFE_W:
         size -= 2
     f = ImageFont.truetype(str(FONT), size)
-    y2 = H - 116 - size                        # 로고가 커져(11/26) 제목을 조금 올림
+    y2 = H - 131 - size                        # 로고가 커져(11/26) 제목을 조금 올림
     y1 = y2 - size - int(size * 0.24)
     for txt, yy, col in ((t1, y1, "white"), (t2, y2, BLUE)):
         d.text((W // 2, yy), txt, font=f, fill=col, anchor="mt", stroke_width=2, stroke_fill=(0, 0, 0))
