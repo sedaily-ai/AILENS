@@ -1,0 +1,75 @@
+{
+ "Version": "2012-10-17",
+ "Statement": [
+  {
+   "Sid": "ReadDailyXml",
+   "Effect": "Allow",
+   "Action": "s3:GetObject",
+   "Resource": "arn:aws:s3:::sedaily-news-xml-storage/daily-xml/*"
+  },
+  {
+   "Sid": "XmlListForNoSuchKey",
+   "Effect": "Allow",
+   "Action": "s3:ListBucket",
+   "Resource": "arn:aws:s3:::sedaily-news-xml-storage",
+   "Condition": {
+    "StringLike": {
+     "s3:prefix": "daily-xml/*"
+    }
+   }
+  },
+  {
+   "Sid": "UploadImage",
+   "Effect": "Allow",
+   "Action": "s3:PutObject",
+   "Resource": "arn:aws:s3:::sedaily-mbti-cms-media-dev/media/instagram/seoul_economic/*"
+  },
+  {
+   "Sid": "PostedState",
+   "Effect": "Allow",
+   "Action": [
+    "s3:GetObject",
+    "s3:PutObject"
+   ],
+   "Resource": "arn:aws:s3:::sedaily-mbti-cms-media-dev/instagram/seoul_economic_posted.json"
+  },
+  {
+   "Sid": "StateListForNoSuchKey",
+   "Effect": "Allow",
+   "Action": "s3:ListBucket",
+   "Resource": "arn:aws:s3:::sedaily-mbti-cms-media-dev",
+   "Condition": {
+    "StringLike": {
+     "s3:prefix": "instagram/*"
+    }
+   }
+  },
+  {
+   "Sid": "Token",
+   "Effect": "Allow",
+   "Action": "ssm:GetParameter",
+   "Resource": "arn:aws:ssm:us-east-1:887078546492:parameter/sedaily-lens/instagram/token-seoul-economic"
+  },
+  {
+   "Sid": "BedrockProfile",
+   "Effect": "Allow",
+   "Action": "bedrock:InvokeModel",
+   "Resource": "arn:aws:bedrock:us-east-1:887078546492:application-inference-profile/02pyphvnvieh"
+  },
+  {
+   "Sid": "BedrockModels",
+   "Effect": "Allow",
+   "Action": "bedrock:InvokeModel",
+   "Resource": [
+    "arn:aws:bedrock:us-east-1::foundation-model/anthropic.claude-sonnet-5",
+    "arn:aws:bedrock:us-east-2::foundation-model/anthropic.claude-sonnet-5",
+    "arn:aws:bedrock:us-west-2::foundation-model/anthropic.claude-sonnet-5"
+   ],
+   "Condition": {
+    "StringLike": {
+     "bedrock:InferenceProfileArn": "arn:aws:bedrock:us-east-1:887078546492:application-inference-profile/02pyphvnvieh"
+    }
+   }
+  }
+ ]
+}
