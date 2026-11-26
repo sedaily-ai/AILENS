@@ -205,3 +205,20 @@ def upload(mp4_path: Path, meta: dict, creds: dict) -> str:
             return json.loads(res.read())["id"]
     except urllib.error.HTTPError as e:
         raise RuntimeError(f"YouTube {e.code}: {e.read().decode('utf-8', 'replace')[:500]}") from e
+
+
+_THUMBNAIL_URL = "https://www.googleapis.com/upload/youtube/v3/thumbnails/set?videoId={}&uploadType=media"
+
+
+def set_thumbnail(video_id: str, jpg_path: Path, creds: dict) -> None:
+    """영상 썸네일 지정(thumbnails.set, 2MB 이하 JPEG). youtube.upload 권한으로 된다(2026-11-25 실측, 쇼츠 포함).
+    실패하면 예외(HTTP 응답 본문 포함)."""
+    token = _access_token(creds)
+    req = urllib.request.Request(
+        _THUMBNAIL_URL.format(video_id), data=jpg_path.read_bytes(), method="POST",
+        headers={"Authorization": f"Bearer {token}", "Content-Type": "image/jpeg"})
+    try:
+        with urllib.request.urlopen(req, timeout=60) as res:
+            res.read()
+    except urllib.error.HTTPError as e:
+        raise RuntimeError(f"thumbnails.set {e.code}: {e.read().decode('utf-8', 'replace')[:300]}") from e
