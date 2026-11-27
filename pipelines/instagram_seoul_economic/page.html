@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>서울경제 인스타 업로드</title>
+<title>인스타 바로 게시</title>
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/static/pretendard.min.css">
 <style>
   :root { --bg:#f5f6f8; --card:#fff; --ink:#17191c; --sub:#6b7280; --line:#e5e7eb; --blue:#3b6fe0; --blue-d:#2b55b5;
@@ -58,6 +58,13 @@
   .row .t { overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
   .row a { color:var(--blue-d); font-weight:700; text-decoration:none; white-space:nowrap; }
   .empty { padding:16px; color:var(--sub); }
+  .tabs { display:flex; gap:4px; border-bottom:1px solid var(--line); margin:0 0 20px; }
+  .tabs .tab { font-weight:700; font-size:15px; padding:10px 14px; color:var(--sub); border-bottom:2px solid transparent; margin-bottom:-1px; }
+  .tabs .tab.on { color:var(--ink); border-bottom-color:var(--ink); }
+  .ch-row { display:flex; align-items:center; gap:10px; margin-bottom:12px; }
+  .ch-row label { font-weight:700; font-size:14px; color:var(--sub); white-space:nowrap; }
+  select { font:inherit; font-size:15px; padding:10px 12px; border:1px solid var(--line); border-radius:10px; background:#fff; min-width:0; flex:0 1 340px; }
+  select option:disabled { color:#a0a4ab; }
   @media (max-width:640px) {
     .wrap { padding:20px 14px 48px; }
     .input-row { flex-direction:column; }
@@ -70,10 +77,19 @@
 </head>
 <body>
 <div class="wrap">
-  <header><div class="logo">S</div><h1>서울경제 인스타 업로드</h1></header>
-  <p class="desc">서울경제 기사 링크를 붙여 넣으면 카드 이미지와 캡션을 만들어 <b>@seoul_economic</b>에 바로 올립니다.</p>
+  <header><div class="logo">S</div><h1>서울경제 인스타</h1></header>
+  <nav class="tabs"><span class="tab on">인스타 바로 게시</span></nav>
+  <p class="desc">기사 링크를 붙여 넣으면 카드 이미지와 캡션을 만들어 <b id="ch-name">@seoul_economic</b>에 바로 올립니다.</p>
 
   <div class="panel">
+    <div class="ch-row">
+      <label for="ch">채널</label>
+      <select id="ch">
+        <option value="seoul_economic" selected>서울경제 (@seoul_economic)</option>
+        <option value="co.ju.boo" disabled>코주부 (@co.ju.boo) — 연결 전</option>
+        <option value="awsomemoney_official" disabled>어썸머니 (@awsomemoney_official) — 연결 전</option>
+      </select>
+    </div>
     <form id="f" class="input-row">
       <input id="url" type="url" required placeholder="https://www.sedaily.com/article/…" autocomplete="off">
       <button class="go" id="go" type="submit">인스타에 올리기</button>
@@ -151,13 +167,15 @@ $("f").addEventListener("submit", async (e) => {
   $("go").disabled = true; $("result").classList.remove("show");
   showStatus("loading", '<div class="spinner"></div><span>카드와 캡션을 만들고 인스타에 올리는 중이에요… (15~30초)</span>');
   try {
-    const res = await fetch("post", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ url }) });
+    const res = await fetch("post", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ url, channel: $("ch").value }) });
     const data = await res.json();
     if (!res.ok) { showStatus("error", esc(data.error || "문제가 생겼어요.")); return; }
     hideStatus(); renderResult(data); loadHistory();
   } catch { showStatus("error", "서버에 연결하지 못했어요. 잠시 뒤 다시 시도해 주세요."); }
   finally { $("go").disabled = false; }
 });
+
+$("ch").addEventListener("change", () => { $("ch-name").textContent = "@" + $("ch").value; });
 
 if (window.__DEMO__) {                       // 예시 화면(로컬 캡처용)
   $("url").value = window.__DEMO__.url || "";

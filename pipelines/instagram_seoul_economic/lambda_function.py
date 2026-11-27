@@ -843,7 +843,10 @@ def http_router(event: dict) -> dict:
         if event.get("isBase64Encoded"):
             raw = base64.b64decode(raw).decode("utf-8")
         try:
-            return _http(200, post_url(json.loads(raw).get("url", ""), force=bool(json.loads(raw).get("force"))))
+            body = json.loads(raw)
+            if body.get("channel", "seoul_economic") != "seoul_economic":   # 화면 드롭다운: 다른 채널은 연결 전
+                raise UserError("아직 연결되지 않은 채널이에요. 지금은 서울경제만 올릴 수 있어요.")
+            return _http(200, post_url(body.get("url", ""), force=bool(body.get("force"))))
         except UserError as e:
             return _http(400, {"error": str(e)})
         except Exception as e:  # noqa: BLE001
