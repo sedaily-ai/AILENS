@@ -1,0 +1,240 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>인스타 바로 게시</title>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/static/pretendard.min.css">
+<style>
+  :root { --bg:#f5f6f8; --card:#fff; --ink:#17191c; --sub:#6b7280; --line:#e5e7eb; --blue:#3b6fe0; --blue-d:#2b55b5;
+          --red:#d64545; --ok:#178a4c; --chip:#eef2fb; }
+  * { box-sizing:border-box; }
+  body { margin:0; background:var(--bg); color:var(--ink); font-family:Pretendard, "Apple SD Gothic Neo", "Malgun Gothic", sans-serif; }
+  .wrap { max-width:960px; margin:0 auto; padding:32px 16px 64px; }
+  header { display:flex; align-items:center; gap:12px; margin-bottom:6px; }
+  header .logo { width:36px; height:36px; border-radius:10px; background:linear-gradient(135deg,#4f7fe6,#2b55b5);
+                 color:#fff; font-weight:800; display:grid; place-items:center; font-size:20px; }
+  h1 { font-size:24px; margin:0; letter-spacing:-0.3px; }
+  .desc { color:var(--sub); margin:0 0 24px; font-size:15px; }
+  .panel { background:var(--card); border:1px solid var(--line); border-radius:16px; padding:20px; }
+  .input-row { display:flex; gap:10px; }
+  input[type=url] { flex:1; min-width:0; font:inherit; font-size:16px; padding:14px 16px; border:1px solid var(--line);
+                    border-radius:12px; outline:none; background:#fafbfc; }
+  input[type=url]:focus { border-color:var(--blue); background:#fff; box-shadow:0 0 0 3px #3b6fe022; }
+  button.go { font:inherit; font-weight:700; font-size:16px; color:#fff; background:var(--blue); border:0; border-radius:12px;
+              padding:0 22px; cursor:pointer; white-space:nowrap; }
+  button.go:hover { background:var(--blue-d); }
+  button.go:disabled { background:#9db3e6; cursor:wait; }
+  .hint { color:var(--sub); font-size:13px; margin-top:10px; }
+  .status { margin-top:16px; padding:14px 16px; border-radius:12px; font-size:15px; display:none; }
+  .status.loading { display:flex; align-items:center; gap:10px; background:#f0f4fd; color:var(--blue-d); }
+  .status.error { display:block; background:#fdeeee; color:var(--red); }
+  .spinner { width:18px; height:18px; border:3px solid #c8d6f6; border-top-color:var(--blue); border-radius:50%;
+             animation:spin 0.8s linear infinite; }
+  @keyframes spin { to { transform:rotate(360deg); } }
+  .result { display:none; margin-top:20px; grid-template-columns:minmax(0,340px) minmax(0,1fr); gap:20px; }
+  .result.show { display:grid; }
+  .result img { width:100%; aspect-ratio:4/5; object-fit:cover; border-radius:12px; border:1px solid var(--line); background:#ddd; }
+  .badge { display:inline-block; font-size:12px; font-weight:700; padding:3px 8px; border-radius:999px; background:var(--chip); color:var(--blue-d); }
+  .badge.ent { background:#fdeef6; color:#b0306e; }
+  .badge.manual { background:#e9f6ee; color:var(--ok); }
+  .done { color:var(--ok); font-weight:700; margin:0 0 8px; }
+  .rtitle { font-size:18px; font-weight:700; margin:8px 0 4px; }
+  .rsub { color:var(--sub); font-size:14px; margin-bottom:12px; }
+  .caption { white-space:pre-wrap; font-size:14px; line-height:1.65; background:#fafbfc; border:1px solid var(--line);
+             border-radius:12px; padding:14px; max-height:340px; overflow:auto; }
+  .tags { margin:10px 0 14px; display:flex; flex-wrap:wrap; gap:6px; }
+  .tags span { font-size:13px; color:var(--blue-d); background:var(--chip); padding:4px 8px; border-radius:8px; }
+  .actions { display:flex; gap:8px; flex-wrap:wrap; }
+  .actions a { text-decoration:none; font-weight:700; font-size:14px; padding:10px 14px; border-radius:10px; }
+  .actions a.primary { background:var(--ink); color:#fff; }
+  .actions a.ghost { border:1px solid var(--line); color:var(--ink); background:#fff; }
+  h2 { font-size:17px; margin:32px 0 12px; }
+  .history { background:var(--card); border:1px solid var(--line); border-radius:16px; overflow:hidden; }
+  .row { display:grid; grid-template-columns:120px 56px minmax(0,1fr) auto; gap:10px; align-items:center;
+         padding:12px 16px; border-top:1px solid var(--line); font-size:14px; }
+  .row:first-child { border-top:0; }
+  .row .when { color:var(--sub); font-variant-numeric:tabular-nums; }
+  .row .t { overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+  .row a { color:var(--blue-d); font-weight:700; text-decoration:none; white-space:nowrap; }
+  .empty { padding:16px; color:var(--sub); }
+  .tabs { display:flex; gap:4px; border-bottom:1px solid var(--line); margin:0 0 20px; }
+  .tabs .tab { font-weight:700; font-size:15px; padding:10px 14px; color:var(--sub); border-bottom:2px solid transparent; margin-bottom:-1px; }
+  .tabs .tab.on { color:var(--ink); border-bottom-color:var(--ink); }
+  .ch-row { display:flex; align-items:center; gap:10px; margin-bottom:12px; }
+  .ch-row label { font-weight:700; font-size:14px; color:var(--sub); white-space:nowrap; }
+  select { font:inherit; font-size:15px; padding:10px 12px; border:1px solid var(--line); border-radius:10px; background:#fff; min-width:0; flex:0 1 340px; }
+  select option:disabled { color:#a0a4ab; }
+  .gate { max-width:420px; margin:80px auto; background:var(--card); border:1px solid var(--line); border-radius:16px; padding:28px; text-align:center; }
+  .gate h2 { margin:0 0 6px; font-size:20px; }
+  .gate p { color:var(--sub); margin:0 0 18px; font-size:14px; }
+  .gate form { display:flex; gap:8px; }
+  .gate .pw-box { flex:1; min-width:0; position:relative; display:flex; }
+  .gate input { flex:1; min-width:0; font:inherit; font-size:16px; padding:12px 44px 12px 14px; border:1px solid var(--line); border-radius:10px; }
+  .gate .eye { position:absolute; right:4px; top:50%; transform:translateY(-50%); width:36px; height:36px; border:0; background:none; cursor:pointer; color:var(--sub); display:flex; align-items:center; justify-content:center; padding:0; }
+  .gate .eye:hover { color:var(--ink); }
+  .gate input::-ms-reveal, .gate input::-ms-clear { display:none; }
+  .gate .eye svg { width:20px; height:20px; }
+  .gate .err { color:var(--red); font-size:14px; margin-top:10px; min-height:20px; }
+  .hidden { display:none !important; }
+  @media (max-width:640px) {
+    .wrap { padding:20px 14px 48px; }
+    .input-row { flex-direction:column; }
+    button.go { padding:14px; }
+    .result.show { grid-template-columns:1fr; }
+    .row { grid-template-columns:auto minmax(0,1fr) auto; }
+    .row .when { grid-column:1 / -1; font-size:12px; }
+  }
+</style>
+</head>
+<body>
+<div class="gate hidden" id="gate">
+  <h2>🔒 비밀번호</h2>
+  <p>공용 비밀번호를 넣어 주세요. 이 브라우저에선 한 번만 넣으면 돼요.</p>
+  <form id="gate-f"><div class="pw-box"><input id="gate-pw" type="password" autocomplete="current-password" placeholder="비밀번호"><button class="eye" id="gate-eye" type="button" aria-label="비밀번호 보기" title="비밀번호 보기"></button></div><button class="go" type="submit">확인</button></form>
+  <div class="err" id="gate-err"></div>
+</div>
+<div class="wrap" id="app">
+  <header><div class="logo">S</div><h1>서울경제 인스타</h1></header>
+  <nav class="tabs"><span class="tab on">인스타 바로 게시</span></nav>
+  <p class="desc">기사 링크를 붙여 넣으면 카드 이미지와 캡션을 만들어 <b id="ch-name">@seoul_economic</b>에 바로 올립니다.</p>
+
+  <div class="panel">
+    <div class="ch-row">
+      <label for="ch">채널</label>
+      <select id="ch">
+        <option value="seoul_economic" selected>서울경제 (@seoul_economic)</option>
+        <option value="co.ju.boo">코주부 (@co.ju.boo)</option>
+        <option value="awsomemoney_official" disabled>어썸머니 (@awsomemoney_official) — 연결 전</option>
+      </select>
+    </div>
+    <form id="f" class="input-row">
+      <input id="url" type="url" required placeholder="https://www.sedaily.com/article/…" autocomplete="off">
+      <button class="go" id="go" type="submit">인스타에 올리기</button>
+    </form>
+    <div class="hint">만드는 데 15~30초쯤 걸려요. 버튼을 누르면 확인 없이 바로 올라갑니다.</div>
+    <div id="status" class="status"></div>
+
+    <div id="result" class="result">
+      <img id="r-img" alt="만들어진 카드">
+      <div>
+        <p class="done" id="r-done">✅ 인스타에 올렸어요</p>
+        <span class="badge" id="r-kind"></span>
+        <div class="rtitle" id="r-card"></div>
+        <div class="rsub" id="r-title"></div>
+        <div class="caption" id="r-caption"></div>
+        <div class="tags" id="r-tags"></div>
+        <div class="actions">
+          <a class="primary" id="r-link" target="_blank" rel="noopener">인스타에서 보기 ↗</a>
+          <a class="ghost" id="r-src" target="_blank" rel="noopener">기사 원문 ↗</a>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <h2>최근 올린 게시물</h2>
+  <div class="history" id="history"><div class="empty">불러오는 중…</div></div>
+</div>
+
+<script>
+const $ = (id) => document.getElementById(id);
+const BADGE = { "1면": "", "연예": "ent", "직접": "manual", "자동": "" };
+
+// ── 공용 비밀번호: 브라우저에 기억(localStorage), 401이면 다시 묻기 ──
+function getKey() { try { return localStorage.getItem("upload_key") || ""; } catch { return ""; } }
+function setKey(v) { try { v ? localStorage.setItem("upload_key", v) : localStorage.removeItem("upload_key"); } catch {} }
+function showGate(msg) { $("app").classList.add("hidden"); $("gate").classList.remove("hidden"); $("gate-err").textContent = msg || ""; $("gate-pw").focus(); }
+function showApp() { $("gate").classList.add("hidden"); $("app").classList.remove("hidden"); }
+async function api(path, opts = {}) {
+  const res = await fetch(path, { ...opts, headers: { ...(opts.headers || {}), "X-Upload-Key": getKey() } });
+  if (res.status === 401) { setKey(""); showGate("비밀번호가 맞지 않아요."); throw new Error("401"); }
+  return res;
+}
+
+function esc(s) { return String(s ?? "").replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c])); }
+
+function showStatus(kind, html) { const s = $("status"); s.className = "status " + kind; s.innerHTML = html; }
+function hideStatus() { $("status").className = "status"; }
+
+function renderResult(r) {
+  const lines = (r.caption || "").split("\n");
+  const tagLine = lines.length && lines[lines.length - 1].trim().startsWith("#") ? lines.pop() : "";
+  $("r-img").src = r.image_url || r.image_data || "";
+  $("r-done").textContent = r.permalink ? "✅ 인스타에 올렸어요" : "🧪 예시 — 실제로 올리지 않았어요";
+  $("r-kind").textContent = r.kind === "ent" ? "연예" : r.kind === "cojuboo" ? "코주부 · 증권·부동산·코인" : "뉴스";
+  $("r-kind").className = "badge" + (r.kind === "ent" ? " ent" : "");
+  $("r-card").textContent = (r.card_title || []).join(" / ");
+  $("r-title").textContent = "기사: " + (r.title || "");
+  $("r-caption").textContent = lines.join("\n").trim();
+  $("r-tags").innerHTML = tagLine.split(/\s+/).filter(Boolean).map((t) => `<span>${esc(t)}</span>`).join("");
+  $("r-link").href = r.permalink || "#";
+  $("r-link").textContent = r.permalink ? "인스타에서 보기 ↗" : "인스타에서 보기 (예시 — 실제 게시 안 함)";
+  $("r-src").href = r.source_url || "#";
+  $("result").classList.add("show");
+}
+
+function renderHistory(items) {
+  if (!items || !items.length) { $("history").innerHTML = '<div class="empty">아직 올린 게시물이 없어요.</div>'; return; }
+  $("history").innerHTML = items.map((r) => `
+    <div class="row">
+      <span class="when">${esc(r.date.slice(5).replace("-", "/"))} ${esc(r.at)}</span>
+      <span class="badge ${BADGE[r.kind] || ""}">${esc(r.kind)}</span>
+      <span class="t" title="${esc(r.title)}">${esc(r.title)}</span>
+      ${r.link ? `<a href="${esc(r.link)}" target="_blank" rel="noopener">보기 ↗</a>` : "<span></span>"}
+    </div>`).join("");
+}
+
+async function loadHistory() {
+  try { const res = await api("history?channel=" + encodeURIComponent($("ch").value)); renderHistory((await res.json()).items); }
+  catch (e) { if (e.message !== "401") $("history").innerHTML = '<div class="empty">기록을 불러오지 못했어요.</div>'; }
+}
+
+$("f").addEventListener("submit", async (e) => {
+  e.preventDefault();
+  const url = $("url").value.trim();
+  if (!url) return;
+  $("go").disabled = true; $("result").classList.remove("show");
+  showStatus("loading", '<div class="spinner"></div><span>카드와 캡션을 만들고 인스타에 올리는 중이에요… (15~30초)</span>');
+  try {
+    const res = await api("post", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ url, channel: $("ch").value }) });
+    const data = await res.json();
+    if (!res.ok) { showStatus("error", esc(data.error || "문제가 생겼어요.")); return; }
+    hideStatus(); renderResult(data); loadHistory();
+  } catch (e) { if (e.message !== "401") showStatus("error", "서버에 연결하지 못했어요. 잠시 뒤 다시 시도해 주세요."); else hideStatus(); }
+  finally { $("go").disabled = false; }
+});
+
+$("ch").addEventListener("change", () => {
+  $("ch-name").textContent = "@" + $("ch").value;
+  $("result").classList.remove("show"); hideStatus();
+  if (!window.__DEMO__) loadHistory();          // 고른 채널 기록으로 다시 불러오기
+});
+
+if (window.__DEMO__) {                       // 예시 화면(로컬 캡처용)
+  $("url").value = window.__DEMO__.url || "";
+  if (window.__DEMO__.result) renderResult(window.__DEMO__.result);
+  renderHistory(window.__DEMO__.history || []);
+} else {
+  const EYE_OPEN = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7S2 12 2 12z"/><circle cx="12" cy="12" r="3"/></svg>';
+  const EYE_OFF = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17.9 17.9A10.4 10.4 0 0 1 12 19c-6.5 0-10-7-10-7a18 18 0 0 1 4.1-5.1M9.9 5.2A9.6 9.6 0 0 1 12 5c6.5 0 10 7 10 7a18 18 0 0 1-2.2 3.2M14.1 14.1a3 3 0 1 1-4.2-4.2"/><path d="M2 2l20 20"/></svg>';
+  const eye = $("gate-eye");
+  eye.innerHTML = EYE_OPEN;
+  eye.addEventListener("click", () => {
+    const pw = $("gate-pw");
+    const show = pw.type === "password";
+    pw.type = show ? "text" : "password";
+    eye.innerHTML = show ? EYE_OFF : EYE_OPEN;
+    eye.setAttribute("aria-label", show ? "비밀번호 숨기기" : "비밀번호 보기");
+    eye.title = eye.getAttribute("aria-label");
+    pw.focus();
+  });
+  $("gate-f").addEventListener("submit", async (e) => {
+    e.preventDefault();
+    setKey($("gate-pw").value.trim());
+    try { await api("auth"); $("gate-pw").value = ""; showApp(); loadHistory(); } catch {}
+  });
+  if (getKey()) { showApp(); loadHistory(); } else { showGate(); }
+}
+</script>
+</body>
+</html>

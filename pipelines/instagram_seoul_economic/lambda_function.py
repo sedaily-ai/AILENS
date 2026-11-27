@@ -25,12 +25,16 @@ EventBridge가 매일 부른다. 한 번 부를 때 1건.
 """
 from __future__ import annotations
 
+import base64
+import hmac
 import html
 import io
 import json
+import math
 import os
 import re
 import time
+import unicodedata
 import urllib.error
 import urllib.parse
 import urllib.request
@@ -171,6 +175,10 @@ def _article(it: ET.Element) -> dict | None:
     }
 
 
+# 사진 설명으로 알아보는 그래픽·표·로고 이미지 — 제목을 얹으면 글자가 겹쳐 지저분해 건너뜀(11/27)
+GRAPHIC_RE = re.compile(r"그래픽|자료\s*=|인포그래픽|도표|\bCI\b|로고|캡처|캡쳐")
+
+
 def _photo_ok(a: dict) -> bool:
     if not a["photo_url"]:
         print(f"사진 없음 — 건너뜀: {a['title']}")
@@ -178,7 +186,81 @@ def _photo_ok(a: dict) -> bool:
     if a["photo_w"] and a["photo_w"] < MIN_PHOTO_W:
         print(f"사진 작음({a['photo_w']}px) — 건너뜀: {a['title']}")
         return False
+    if GRAPHIC_RE.search(a.get("photo_caption") or ""):
+        print(f"그래픽·표 사진 — 건너뜀: {a['title']}")
+        return False
     return True
+
+
+# ── 1-3. 코주부(@co.ju.boo) 기사 — 그날 지면의 주식·부동산·코인 ────────
+
+COJUBOO_GROUPS = ("주식", "부동산", "코인")
+
+
+def cojuboo_group(a: dict) -> str | None:
+    tops = {c.split(",")[0] for c in a["categories"]}
+    text = " ".join(a["categories"]) + " " + a["title"]
+    if "블록체인" in tops or "코인" in text or "가상자산" in text:
+        return "코인"
+    if "부동산" in tops:
+        return "부동산"
+    if "증권" in tops and a.get("page", 0) >= 6:          # 신문 뒤쪽 증권면(Market-signal 지면에 가깝게)
+        return "주식"
+    return None
+
+
+def cojuboo_candidates(date: str) -> list[dict]:
+    """지면 날짜 date의 기사 중 코주부 주제(주식·부동산·코인), 사진 쓸 수 있는 것. group·page를 붙여 돌려준다."""
+    paper = date.replace("-", "")
+    prev = (datetime.strptime(paper, "%Y%m%d") - timedelta(days=1)).strftime("%Y%m%d")
+    found: dict[str, dict] = {}
+    for day in (prev, paper):
+        root = _xml_root(day)
+        if root is None:
+            continue
+        for it in root:
+            p = it.find("paper")
+            if p is None or (p.findtext("publishInfo/date") or "").strip() != paper:
+                continue
+            a = _article(it)
+            if not a:
+                continue
+            a["page"] = int((p.findtext("editingInfo/paperNumber") or "0").strip() or 0)
+            g = cojuboo_group(a)
+            if g:
+                a["group"] = g
+                found[a["id"]] = a
+    out = []
+    for a in sorted(found.values(), key=lambda a: (a["page"], a["at"])):
+        if a["page"] < 6:                                   # 1~5면 종합면 제외 — 분류가 엉뚱하게 붙은 기사가 많다(11/27 신현송 기사가 '부동산')
+            continue
+        if not _photo_ok(a):
+            continue
+        if not (a.get("photo_caption") or "").strip():     # 지면 그래픽·표는 사진 설명이 비어 있는 경우가 많다(11/27 K바이오 기사)
+            print(f"사진 설명 없음(그래픽 가능성) — 건너뜀: {a['title']}")
+            continue
+        out.append(a)
+    return out
+
+
+# 하루 5건 = 주식 3 · 부동산 1 · 코인 1 (11/27 결정). 칸마다 이 순서의 주제를 먼저 찾는다.
+COJUBOO_ORDER = ("주식", "부동산", "주식", "코인", "주식")
+
+
+def pick_cojuboo(cands: list[dict], recent_groups: list[str]) -> dict | None:
+    """오늘 n번째 칸 → COJUBOO_ORDER[n] 주제의 지면 앞쪽 기사. 그 주제 후보가 없으면 아직 몫이 남은 다른 주제, 그래도 없으면 아무 주제."""
+    if not cands:
+        return None
+    n = len(recent_groups)
+    want = COJUBOO_ORDER[n % len(COJUBOO_ORDER)]
+    quota = {g: COJUBOO_ORDER.count(g) - recent_groups.count(g) for g in COJUBOO_GROUPS}
+    key = lambda a: (a["page"], a["at"])  # noqa: E731
+    for pool in ([a for a in cands if a["group"] == want],
+                 [a for a in cands if quota.get(a["group"], 0) > 0],
+                 cands):
+        if pool:
+            return min(pool, key=key)
+    return None
 
 
 # ── 1-2. 연예 기사(S3 daily-xml, 최근 24시간) ──────────────────────
@@ -286,6 +368,104 @@ def no_hanja(t: str) -> str:
     return t
 
 
+# ── 숫자 대조·투자 권유 검사(11/27) ─────────────────────────────────
+# AI가 지시를 어기고 기사에 없는 숫자(예: 700조·2000조 → "3배")를 만들어 낸 적이 있어, 프롬프트만 믿지 않고 코드로 대조한다.
+
+class CopyCheckError(RuntimeError):
+    """AI 글이 숫자·표현 검사를 두 번 다 통과하지 못함 → 그 기사는 실패 처리(다음 칸은 다음 기사)."""
+
+
+_BIG = {"조": 10**12, "억": 10**8, "만": 10**4, "천": 10**3}
+_NUM_RE = re.compile(
+    r"(약\s*)?"
+    r"((?:\d+(?:\.\d+)?\s*(?:조|억|만|천)\s*)*\d+(?:\.\d+)?(?:\s*(?:조|억|만|천))?)"
+    r"\s*(%\s*p|%\s*P|%\s*포인트|퍼센트\s*포인트|%|퍼센트|포인트|배|년|월|일|분기|차|호|위|시|세|회|번째|주년|기|대|명|건|가구|원|달러|위안|엔|유로|개|곳|종|단|층|주|㎡|GWh|MWh|GW|MW|kWh|톤)?")
+_STRICT = {"pct", "pp", "times"}                     # 이 단위는 기사에도 같은 단위로 있어야 함
+_LENIENT = {"년", "월", "일", "분기", "차", "호", "위", "시", "세", "회", "번째", "주년", "기"}  # 날짜·서수: 숫자만 있으면 통과
+
+
+def _norm_num_text(s: str) -> str:
+    s = unicodedata.normalize("NFKC", s or "")
+    return re.sub(r"(?<=\d),(?=\d{3})", "", s)     # 3,000 → 3000
+
+
+def _unit_class(u: str) -> str:
+    u = (u or "").replace(" ", "")
+    if u in ("%p", "%P", "%포인트", "퍼센트포인트"):
+        return "pp"
+    if u in ("%", "퍼센트"):
+        return "pct"
+    if u == "배":
+        return "times"
+    if u in _LENIENT:
+        return "lenient"
+    return "other"
+
+
+def _num_value(body: str) -> tuple[float, float]:
+    """'72만6454' → (726454, 1), '3000억' → (3e11, 1e8), '1.2조' → (1.2e12, 1e11). (값, 마지막 자리 크기)"""
+    body = body.replace(" ", "")
+    total, prec = 0.0, 1.0
+    for num, big in re.findall(r"(\d+(?:\.\d+)?)(조|억|만|천)?", body):
+        mult = _BIG.get(big, 1)
+        total += float(num) * mult
+        dec = len(num.split(".")[1]) if "." in num else 0
+        prec = mult / (10 ** dec)
+    return total, prec
+
+
+def extract_numbers(text: str) -> list[dict]:
+    out = []
+    for m in _NUM_RE.finditer(_norm_num_text(text)):
+        approx, body, unit = m.group(1), m.group(2), m.group(3) or ""
+        v, prec = _num_value(body)
+        out.append({"raw": m.group(0).strip(), "value": v, "prec": prec, "cls": _unit_class(unit),
+                    "approx": bool(approx), "digits": re.findall(r"\d+(?:\.\d+)?", body)})
+    return out
+
+
+def missing_numbers(text: str, source: str) -> list[str]:
+    """text(AI 글)의 숫자 중 source(기사)에 근거가 없는 것. 쉼표·띄어쓰기·전각 차이는 무시.
+    %·%p·배는 기사에도 같은 단위여야 하고, 날짜·서수(년·월·일·분기·차·호·위 등)는 숫자만 있으면 통과.
+    "약"이 붙으면 기사 숫자를 같은 자리에서 내림·반올림한 값까지 인정(약 72만 ← 72만6454), "약" 없이 반올림하면 불일치."""
+    src = extract_numbers(source)
+    src_digits = {d for s in src for d in s["digits"]}
+    bad = []
+    for n in extract_numbers(text):
+        if n["cls"] == "lenient":
+            if not all(d in src_digits for d in n["digits"]):
+                bad.append(n["raw"])
+            continue
+        if n["cls"] in _STRICT:
+            pool = [s for s in src if s["cls"] == n["cls"]]
+        else:
+            pool = [s for s in src if s["cls"] != "times"]
+        ok = any(abs(s["value"] - n["value"]) <= 1e-9 * max(1.0, abs(s["value"])) for s in pool)
+        if not ok and n["approx"]:
+            p = n["prec"]
+            ok = any(abs(math.floor(s["value"] / p) * p - n["value"]) < p * 1e-6
+                     or abs(round(s["value"] / p) * p - n["value"]) < p * 1e-6 for s in pool)
+        if not ok:
+            bad.append(n["raw"])
+    return bad
+
+
+ADVICE_RE = re.compile(
+    r"(매수|매도|투자)\s*(기회|추천|타이밍|적기|하세요|해야|할\s*때)|지금\s*(사|팔|담|매수|매도)|사야\s*(할|한다|해|합니다)|팔아야|"
+    r"급등\s*(예상|임박)|추천\s*(종목|주)|기회(를\s*잡|입니다|예요|일까|로\s*삼)|수익\s*보장|대박|놓치지\s*마|담아야")
+COJUBOO_DISCLAIMER = "※ 본 게시물은 투자 권유가 아닙니다."
+
+
+def copy_problems(g: dict, art: dict, kind: str) -> list[str]:
+    """AI 결과(제목 2줄·캡션 본문)의 숫자·표현 문제. 캡션 본문 = 출처·원문·해시태그를 붙이기 전 g['caption']."""
+    text = "\n".join((g.get("title1", ""), g.get("title2", ""), g.get("caption", "")))
+    source = "\n".join((art.get("title", ""), art.get("sub_title", ""), art.get("content", ""), art.get("photo_caption", "")))
+    probs = [f"기사에 없는 숫자: {x}" for x in missing_numbers(text, source)]
+    if kind == "cojuboo":
+        probs += [f"투자 권유 표현: {m.group(0)}" for m in ADVICE_RE.finditer(text)]
+    return probs
+
+
 # ── 2. 글(AI) ───────────────────────────────────────────────────────
 
 PROMPT = """아래는 서울경제신문 지면 1면 기사와, 게시물에 쓸 기사 사진(첨부)·사진 설명이다.
@@ -299,6 +479,10 @@ PROMPT = """아래는 서울경제신문 지면 1면 기사와, 게시물에 쓸
 - 한자 쓰지 말 것(글꼴에 없음). 李→이 대통령, 靑→청와대, 美→미국, 中→중국처럼 한글로.
 - 금지: ㄷㄷ·ㅋㅋ 같은 인터넷 말투, 감탄사, 궁금증만 부추기는 물음표, 과장된 표현, 이모지.
 - 사실을 과장·왜곡하지 말 것. 줄이다가 뜻이 바뀌면 안 된다(예: '첫 여성'을 '65년 만의 여성'으로 줄이면 예전에도 있었던 것처럼 읽힌다 → 금지).
+- 숫자는 기사에 쓰인 그대로만. 기사 숫자로 배수·비율·합계를 직접 계산해 새 숫자를 만들지 말 것(예: 영업익 700조·시총 2000조 → "3배" 금지).
+- 숫자에는 단위를 붙인다(예: "3000억"이 아니라 "3000억 원", "73만"이 아니라 "73만 명"). %%와 %%p(퍼센트포인트)를 기사 표기대로 구분한다.
+- 숫자를 반올림·줄이면 반드시 "약"을 붙인다(예: 72만6454명 → "약 72만 명"). "약" 없이 반올림 금지.
+- 전망·목표·계획·추정을 확정된 일처럼 쓰지 말 것(예: "~할 전망"을 "~했다"로, "목표 50만 가구"를 "50만 가구 공급"으로 바꾸기 금지).
 - 기사 속 서로 다른 대상·조치를 한 문장으로 합치지 말 것. 1줄의 주어·상황과 2줄의 결과는 기사에서 실제로 이어진 내용이어야 한다(예: 내신 부정행위는 '퇴학', 국가자격시험 부정행위는 '징역 5년'인데 "시험때 스마트워치 / 퇴학+징역 5년"으로 쓰면 한 사람이 둘 다 받는 것처럼 읽힌다 → 금지).
 
 [사진 자르기] 사진은 세로 4:5로 잘린다. 사진 설명을 근거로, 제목에서 말하는 주인공이 사진 가로 어디에 있는지 focus_x(0=왼쪽 끝, 1=오른쪽 끝)로 답하라.
@@ -325,18 +509,32 @@ PROMPT = """아래는 서울경제신문 지면 1면 기사와, 게시물에 쓸
 """
 
 
-def write_copy(art: dict, photo: Image.Image, kind: str = "front") -> dict:
-    """AI가 가끔 항목을 빠뜨리고 답해서 한 번 더 묻는다."""
+PROMPT_LABEL = {"front": "서울경제신문 지면 1면 기사", "ent": "서울경제 연예·영화 기사",
+                "cojuboo": "서울경제신문 지면 증권·부동산·코인 기사"}
+COJUBOO_RULE = """
+[코주부 추가 규칙] 코인·주식·부동산 정보 계정이다. 투자 권유로 읽힐 표현 금지: 매수·매도 권유, "지금 사야", "급등 예상", "추천 종목", "투자 기회" 같은 말.
+기사 사실만 전하고, 특정 종목을 사라·팔라는 뉘앙스를 피한다.
+"""
+
+
+def write_copy(art: dict, photo: Image.Image, kind: str = "front", note: str = "") -> dict:
+    """AI가 가끔 항목을 빠뜨리고 답해서 한 번 더 묻는다. note = 다시 쓰게 할 때 붙이는 지적."""
     try:
-        return _write_copy(art, photo, kind)
+        return _write_copy(art, photo, kind, note)
     except (RuntimeError, ValueError) as e:
         print(f"AI 응답 문제 → 한 번 더: {e}")
-        return _write_copy(art, photo, kind)
+        return _write_copy(art, photo, kind, note)
 
 
-def _write_copy(art: dict, photo: Image.Image, kind: str) -> dict:
-    base = PROMPT if kind == "front" else PROMPT.replace("서울경제신문 지면 1면 기사", "서울경제 연예·영화 기사")
+def _write_copy(art: dict, photo: Image.Image, kind: str, note: str = "") -> dict:
+    # 11/27 고침: 전엔 front가 아니면 모두 '연예·영화 기사'로 바뀌어 코주부도 연예 기사라고 소개됐다
+    base = PROMPT.replace("서울경제신문 지면 1면 기사", PROMPT_LABEL.get(kind, PROMPT_LABEL["front"]))
     prompt = base % (art["photo_caption"] or "(없음)", art["title"], art["sub_title"] or "(없음)", art["content"][:6000])
+    if kind == "cojuboo":
+        prompt += COJUBOO_RULE
+    if note:
+        prompt += "\n[다시 쓰기] 이전 답에 문제가 있었다. 아래를 고쳐서 처음부터 다시 써라.\n" + note + \
+                  "\n숫자는 기사 본문에 있는 그대로(단위 포함)만 쓰고, 기사에서 찾을 수 없는 숫자는 빼라.\n"
     small = photo.copy()
     small.thumbnail((1200, 1200))
     buf = io.BytesIO()
@@ -401,12 +599,12 @@ def wait_ready(container_id: str, token: str, tries: int = 30) -> None:
     raise RuntimeError(f"컨테이너 {container_id} 준비 시간 초과")
 
 
-def publish_single(jpeg: bytes, key: str, caption: str, token: str) -> str:
+def publish_single(jpeg: bytes, key: str, caption: str, token: str, ig_user_id: str = IG_USER_ID) -> str:
     s3.put_object(Bucket=S3_BUCKET, Key=key, Body=jpeg, ContentType="image/jpeg")
     url = f"https://{S3_BUCKET}.s3.us-east-1.amazonaws.com/{urllib.parse.quote(key)}"
-    c = http_json(f"{GRAPH}/{IG_USER_ID}/media", {"image_url": url, "caption": caption, "access_token": token})
+    c = http_json(f"{GRAPH}/{ig_user_id}/media", {"image_url": url, "caption": caption, "access_token": token})
     wait_ready(c["id"], token)
-    media = http_json(f"{GRAPH}/{IG_USER_ID}/media_publish", {"creation_id": c["id"], "access_token": token})
+    media = http_json(f"{GRAPH}/{ig_user_id}/media_publish", {"creation_id": c["id"], "access_token": token})
     return http_json(f"{GRAPH}/{media['id']}?fields=permalink&access_token={token}").get("permalink", media["id"])
 
 
@@ -416,13 +614,24 @@ def build_post(art: dict, date: str, kind: str = "front") -> tuple[bytes, str, d
     """기사 1건 → (JPEG, 캡션, AI 결과)."""
     photo = Image.open(io.BytesIO(http_bytes(art["photo_url"]))).convert("RGB")
     g = write_copy(art, photo, kind)
+    probs = copy_problems(g, art, kind)                  # 숫자 대조(+코주부 투자 권유) — 걸리면 지적을 붙여 1회 다시 쓰기
+    if probs:
+        print(f"글 검사 걸림 → 다시 쓰기: {probs}")
+        g = write_copy(art, photo, kind, note="\n".join("- " + p for p in probs))
+        probs = copy_problems(g, art, kind)
+        if probs:
+            print(f"글 검사 다시 걸림 → 이 기사 실패: {probs}")
+            raise CopyCheckError("; ".join(probs))
     g["title1"], g["title2"] = no_hanja(g["title1"].strip()), no_hanja(g["title2"].strip())
     g["title1"], g["title2"] = check_quotes(g["title1"], art), check_quotes(g["title2"], art)
+    # 따옴표가 두 줄에 걸친 경우("…시총 / 영업익…")도 이어서 검사(11/27)
+    g["title1"], g["title2"] = (check_quotes(g["title1"] + "\n" + g["title2"], art).split("\n", 1) + [""])[:2]
     fx =min(1.0, max(0.0, float(g.get("focus_x", 0.5))))
     buf = io.BytesIO()
     make_image(photo, g["title1"].strip(), g["title2"].strip(), fx, date).save(buf, "JPEG", quality=92)
     credit = photo_credit(art["photo_caption"])
-    caption = (g["caption"].strip() + "\n\n" + (credit + "\n" if credit else "") + "원문: 서울경제신문\n\n"
+    caption = (g["caption"].strip() + "\n\n" + (credit + "\n" if credit else "") + "원문: 서울경제신문\n"
+               + (COJUBOO_DISCLAIMER + "\n" if kind == "cojuboo" else "") + "\n"
                + " ".join("#" + h.lstrip("#").replace(" ", "") for h in g.get("hashtags", [])))[:2200]
     g["focus_x"] = fx
     return buf.getvalue(), caption, g
@@ -431,16 +640,24 @@ def build_post(art: dict, date: str, kind: str = "front") -> tuple[bytes, str, d
 LAST_JPEG: bytes | None = None
 FRONT_HOURS = {6, 7, 8, 12, 14}             # 1면 — EventBridge 입력 {"kind": "front"}가 없을 때 시각으로 판단
 ENT_HOURS = {10, 16, 19, 21}                # 연예
+# 코주부(09·11·13·15·17시)는 EventBridge 입력 {"kind": "cojuboo"}로만 부른다(시각 판단 없음).
+COJUBOO_IG_ID = os.environ.get("COJUBOO_IG_ID", "17841446436396009")   # @co.ju.boo — 같은 시스템 사용자 토큰
+MAX_COJUBOO_PER_DAY = int(os.environ.get("MAX_COJUBOO_PER_DAY", "5"))
+COJUBOO_START = os.environ.get("COJUBOO_START", "2026-11-30")         # 이 날짜 전엔 게시 안 함(11/27 결정: 다음 주 월요일 시작). 평일만은 EventBridge cron(MON-FRI)이 맡는다.
 
 
-def lambda_handler(event, context):
-    event = event or {}
+def auto_post(event: dict) -> dict:
+    """EventBridge 자동 게시(1면·연예·코주부) — 한 번에 1건."""
     now = datetime.fromisoformat(event["now"]).replace(tzinfo=KST) if event.get("now") else datetime.now(KST)  # now는 시험용
     date = event.get("date") or now.strftime("%Y-%m-%d")
     kind = event.get("kind") or ("ent" if now.hour in ENT_HOURS else "front")
     dry_run = bool(event.get("dry_run"))
-    limit = MAX_PER_DAY if kind == "front" else MAX_ENT_PER_DAY
-    key = date if kind == "front" else f"{date}_ent"          # 기록: {날짜: [1면…], 날짜_ent: [연예…]}
+    if kind == "cojuboo" and date < COJUBOO_START and not dry_run:
+        print(f"코주부는 {COJUBOO_START}부터 — {date} 건너뜀")
+        return {"date": date, "kind": kind, "skipped": "before start"}
+    limit = {"front": MAX_PER_DAY, "ent": MAX_ENT_PER_DAY, "cojuboo": MAX_COJUBOO_PER_DAY}[kind]
+    key = {"front": date, "ent": f"{date}_ent", "cojuboo": f"{date}_cojuboo"}[kind]   # 기록 키
+    ig_user_id = COJUBOO_IG_ID if kind == "cojuboo" else IG_USER_ID
 
     state = load_state()
     done = state.get(key, [])
@@ -449,11 +666,16 @@ def lambda_handler(event, context):
         return {"date": date, "kind": kind, "skipped": "daily limit"}
 
     failed = state.get(f"{key}_failed", [])
-    posted_ids = {d["id"] for k, v in state.items() if not k.endswith("_failed") for d in v}
+    # 계정별로 중복을 본다 — 서울경제(1면·연예)와 코주부는 같은 기사가 나가도 된다(11/27 결정)
+    same_account = (lambda k: "_cojuboo" in k) if kind == "cojuboo" else (lambda k: "_cojuboo" not in k)
+    posted_ids = {d["id"] for k, v in state.items() if not k.endswith("_failed") and same_account(k) for d in v}
     skip_ids = posted_ids | set(failed)                       # 실패한 기사는 다음 시간대에 건너뜀
     if kind == "front":
         todo = [a for a in front_page(date) if a["id"] not in skip_ids]
         art = todo[0] if todo else None
+    elif kind == "cojuboo":
+        art = pick_cojuboo([a for a in cojuboo_candidates(date) if a["id"] not in skip_ids],
+                           [d.get("group", "") for d in done])
     else:
         recent_days = {(now - timedelta(days=i)).strftime("%Y-%m-%d") for i in range(3)}
         rows = sorted((k[:10], d.get("at", ""), d.get("title", "")) for k, v in state.items()
@@ -470,10 +692,14 @@ def lambda_handler(event, context):
         if dry_run:
             global LAST_JPEG
             LAST_JPEG = jpeg                                  # 로컬 시험용(Lambda 응답엔 바이트를 넣지 않음)
-            return {"date": date, "kind": kind, "dry_run": True, "article": art["title"],
-                    "title": [g["title1"], g["title2"]], "caption": caption}
-        link = publish_single(jpeg, f"{S3_PREFIX}/{date}/{art['id']}.jpg", caption, get_token())
-        done.append({"id": art["id"], "title": art["title"], "link": link, "at": now.strftime("%H:%M")})
+            return {"date": date, "kind": kind, "dry_run": True, "article": art["title"], "group": art.get("group"),
+                    "id": art["id"], "title": [g["title1"], g["title2"]], "caption": caption}
+        sub = f"cojuboo/{date}" if kind == "cojuboo" else date
+        link = publish_single(jpeg, f"{S3_PREFIX}/{sub}/{art['id']}.jpg", caption, get_token(), ig_user_id)
+        row = {"id": art["id"], "title": art["title"], "link": link, "at": now.strftime("%H:%M")}
+        if kind == "cojuboo":
+            row["group"] = art.get("group", "")
+        done.append(row)
         state[key] = done
         save_state(state)
         print(f"게시 완료 {key} ({len(done)}/{limit}) {link}")
@@ -484,3 +710,208 @@ def lambda_handler(event, context):
             save_state(state)
         print(f"게시 실패 {key} {art['title']}: {type(e).__name__}: {e}")
         raise
+
+
+# ── 직접 올리기(기사 링크 → 바로 게시) ─────────────────────────────
+
+class UserError(Exception):
+    """화면에 그대로 보여 줄 쉬운 말 오류."""
+
+
+def article_key(url: str) -> str:
+    """sedaily.com/article/20118961, m.sedaily.com/article/…, signal.sedaily.com/article/… → '20118961'."""
+    m = re.search(r"sedaily\.com/(?:[\w-]+/)*article/(\d+)", url or "", re.I)
+    if not m:
+        raise UserError("서울경제 기사 링크가 아니에요. sedaily.com/article/… 주소를 붙여 넣어 주세요.")
+    return m.group(1)
+
+
+def find_in_xml(key: str, days: int = 4) -> dict | None:
+    """최근 days일 daily-xml에서 공개 기사 번호(key)로 찾는다."""
+    today = datetime.now(KST)
+    for i in range(days):
+        root = _xml_root((today - timedelta(days=i)).strftime("%Y%m%d"))
+        if root is None:
+            continue
+        for it in root:
+            if (it.findtext("key") or "").strip() == key:
+                return _article(it)
+    return None
+
+
+def article_from_page(key: str) -> dict:
+    """XML에 없을 때(오래된 기사 등) 기사 페이지를 직접 읽는다 — 제목·부제·본문·대표 사진·사진 설명."""
+    try:
+        page = http_bytes(f"https://www.sedaily.com/article/{key}").decode("utf-8", "ignore")
+    except Exception as e:  # noqa: BLE001
+        raise UserError("기사 페이지를 열 수 없어요. 링크가 맞는지 확인해 주세요.") from e
+    meta = lambda p: (re.search(r'<meta[^>]+property="%s"[^>]+content="([^"]*)"' % p, page) or [None, ""])[1]  # noqa: E731
+    title = html.unescape(meta("og:title")).strip()
+    if not title:
+        raise UserError("기사를 찾지 못했어요. 링크가 맞는지 확인해 주세요.")
+    sub = re.search(r'class="article-subtitle[^"]*"[^>]*>(.*?)</div>', page, re.S)
+    body = page[page.find('class="article-content"'):page.find('class="reporter-article"')]
+    body = re.sub(r"<figcaption.*?</figcaption>", "", body, flags=re.S)
+    cap = re.search(r"<figcaption[^>]*>(.*?)</figcaption>", page, re.S)
+    section = meta("article:section")
+    return {
+        "id": f"web-{key}", "key": key, "title": title,
+        "sub_title": strip_html(sub.group(1)) if sub else "",
+        "content": strip_html(body)[:8000],
+        "categories": [f"연예,{section}" if re.search("연예|영화|방송|스타", section) else section],
+        "url": f"https://www.sedaily.com/article/{key}",
+        "photo_url": meta("og:image") or None, "photo_w": 0,
+        "photo_caption": strip_html(cap.group(1)) if cap else "",
+        "at": "",
+    }
+
+
+def is_ent(art: dict) -> bool:
+    return any(c.startswith("연예,") or c == "문화·라이프,문화,영화" for c in art.get("categories", []))
+
+
+# 직접 올리기 채널 — 화면 드롭다운 값 → (게시 계정, 기록 키 접미사). 어썸머니는 연결 전이라 없음.
+CHANNELS = {
+    "seoul_economic": {"ig": IG_USER_ID, "manual": "_manual"},
+    "co.ju.boo": {"ig": COJUBOO_IG_ID, "manual": "_cojuboo_manual"},
+}
+# 기록 키 접미사 → (채널, 화면 표시 종류)
+STATE_KINDS = {"": ("seoul_economic", "1면"), "_ent": ("seoul_economic", "연예"),
+               "_manual": ("seoul_economic", "직접"),
+               "_cojuboo": ("co.ju.boo", "자동"), "_cojuboo_manual": ("co.ju.boo", "직접")}
+
+
+def post_url(url: str, dry_run: bool = False, force: bool = False, channel: str = "seoul_economic") -> dict:
+    """기자가 고른 기사 링크 1건 → 카드·캡션 만들어 고른 채널에 바로 게시(dry_run이면 만들기만).
+    숫자 대조·한자·따옴표 검사는 build_post 그대로. 코주부는 프롬프트 라벨 cojuboo(증권·부동산·코인) +
+    투자 권유 금지·면책 문구가 적용된다."""
+    if channel not in CHANNELS:
+        raise UserError("아직 연결되지 않은 채널이에요.")
+    ch = CHANNELS[channel]
+    key = article_key(url)
+    art = find_in_xml(key) or article_from_page(key)
+    if not art.get("photo_url"):
+        raise UserError("사진이 없는 기사라 카드를 만들 수 없어요.")
+    state = load_state()
+    # 같은 계정에 같은 기사 중복 금지(서울경제와 코주부는 서로 겹쳐도 됨 — 자동 게시와 같은 규칙)
+    is_coj = channel == "co.ju.boo"
+    posted = {d["id"]: d for k, v in state.items()
+              if not k.endswith("_failed") and (("_cojuboo" in k) == is_coj) for d in v}
+    if art["id"] in posted and not force:
+        raise UserError(f"이 채널에 이미 올린 기사예요 ({posted[art['id']].get('link', '')}).")
+    now = datetime.now(KST)
+    date = now.strftime("%Y-%m-%d")
+    kind = "cojuboo" if is_coj else ("ent" if is_ent(art) else "front")
+    try:
+        jpeg, caption, g = build_post(art, date, kind)
+    except CopyCheckError as e:
+        raise UserError(f"AI가 쓴 글에 기사와 다른 숫자·표현이 있어 올리지 않았어요: {e}") from e
+    except RuntimeError as e:
+        raise UserError(f"카드를 만들지 못했어요: {e}") from e
+    result = {"title": art["title"], "card_title": [g["title1"], g["title2"]], "kind": kind, "channel": channel,
+              "caption": caption, "source_url": art.get("url") or url}
+    if dry_run:
+        global LAST_JPEG
+        LAST_JPEG = jpeg
+        return {**result, "dry_run": True, "image_url": None, "permalink": None}
+    sub = f"cojuboo/{date}" if is_coj else date
+    s3_key = f"{S3_PREFIX}/{sub}/manual-{art['id']}.jpg"
+    link = publish_single(jpeg, s3_key, caption, get_token(), ch["ig"])
+    skey = f"{date}{ch['manual']}"                            # 자동 게시 하루 한도와 섞이지 않게 별도 키
+    rows = state.get(skey, [])
+    rows.append({"id": art["id"], "title": art["title"], "link": link, "at": now.strftime("%H:%M"),
+                 "via": "manual_url", "url": url})
+    state[skey] = rows
+    save_state(state)
+    return {**result, "image_url": f"https://{S3_BUCKET}.s3.us-east-1.amazonaws.com/{urllib.parse.quote(s3_key)}",
+            "permalink": link}
+
+
+def history(limit: int = 30, channel: str | None = None) -> list[dict]:
+    """게시 기록 최신순. channel을 주면 그 채널 것만(서울경제 = 1면·연예·직접, 코주부 = 자동·직접)."""
+    rows = []
+    for k, v in load_state().items():
+        if k.endswith("_failed") or k[10:] not in STATE_KINDS:
+            continue
+        ch, kind = STATE_KINDS[k[10:]]
+        if channel and ch != channel:
+            continue
+        for d in v:
+            rows.append({"date": k[:10], "at": d.get("at", ""), "kind": kind, "channel": ch,
+                         "title": d.get("title", ""), "link": d.get("link", "")})
+    rows.sort(key=lambda r: (r["date"], r["at"]), reverse=True)
+    return rows[:limit]
+
+
+# ── 진입점 ───────────────────────────────────────────────────────────
+
+PAGE = HERE / "page.html"
+
+
+def _http(status: int, body, ctype: str = "application/json; charset=utf-8") -> dict:
+    if not isinstance(body, str):
+        body = json.dumps(body, ensure_ascii=False)
+    return {"statusCode": status, "headers": {"Content-Type": ctype, "Cache-Control": "no-store"}, "body": body}
+
+
+UPLOAD_KEY_PARAM = os.environ.get("UPLOAD_KEY_PARAM", "/sedaily-lens/instagram/upload-password")  # 공용 비밀번호(SSM SecureString)
+_upload_key_cache: dict = {}
+
+
+def _upload_key() -> str:
+    """공용 비밀번호. 바꾸면 5분 안에 반영(캐시)."""
+    if time.time() - _upload_key_cache.get("at", 0) > 300:
+        _upload_key_cache["v"] = boto3.client("ssm").get_parameter(
+            Name=UPLOAD_KEY_PARAM, WithDecryption=True)["Parameter"]["Value"].strip()
+        _upload_key_cache["at"] = time.time()
+    return _upload_key_cache["v"]
+
+
+def _authorized(event: dict) -> bool:
+    headers = {k.lower(): v for k, v in (event.get("headers") or {}).items()}
+    given = (headers.get("x-upload-key") or "").strip()
+    return bool(given) and hmac.compare_digest(given.encode(), _upload_key().encode())
+
+
+def http_router(event: dict) -> dict:
+    """Lambda Function URL(HTTP) — GET / 화면(누구나), POST /post 직접 올리기·GET /history 기록(공용 비밀번호 필요)."""
+    method = event["requestContext"]["http"]["method"]
+    path = event.get("rawPath") or "/"
+    if method == "GET" and path in ("/", "/index.html"):
+        return _http(200, PAGE.read_text(encoding="utf-8"), "text/html; charset=utf-8")
+    if path in ("/history", "/post", "/auth") and not _authorized(event):
+        time.sleep(1)                                      # 비밀번호 마구 넣어 보기 늦추기
+        return _http(401, {"error": "비밀번호가 맞지 않아요."})
+    if method == "GET" and path == "/auth":
+        return _http(200, {"ok": True})
+    if method == "GET" and path == "/history":
+        ch = (event.get("queryStringParameters") or {}).get("channel") or None
+        if ch and ch not in CHANNELS:
+            return _http(400, {"error": "아직 연결되지 않은 채널이에요."})
+        return _http(200, {"items": history(channel=ch)})
+    if method == "POST" and path == "/post":
+        raw = event.get("body") or "{}"
+        if event.get("isBase64Encoded"):
+            raw = base64.b64decode(raw).decode("utf-8")
+        try:
+            body = json.loads(raw)
+            return _http(200, post_url(body.get("url", ""), force=bool(body.get("force")),
+                                       channel=body.get("channel", "seoul_economic")))
+        except UserError as e:
+            return _http(400, {"error": str(e)})
+        except Exception as e:  # noqa: BLE001
+            print(f"직접 올리기 실패: {type(e).__name__}: {e}")
+            return _http(500, {"error": "올리는 중 문제가 생겼어요. 잠시 뒤 다시 시도해 주세요."})
+    return _http(404, {"error": "없는 주소예요."})
+
+
+def lambda_handler(event, context):
+    event = event or {}
+    if "requestContext" in event and "http" in event.get("requestContext", {}):
+        return http_router(event)
+    if event.get("action") == "post_url":                      # 수동 호출용(콘솔·CLI)
+        return post_url(event.get("url", ""), dry_run=bool(event.get("dry_run")), force=bool(event.get("force")),
+                        channel=event.get("channel", "seoul_economic"))
+    if event.get("action") == "history":
+        return {"items": history(int(event.get("limit", 30)), event.get("channel"))}
+    return auto_post(event)                                   # EventBridge 자동 게시(기존 동작 그대로)
