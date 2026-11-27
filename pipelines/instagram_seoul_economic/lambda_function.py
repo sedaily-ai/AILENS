@@ -26,6 +26,7 @@ EventBridge가 매일 부른다. 한 번 부를 때 1건.
 from __future__ import annotations
 
 import base64
+import hmac
 import html
 import io
 import json
@@ -805,7 +806,7 @@ def post_url(url: str, dry_run: bool = False, force: bool = False) -> dict:
 
 def history(limit: int = 30) -> list[dict]:
     """게시 기록(자동 1면·연예 + 직접 올리기) 최신순."""
-    kinds = {"": "1면", "_ent": "연예", "_manual": "직접"}
+    kinds = {"": "1면", "_ent": "연예", "_manual": "직접", "_cojuboo": "코주부"}
     rows = []
     for k, v in load_state().items():
         if k.endswith("_failed"):
@@ -828,14 +829,36 @@ def _http(status: int, body, ctype: str = "application/json; charset=utf-8") -> 
     return {"statusCode": status, "headers": {"Content-Type": ctype, "Cache-Control": "no-store"}, "body": body}
 
 
+UPLOAD_KEY_PARAM = os.environ.get("UPLOAD_KEY_PARAM", "/sedaily-lens/instagram/upload-password")  # 공용 비밀번호(SSM SecureString)
+_upload_key_cache: dict = {}
+
+
+def _upload_key() -> str:
+    """공용 비밀번호. 바꾸면 5분 안에 반영(캐시)."""
+    if time.time() - _upload_key_cache.get("at", 0) > 300:
+        _upload_key_cache["v"] = boto3.client("ssm").get_parameter(
+            Name=UPLOAD_KEY_PARAM, WithDecryption=True)["Parameter"]["Value"].strip()
+        _upload_key_cache["at"] = time.time()
+    return _upload_key_cache["v"]
+
+
+def _authorized(event: dict) -> bool:
+    headers = {k.lower(): v for k, v in (event.get("headers") or {}).items()}
+    given = (headers.get("x-upload-key") or "").strip()
+    return bool(given) and hmac.compare_digest(given.encode(), _upload_key().encode())
+
+
 def http_router(event: dict) -> dict:
-    """Lambda Function URL(HTTP) — GET / 화면, POST /post 직접 올리기, GET /history 기록."""
+    """Lambda Function URL(HTTP) — GET / 화면(누구나), POST /post 직접 올리기·GET /history 기록(공용 비밀번호 필요)."""
     method = event["requestContext"]["http"]["method"]
     path = event.get("rawPath") or "/"
-    # TODO(비밀번호): 공개 주소라 아무나 서울경제 계정에 올릴 수 있다. 배포 전 비밀번호(헤더 X-Upload-Key 와
-    #   SSM 값 비교) 또는 사내 IP 제한을 넣을 것. 지금은 시제품이라 비워 둠.
     if method == "GET" and path in ("/", "/index.html"):
         return _http(200, PAGE.read_text(encoding="utf-8"), "text/html; charset=utf-8")
+    if path in ("/history", "/post", "/auth") and not _authorized(event):
+        time.sleep(1)                                      # 비밀번호 마구 넣어 보기 늦추기
+        return _http(401, {"error": "비밀번호가 맞지 않아요."})
+    if method == "GET" and path == "/auth":
+        return _http(200, {"ok": True})
     if method == "GET" and path == "/history":
         return _http(200, {"items": history()})
     if method == "POST" and path == "/post":

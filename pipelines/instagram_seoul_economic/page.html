@@ -65,6 +65,13 @@
   .ch-row label { font-weight:700; font-size:14px; color:var(--sub); white-space:nowrap; }
   select { font:inherit; font-size:15px; padding:10px 12px; border:1px solid var(--line); border-radius:10px; background:#fff; min-width:0; flex:0 1 340px; }
   select option:disabled { color:#a0a4ab; }
+  .gate { max-width:420px; margin:80px auto; background:var(--card); border:1px solid var(--line); border-radius:16px; padding:28px; text-align:center; }
+  .gate h2 { margin:0 0 6px; font-size:20px; }
+  .gate p { color:var(--sub); margin:0 0 18px; font-size:14px; }
+  .gate form { display:flex; gap:8px; }
+  .gate input { flex:1; min-width:0; font:inherit; font-size:16px; padding:12px 14px; border:1px solid var(--line); border-radius:10px; }
+  .gate .err { color:var(--red); font-size:14px; margin-top:10px; min-height:20px; }
+  .hidden { display:none !important; }
   @media (max-width:640px) {
     .wrap { padding:20px 14px 48px; }
     .input-row { flex-direction:column; }
@@ -76,7 +83,13 @@
 </style>
 </head>
 <body>
-<div class="wrap">
+<div class="gate hidden" id="gate">
+  <h2>🔒 비밀번호</h2>
+  <p>공용 비밀번호를 넣어 주세요. 이 브라우저에선 한 번만 넣으면 돼요.</p>
+  <form id="gate-f"><input id="gate-pw" type="password" autocomplete="current-password" placeholder="비밀번호"><button class="go" type="submit">확인</button></form>
+  <div class="err" id="gate-err"></div>
+</div>
+<div class="wrap" id="app">
   <header><div class="logo">S</div><h1>서울경제 인스타</h1></header>
   <nav class="tabs"><span class="tab on">인스타 바로 게시</span></nav>
   <p class="desc">기사 링크를 붙여 넣으면 카드 이미지와 캡션을 만들어 <b id="ch-name">@seoul_economic</b>에 바로 올립니다.</p>
@@ -122,6 +135,17 @@
 const $ = (id) => document.getElementById(id);
 const BADGE = { "1면": "", "연예": "ent", "직접": "manual" };
 
+// ── 공용 비밀번호: 브라우저에 기억(localStorage), 401이면 다시 묻기 ──
+function getKey() { try { return localStorage.getItem("upload_key") || ""; } catch { return ""; } }
+function setKey(v) { try { v ? localStorage.setItem("upload_key", v) : localStorage.removeItem("upload_key"); } catch {} }
+function showGate(msg) { $("app").classList.add("hidden"); $("gate").classList.remove("hidden"); $("gate-err").textContent = msg || ""; $("gate-pw").focus(); }
+function showApp() { $("gate").classList.add("hidden"); $("app").classList.remove("hidden"); }
+async function api(path, opts = {}) {
+  const res = await fetch(path, { ...opts, headers: { ...(opts.headers || {}), "X-Upload-Key": getKey() } });
+  if (res.status === 401) { setKey(""); showGate("비밀번호가 맞지 않아요."); throw new Error("401"); }
+  return res;
+}
+
 function esc(s) { return String(s ?? "").replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c])); }
 
 function showStatus(kind, html) { const s = $("status"); s.className = "status " + kind; s.innerHTML = html; }
@@ -156,8 +180,8 @@ function renderHistory(items) {
 }
 
 async function loadHistory() {
-  try { const res = await fetch("history"); renderHistory((await res.json()).items); }
-  catch { $("history").innerHTML = '<div class="empty">기록을 불러오지 못했어요.</div>'; }
+  try { const res = await api("history"); renderHistory((await res.json()).items); }
+  catch (e) { if (e.message !== "401") $("history").innerHTML = '<div class="empty">기록을 불러오지 못했어요.</div>'; }
 }
 
 $("f").addEventListener("submit", async (e) => {
@@ -167,11 +191,11 @@ $("f").addEventListener("submit", async (e) => {
   $("go").disabled = true; $("result").classList.remove("show");
   showStatus("loading", '<div class="spinner"></div><span>카드와 캡션을 만들고 인스타에 올리는 중이에요… (15~30초)</span>');
   try {
-    const res = await fetch("post", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ url, channel: $("ch").value }) });
+    const res = await api("post", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ url, channel: $("ch").value }) });
     const data = await res.json();
     if (!res.ok) { showStatus("error", esc(data.error || "문제가 생겼어요.")); return; }
     hideStatus(); renderResult(data); loadHistory();
-  } catch { showStatus("error", "서버에 연결하지 못했어요. 잠시 뒤 다시 시도해 주세요."); }
+  } catch (e) { if (e.message !== "401") showStatus("error", "서버에 연결하지 못했어요. 잠시 뒤 다시 시도해 주세요."); else hideStatus(); }
   finally { $("go").disabled = false; }
 });
 
@@ -182,7 +206,12 @@ if (window.__DEMO__) {                       // 예시 화면(로컬 캡처용)
   if (window.__DEMO__.result) renderResult(window.__DEMO__.result);
   renderHistory(window.__DEMO__.history || []);
 } else {
-  loadHistory();
+  $("gate-f").addEventListener("submit", async (e) => {
+    e.preventDefault();
+    setKey($("gate-pw").value.trim());
+    try { await api("auth"); $("gate-pw").value = ""; showApp(); loadHistory(); } catch {}
+  });
+  if (getKey()) { showApp(); loadHistory(); } else { showGate(); }
 }
 </script>
 </body>
