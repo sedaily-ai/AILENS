@@ -171,6 +171,10 @@ def _article(it: ET.Element) -> dict | None:
     }
 
 
+# 사진 설명으로 알아보는 그래픽·표·로고 이미지 — 제목을 얹으면 글자가 겹쳐 지저분해 건너뜀(11/27)
+GRAPHIC_RE = re.compile(r"그래픽|자료\s*=|인포그래픽|도표|\bCI\b|로고|캡처|캡쳐")
+
+
 def _photo_ok(a: dict) -> bool:
     if not a["photo_url"]:
         print(f"사진 없음 — 건너뜀: {a['title']}")
@@ -178,7 +182,68 @@ def _photo_ok(a: dict) -> bool:
     if a["photo_w"] and a["photo_w"] < MIN_PHOTO_W:
         print(f"사진 작음({a['photo_w']}px) — 건너뜀: {a['title']}")
         return False
+    if GRAPHIC_RE.search(a.get("photo_caption") or ""):
+        print(f"그래픽·표 사진 — 건너뜀: {a['title']}")
+        return False
     return True
+
+
+# ── 1-3. 코주부(@co.ju.boo) 기사 — 그날 지면의 주식·부동산·코인 ────────
+
+COJUBOO_GROUPS = ("주식", "부동산", "코인")
+
+
+def cojuboo_group(a: dict) -> str | None:
+    tops = {c.split(",")[0] for c in a["categories"]}
+    text = " ".join(a["categories"]) + " " + a["title"]
+    if "블록체인" in tops or "코인" in text or "가상자산" in text:
+        return "코인"
+    if "부동산" in tops:
+        return "부동산"
+    if "증권" in tops and a.get("page", 0) >= 6:          # 신문 뒤쪽 증권면(Market-signal 지면에 가깝게)
+        return "주식"
+    return None
+
+
+def cojuboo_candidates(date: str) -> list[dict]:
+    """지면 날짜 date의 기사 중 코주부 주제(주식·부동산·코인), 사진 쓸 수 있는 것. group·page를 붙여 돌려준다."""
+    paper = date.replace("-", "")
+    prev = (datetime.strptime(paper, "%Y%m%d") - timedelta(days=1)).strftime("%Y%m%d")
+    found: dict[str, dict] = {}
+    for day in (prev, paper):
+        root = _xml_root(day)
+        if root is None:
+            continue
+        for it in root:
+            p = it.find("paper")
+            if p is None or (p.findtext("publishInfo/date") or "").strip() != paper:
+                continue
+            a = _article(it)
+            if not a:
+                continue
+            a["page"] = int((p.findtext("editingInfo/paperNumber") or "0").strip() or 0)
+            g = cojuboo_group(a)
+            if g:
+                a["group"] = g
+                found[a["id"]] = a
+    out = []
+    for a in sorted(found.values(), key=lambda a: (a["page"], a["at"])):
+        if not _photo_ok(a):
+            continue
+        if not (a.get("photo_caption") or "").strip():     # 지면 그래픽·표는 사진 설명이 비어 있는 경우가 많다(11/27 K바이오 기사)
+            print(f"사진 설명 없음(그래픽 가능성) — 건너뜀: {a['title']}")
+            continue
+        out.append(a)
+    return out
+
+
+def pick_cojuboo(cands: list[dict], recent_groups: list[str]) -> dict | None:
+    """주식·부동산·코인이 섞이게: 오늘 덜 올린 주제 → 바로 전 게시와 다른 주제 → 같은 주제 안에선 지면 앞쪽."""
+    if not cands:
+        return None
+    count = {g: recent_groups.count(g) for g in COJUBOO_GROUPS}
+    last = recent_groups[-1] if recent_groups else None
+    return min(cands, key=lambda a: (count[a["group"]], a["group"] == last, a["page"], a["at"]))
 
 
 # ── 1-2. 연예 기사(S3 daily-xml, 최근 24시간) ──────────────────────
@@ -401,12 +466,12 @@ def wait_ready(container_id: str, token: str, tries: int = 30) -> None:
     raise RuntimeError(f"컨테이너 {container_id} 준비 시간 초과")
 
 
-def publish_single(jpeg: bytes, key: str, caption: str, token: str) -> str:
+def publish_single(jpeg: bytes, key: str, caption: str, token: str, ig_user_id: str = IG_USER_ID) -> str:
     s3.put_object(Bucket=S3_BUCKET, Key=key, Body=jpeg, ContentType="image/jpeg")
     url = f"https://{S3_BUCKET}.s3.us-east-1.amazonaws.com/{urllib.parse.quote(key)}"
-    c = http_json(f"{GRAPH}/{IG_USER_ID}/media", {"image_url": url, "caption": caption, "access_token": token})
+    c = http_json(f"{GRAPH}/{ig_user_id}/media", {"image_url": url, "caption": caption, "access_token": token})
     wait_ready(c["id"], token)
-    media = http_json(f"{GRAPH}/{IG_USER_ID}/media_publish", {"creation_id": c["id"], "access_token": token})
+    media = http_json(f"{GRAPH}/{ig_user_id}/media_publish", {"creation_id": c["id"], "access_token": token})
     return http_json(f"{GRAPH}/{media['id']}?fields=permalink&access_token={token}").get("permalink", media["id"])
 
 
@@ -418,6 +483,8 @@ def build_post(art: dict, date: str, kind: str = "front") -> tuple[bytes, str, d
     g = write_copy(art, photo, kind)
     g["title1"], g["title2"] = no_hanja(g["title1"].strip()), no_hanja(g["title2"].strip())
     g["title1"], g["title2"] = check_quotes(g["title1"], art), check_quotes(g["title2"], art)
+    # 따옴표가 두 줄에 걸친 경우("…시총 / 영업익…")도 이어서 검사(11/27)
+    g["title1"], g["title2"] = (check_quotes(g["title1"] + "\n" + g["title2"], art).split("\n", 1) + [""])[:2]
     fx =min(1.0, max(0.0, float(g.get("focus_x", 0.5))))
     buf = io.BytesIO()
     make_image(photo, g["title1"].strip(), g["title2"].strip(), fx, date).save(buf, "JPEG", quality=92)
@@ -431,6 +498,9 @@ def build_post(art: dict, date: str, kind: str = "front") -> tuple[bytes, str, d
 LAST_JPEG: bytes | None = None
 FRONT_HOURS = {6, 7, 8, 12, 14}             # 1면 — EventBridge 입력 {"kind": "front"}가 없을 때 시각으로 판단
 ENT_HOURS = {10, 16, 19, 21}                # 연예
+# 코주부(09·11·13·15·17시)는 EventBridge 입력 {"kind": "cojuboo"}로만 부른다(시각 판단 없음).
+COJUBOO_IG_ID = os.environ.get("COJUBOO_IG_ID", "17841446436396009")   # @co.ju.boo — 같은 시스템 사용자 토큰
+MAX_COJUBOO_PER_DAY = int(os.environ.get("MAX_COJUBOO_PER_DAY", "5"))
 
 
 def lambda_handler(event, context):
@@ -439,8 +509,9 @@ def lambda_handler(event, context):
     date = event.get("date") or now.strftime("%Y-%m-%d")
     kind = event.get("kind") or ("ent" if now.hour in ENT_HOURS else "front")
     dry_run = bool(event.get("dry_run"))
-    limit = MAX_PER_DAY if kind == "front" else MAX_ENT_PER_DAY
-    key = date if kind == "front" else f"{date}_ent"          # 기록: {날짜: [1면…], 날짜_ent: [연예…]}
+    limit = {"front": MAX_PER_DAY, "ent": MAX_ENT_PER_DAY, "cojuboo": MAX_COJUBOO_PER_DAY}[kind]
+    key = {"front": date, "ent": f"{date}_ent", "cojuboo": f"{date}_cojuboo"}[kind]   # 기록 키
+    ig_user_id = COJUBOO_IG_ID if kind == "cojuboo" else IG_USER_ID
 
     state = load_state()
     done = state.get(key, [])
@@ -449,11 +520,16 @@ def lambda_handler(event, context):
         return {"date": date, "kind": kind, "skipped": "daily limit"}
 
     failed = state.get(f"{key}_failed", [])
-    posted_ids = {d["id"] for k, v in state.items() if not k.endswith("_failed") for d in v}
+    # 계정별로 중복을 본다 — 서울경제(1면·연예)와 코주부는 같은 기사가 나가도 된다(11/27 결정)
+    same_account = (lambda k: "_cojuboo" in k) if kind == "cojuboo" else (lambda k: "_cojuboo" not in k)
+    posted_ids = {d["id"] for k, v in state.items() if not k.endswith("_failed") and same_account(k) for d in v}
     skip_ids = posted_ids | set(failed)                       # 실패한 기사는 다음 시간대에 건너뜀
     if kind == "front":
         todo = [a for a in front_page(date) if a["id"] not in skip_ids]
         art = todo[0] if todo else None
+    elif kind == "cojuboo":
+        art = pick_cojuboo([a for a in cojuboo_candidates(date) if a["id"] not in skip_ids],
+                           [d.get("group", "") for d in done])
     else:
         recent_days = {(now - timedelta(days=i)).strftime("%Y-%m-%d") for i in range(3)}
         rows = sorted((k[:10], d.get("at", ""), d.get("title", "")) for k, v in state.items()
@@ -470,10 +546,14 @@ def lambda_handler(event, context):
         if dry_run:
             global LAST_JPEG
             LAST_JPEG = jpeg                                  # 로컬 시험용(Lambda 응답엔 바이트를 넣지 않음)
-            return {"date": date, "kind": kind, "dry_run": True, "article": art["title"],
-                    "title": [g["title1"], g["title2"]], "caption": caption}
-        link = publish_single(jpeg, f"{S3_PREFIX}/{date}/{art['id']}.jpg", caption, get_token())
-        done.append({"id": art["id"], "title": art["title"], "link": link, "at": now.strftime("%H:%M")})
+            return {"date": date, "kind": kind, "dry_run": True, "article": art["title"], "group": art.get("group"),
+                    "id": art["id"], "title": [g["title1"], g["title2"]], "caption": caption}
+        sub = f"cojuboo/{date}" if kind == "cojuboo" else date
+        link = publish_single(jpeg, f"{S3_PREFIX}/{sub}/{art['id']}.jpg", caption, get_token(), ig_user_id)
+        row = {"id": art["id"], "title": art["title"], "link": link, "at": now.strftime("%H:%M")}
+        if kind == "cojuboo":
+            row["group"] = art.get("group", "")
+        done.append(row)
         state[key] = done
         save_state(state)
         print(f"게시 완료 {key} ({len(done)}/{limit}) {link}")
