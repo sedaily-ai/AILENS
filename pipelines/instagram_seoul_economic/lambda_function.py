@@ -228,6 +228,8 @@ def cojuboo_candidates(date: str) -> list[dict]:
                 found[a["id"]] = a
     out = []
     for a in sorted(found.values(), key=lambda a: (a["page"], a["at"])):
+        if a["page"] < 6:                                   # 1~5면 종합면 제외 — 분류가 엉뚱하게 붙은 기사가 많다(11/27 신현송 기사가 '부동산')
+            continue
         if not _photo_ok(a):
             continue
         if not (a.get("photo_caption") or "").strip():     # 지면 그래픽·표는 사진 설명이 비어 있는 경우가 많다(11/27 K바이오 기사)
@@ -237,13 +239,24 @@ def cojuboo_candidates(date: str) -> list[dict]:
     return out
 
 
+# 하루 5건 = 주식 3 · 부동산 1 · 코인 1 (11/27 결정). 칸마다 이 순서의 주제를 먼저 찾는다.
+COJUBOO_ORDER = ("주식", "부동산", "주식", "코인", "주식")
+
+
 def pick_cojuboo(cands: list[dict], recent_groups: list[str]) -> dict | None:
-    """주식·부동산·코인이 섞이게: 오늘 덜 올린 주제 → 바로 전 게시와 다른 주제 → 같은 주제 안에선 지면 앞쪽."""
+    """오늘 n번째 칸 → COJUBOO_ORDER[n] 주제의 지면 앞쪽 기사. 그 주제 후보가 없으면 아직 몫이 남은 다른 주제, 그래도 없으면 아무 주제."""
     if not cands:
         return None
-    count = {g: recent_groups.count(g) for g in COJUBOO_GROUPS}
-    last = recent_groups[-1] if recent_groups else None
-    return min(cands, key=lambda a: (count[a["group"]], a["group"] == last, a["page"], a["at"]))
+    n = len(recent_groups)
+    want = COJUBOO_ORDER[n % len(COJUBOO_ORDER)]
+    quota = {g: COJUBOO_ORDER.count(g) - recent_groups.count(g) for g in COJUBOO_GROUPS}
+    key = lambda a: (a["page"], a["at"])  # noqa: E731
+    for pool in ([a for a in cands if a["group"] == want],
+                 [a for a in cands if quota.get(a["group"], 0) > 0],
+                 cands):
+        if pool:
+            return min(pool, key=key)
+    return None
 
 
 # ── 1-2. 연예 기사(S3 daily-xml, 최근 24시간) ──────────────────────
@@ -364,6 +377,7 @@ PROMPT = """아래는 서울경제신문 지면 1면 기사와, 게시물에 쓸
 - 한자 쓰지 말 것(글꼴에 없음). 李→이 대통령, 靑→청와대, 美→미국, 中→중국처럼 한글로.
 - 금지: ㄷㄷ·ㅋㅋ 같은 인터넷 말투, 감탄사, 궁금증만 부추기는 물음표, 과장된 표현, 이모지.
 - 사실을 과장·왜곡하지 말 것. 줄이다가 뜻이 바뀌면 안 된다(예: '첫 여성'을 '65년 만의 여성'으로 줄이면 예전에도 있었던 것처럼 읽힌다 → 금지).
+- 숫자는 기사에 쓰인 그대로만. 기사 숫자로 배수·비율·합계를 직접 계산해 새 숫자를 만들지 말 것(예: 영업익 700조·시총 2000조 → "3배" 금지).
 - 기사 속 서로 다른 대상·조치를 한 문장으로 합치지 말 것. 1줄의 주어·상황과 2줄의 결과는 기사에서 실제로 이어진 내용이어야 한다(예: 내신 부정행위는 '퇴학', 국가자격시험 부정행위는 '징역 5년'인데 "시험때 스마트워치 / 퇴학+징역 5년"으로 쓰면 한 사람이 둘 다 받는 것처럼 읽힌다 → 금지).
 
 [사진 자르기] 사진은 세로 4:5로 잘린다. 사진 설명을 근거로, 제목에서 말하는 주인공이 사진 가로 어디에 있는지 focus_x(0=왼쪽 끝, 1=오른쪽 끝)로 답하라.
@@ -501,6 +515,7 @@ ENT_HOURS = {10, 16, 19, 21}                # 연예
 # 코주부(09·11·13·15·17시)는 EventBridge 입력 {"kind": "cojuboo"}로만 부른다(시각 판단 없음).
 COJUBOO_IG_ID = os.environ.get("COJUBOO_IG_ID", "17841446436396009")   # @co.ju.boo — 같은 시스템 사용자 토큰
 MAX_COJUBOO_PER_DAY = int(os.environ.get("MAX_COJUBOO_PER_DAY", "5"))
+COJUBOO_START = os.environ.get("COJUBOO_START", "2026-11-30")         # 이 날짜 전엔 게시 안 함(11/27 결정: 다음 주 월요일 시작). 평일만은 EventBridge cron(MON-FRI)이 맡는다.
 
 
 def lambda_handler(event, context):
@@ -509,6 +524,9 @@ def lambda_handler(event, context):
     date = event.get("date") or now.strftime("%Y-%m-%d")
     kind = event.get("kind") or ("ent" if now.hour in ENT_HOURS else "front")
     dry_run = bool(event.get("dry_run"))
+    if kind == "cojuboo" and date < COJUBOO_START and not dry_run:
+        print(f"코주부는 {COJUBOO_START}부터 — {date} 건너뜀")
+        return {"date": date, "kind": kind, "skipped": "before start"}
     limit = {"front": MAX_PER_DAY, "ent": MAX_ENT_PER_DAY, "cojuboo": MAX_COJUBOO_PER_DAY}[kind]
     key = {"front": date, "ent": f"{date}_ent", "cojuboo": f"{date}_cojuboo"}[kind]   # 기록 키
     ig_user_id = COJUBOO_IG_ID if kind == "cojuboo" else IG_USER_ID

@@ -43,10 +43,10 @@
 - AI가 "올릴 만한 기사 없음"이라고 하면 그 칸은 비운다(애매하면 안 올리는 쪽).
 - 평일엔 연예 기사가 하루 9~13건이라 충분하지만, 주말·월요일엔 하루 1건 정도라 0~1건만 올라간다(11/19~26 실측).
 
-## 코주부(@co.ju.boo) 자동 게시 (09·11·13·15·17시)
+## 코주부(@co.ju.boo) 자동 게시 (평일 09·11·13·15·17시, 11/30 시작)
 
 같은 Lambda·같은 카드(서울경제 로고 그대로)로 코주부 계정에도 올린다. EventBridge 규칙
-`sedaily-instagram-seoul-economic-cojuboo` cron(0 0,2,4,6,8 * * ? *) 입력 `{"kind":"cojuboo"}`, 하루 최대 5건.
+`sedaily-instagram-seoul-economic-cojuboo` cron(0 0,2,4,6,8 ? * MON-FRI *) 입력 `{"kind":"cojuboo"}`, 하루 최대 5건 = 주식 3·부동산 1·코인 1(순서 주식→부동산→주식→코인→주식, 그 주제가 없으면 다른 주제로 채움). 1~5면 종합면 기사는 제외. 코드의 `COJUBOO_START`(2026-11-30) 전엔 게시하지 않는다.
 
 - **후보:** 그날 지면(publishInfo/date = 오늘) 기사 중
   - 주식 = 분류 `증권,…` 이면서 지면 6면 이상(신문 뒤쪽 증권면 = Market-signal 지면에 가깝게. XML·e-Paper에 섹션 이름이 없어 면 번호로 근사)
@@ -58,7 +58,7 @@
 - **권한 구조:** 코주부 계정은 별도 비즈니스 포트폴리오(인스타 로그인 신분이 전체 관리자)에 있고, 그 포트폴리오가 "서울경제 LENS"에
   콘텐츠 권한을 파트너 할당 → 시스템 사용자 `seoul-economic-publisher`에 co.ju.boo(콘텐츠) 배정. **토큰은 서울경제와 같은 것**
   (`/sedaily-lens/instagram/token-seoul-economic`). IG 사용자 ID `17841446436396009`(환경변수 `COJUBOO_IG_ID`로 바꿀 수 있음).
-- 11/27 설치 시 규칙은 꺼 둔 상태(DISABLED). 켜기: `aws events enable-rule --name sedaily-instagram-seoul-economic-cojuboo`.
+- 11/27 규칙을 평일(MON-FRI)로 바꿔 켬, 실제 첫 게시는 11/30(월) 09시(코드의 시작일 조건). 끄기: `aws events disable-rule --name sedaily-instagram-seoul-economic-cojuboo`.
 
 ## 제목 규칙에서 특히 막는 것
 
@@ -75,7 +75,7 @@
 |---|---|
 | Lambda | `sedaily-instagram-seoul-economic` (python3.12, x86_64, 300초, 1024MB, 비동기 재시도 0) |
 | IAM 역할 | `sedaily-instagram-seoul-economic-role` — `iam-policy.json` + 관리형 AWSLambdaBasicExecutionRole |
-| EventBridge | `sedaily-instagram-seoul-economic-front` cron(0 21,22,23,3,5 * * ? *) 입력 {"kind":"front"} = 06·07·08·12·14시 KST / `sedaily-instagram-seoul-economic-ent` cron(0 1,7,10,12 * * ? *) 입력 {"kind":"ent"} = 10·16·19·21시 KST / `sedaily-instagram-seoul-economic-cojuboo` cron(0 0,2,4,6,8 * * ? *) 입력 {"kind":"cojuboo"} = 09·11·13·15·17시 KST (+ Lambda 리소스 정책 `events-front`·`events-ent`·`events-cojuboo`). 1면 11/26·연예 11/27 켬, 코주부는 11/27 DISABLED로 설치 |
+| EventBridge | `sedaily-instagram-seoul-economic-front` cron(0 21,22,23,3,5 * * ? *) 입력 {"kind":"front"} = 06·07·08·12·14시 KST / `sedaily-instagram-seoul-economic-ent` cron(0 1,7,10,12 * * ? *) 입력 {"kind":"ent"} = 10·16·19·21시 KST / `sedaily-instagram-seoul-economic-cojuboo` cron(0 0,2,4,6,8 ? * MON-FRI *) 입력 {"kind":"cojuboo"} = 평일 09·11·13·15·17시 KST (+ Lambda 리소스 정책 `events-front`·`events-ent`·`events-cojuboo`). 1면 11/26·연예 11/27 켬, 코주부는 11/27 켬(11/30부터 게시) |
 | Bedrock 앱 프로필 | `seoul-economic-instagram-sonnet-5` (02pyphvnvieh) — `us.anthropic.claude-sonnet-5` 복사, 비용 태그용 |
 | 토큰 | SSM SecureString `/sedaily-lens/instagram/token-seoul-economic` — "서울경제 LENS" 시스템 사용자 `seoul-economic-publisher`(ID 61596631964956, Employee, 만료 없음, instagram_basic·instagram_content_publish) |
 | 게시 기록 | `s3://sedaily-mbti-cms-media-dev/instagram/seoul_economic_posted.json` |
