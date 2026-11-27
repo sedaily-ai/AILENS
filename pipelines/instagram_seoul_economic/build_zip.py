@@ -34,6 +34,7 @@ def main() -> None:
         with zipfile.ZipFile(whl) as z:
             z.extractall(PKG)
     shutil.copy2(HERE / "lambda_function.py", PKG / "lambda_function.py")
+    shutil.copy2(HERE / "page.html", PKG / "page.html")               # 직접 올리기 화면(Function URL GET /)
     for f in FONTS:
         shutil.copy2(FONT_DIR / f, PKG / "fonts" / f)
     shutil.copy2(LOGO, PKG / "sedaily-logo-white.png")

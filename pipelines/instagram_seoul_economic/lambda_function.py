@@ -25,6 +25,7 @@ EventBridge가 매일 부른다. 한 번 부를 때 1건.
 """
 from __future__ import annotations
 
+import base64
 import html
 import io
 import json
@@ -644,8 +645,8 @@ MAX_COJUBOO_PER_DAY = int(os.environ.get("MAX_COJUBOO_PER_DAY", "5"))
 COJUBOO_START = os.environ.get("COJUBOO_START", "2026-11-30")         # 이 날짜 전엔 게시 안 함(11/27 결정: 다음 주 월요일 시작). 평일만은 EventBridge cron(MON-FRI)이 맡는다.
 
 
-def lambda_handler(event, context):
-    event = event or {}
+def auto_post(event: dict) -> dict:
+    """EventBridge 자동 게시(1면·연예) — 한 번에 1건."""
     now = datetime.fromisoformat(event["now"]).replace(tzinfo=KST) if event.get("now") else datetime.now(KST)  # now는 시험용
     date = event.get("date") or now.strftime("%Y-%m-%d")
     kind = event.get("kind") or ("ent" if now.hour in ENT_HOURS else "front")
@@ -708,3 +709,155 @@ def lambda_handler(event, context):
             save_state(state)
         print(f"게시 실패 {key} {art['title']}: {type(e).__name__}: {e}")
         raise
+
+
+# ── 직접 올리기(기사 링크 → 바로 게시) ─────────────────────────────
+
+class UserError(Exception):
+    """화면에 그대로 보여 줄 쉬운 말 오류."""
+
+
+def article_key(url: str) -> str:
+    """sedaily.com/article/20118961, m.sedaily.com/article/…, signal.sedaily.com/article/… → '20118961'."""
+    m = re.search(r"sedaily\.com/(?:[\w-]+/)*article/(\d+)", url or "", re.I)
+    if not m:
+        raise UserError("서울경제 기사 링크가 아니에요. sedaily.com/article/… 주소를 붙여 넣어 주세요.")
+    return m.group(1)
+
+
+def find_in_xml(key: str, days: int = 4) -> dict | None:
+    """최근 days일 daily-xml에서 공개 기사 번호(key)로 찾는다."""
+    today = datetime.now(KST)
+    for i in range(days):
+        root = _xml_root((today - timedelta(days=i)).strftime("%Y%m%d"))
+        if root is None:
+            continue
+        for it in root:
+            if (it.findtext("key") or "").strip() == key:
+                return _article(it)
+    return None
+
+
+def article_from_page(key: str) -> dict:
+    """XML에 없을 때(오래된 기사 등) 기사 페이지를 직접 읽는다 — 제목·부제·본문·대표 사진·사진 설명."""
+    try:
+        page = http_bytes(f"https://www.sedaily.com/article/{key}").decode("utf-8", "ignore")
+    except Exception as e:  # noqa: BLE001
+        raise UserError("기사 페이지를 열 수 없어요. 링크가 맞는지 확인해 주세요.") from e
+    meta = lambda p: (re.search(r'<meta[^>]+property="%s"[^>]+content="([^"]*)"' % p, page) or [None, ""])[1]  # noqa: E731
+    title = html.unescape(meta("og:title")).strip()
+    if not title:
+        raise UserError("기사를 찾지 못했어요. 링크가 맞는지 확인해 주세요.")
+    sub = re.search(r'class="article-subtitle[^"]*"[^>]*>(.*?)</div>', page, re.S)
+    body = page[page.find('class="article-content"'):page.find('class="reporter-article"')]
+    body = re.sub(r"<figcaption.*?</figcaption>", "", body, flags=re.S)
+    cap = re.search(r"<figcaption[^>]*>(.*?)</figcaption>", page, re.S)
+    section = meta("article:section")
+    return {
+        "id": f"web-{key}", "key": key, "title": title,
+        "sub_title": strip_html(sub.group(1)) if sub else "",
+        "content": strip_html(body)[:8000],
+        "categories": [f"연예,{section}" if re.search("연예|영화|방송|스타", section) else section],
+        "url": f"https://www.sedaily.com/article/{key}",
+        "photo_url": meta("og:image") or None, "photo_w": 0,
+        "photo_caption": strip_html(cap.group(1)) if cap else "",
+        "at": "",
+    }
+
+
+def is_ent(art: dict) -> bool:
+    return any(c.startswith("연예,") or c == "문화·라이프,문화,영화" for c in art.get("categories", []))
+
+
+def post_url(url: str, dry_run: bool = False, force: bool = False) -> dict:
+    """기자가 고른 기사 링크 1건 → 카드·캡션 만들어 바로 게시(dry_run이면 만들기만)."""
+    key = article_key(url)
+    art = find_in_xml(key) or article_from_page(key)
+    if not art.get("photo_url"):
+        raise UserError("사진이 없는 기사라 카드를 만들 수 없어요.")
+    state = load_state()
+    posted = {d["id"]: d for k, v in state.items() if not k.endswith("_failed") for d in v}
+    if art["id"] in posted and not force:
+        raise UserError(f"이미 올린 기사예요 ({posted[art['id']].get('link', '')}).")
+    now = datetime.now(KST)
+    date = now.strftime("%Y-%m-%d")
+    kind = "ent" if is_ent(art) else "front"
+    try:
+        jpeg, caption, g = build_post(art, date, kind)
+    except RuntimeError as e:
+        raise UserError(f"카드를 만들지 못했어요: {e}") from e
+    result = {"title": art["title"], "card_title": [g["title1"], g["title2"]], "kind": kind,
+              "caption": caption, "source_url": art.get("url") or url}
+    if dry_run:
+        global LAST_JPEG
+        LAST_JPEG = jpeg
+        return {**result, "dry_run": True, "image_url": None, "permalink": None}
+    s3_key = f"{S3_PREFIX}/{date}/manual-{art['id']}.jpg"
+    link = publish_single(jpeg, s3_key, caption, get_token())
+    rows = state.get(f"{date}_manual", [])                   # 자동 게시 하루 한도와 섞이지 않게 별도 키
+    rows.append({"id": art["id"], "title": art["title"], "link": link, "at": now.strftime("%H:%M"),
+                 "via": "manual_url", "url": url})
+    state[f"{date}_manual"] = rows
+    save_state(state)
+    return {**result, "image_url": f"https://{S3_BUCKET}.s3.us-east-1.amazonaws.com/{urllib.parse.quote(s3_key)}",
+            "permalink": link}
+
+
+def history(limit: int = 30) -> list[dict]:
+    """게시 기록(자동 1면·연예 + 직접 올리기) 최신순."""
+    kinds = {"": "1면", "_ent": "연예", "_manual": "직접"}
+    rows = []
+    for k, v in load_state().items():
+        if k.endswith("_failed"):
+            continue
+        for d in v:
+            rows.append({"date": k[:10], "at": d.get("at", ""), "kind": kinds.get(k[10:], "기타"),
+                         "title": d.get("title", ""), "link": d.get("link", "")})
+    rows.sort(key=lambda r: (r["date"], r["at"]), reverse=True)
+    return rows[:limit]
+
+
+# ── 진입점 ───────────────────────────────────────────────────────────
+
+PAGE = HERE / "page.html"
+
+
+def _http(status: int, body, ctype: str = "application/json; charset=utf-8") -> dict:
+    if not isinstance(body, str):
+        body = json.dumps(body, ensure_ascii=False)
+    return {"statusCode": status, "headers": {"Content-Type": ctype, "Cache-Control": "no-store"}, "body": body}
+
+
+def http_router(event: dict) -> dict:
+    """Lambda Function URL(HTTP) — GET / 화면, POST /post 직접 올리기, GET /history 기록."""
+    method = event["requestContext"]["http"]["method"]
+    path = event.get("rawPath") or "/"
+    # TODO(비밀번호): 공개 주소라 아무나 서울경제 계정에 올릴 수 있다. 배포 전 비밀번호(헤더 X-Upload-Key 와
+    #   SSM 값 비교) 또는 사내 IP 제한을 넣을 것. 지금은 시제품이라 비워 둠.
+    if method == "GET" and path in ("/", "/index.html"):
+        return _http(200, PAGE.read_text(encoding="utf-8"), "text/html; charset=utf-8")
+    if method == "GET" and path == "/history":
+        return _http(200, {"items": history()})
+    if method == "POST" and path == "/post":
+        raw = event.get("body") or "{}"
+        if event.get("isBase64Encoded"):
+            raw = base64.b64decode(raw).decode("utf-8")
+        try:
+            return _http(200, post_url(json.loads(raw).get("url", ""), force=bool(json.loads(raw).get("force"))))
+        except UserError as e:
+            return _http(400, {"error": str(e)})
+        except Exception as e:  # noqa: BLE001
+            print(f"직접 올리기 실패: {type(e).__name__}: {e}")
+            return _http(500, {"error": "올리는 중 문제가 생겼어요. 잠시 뒤 다시 시도해 주세요."})
+    return _http(404, {"error": "없는 주소예요."})
+
+
+def lambda_handler(event, context):
+    event = event or {}
+    if "requestContext" in event and "http" in event.get("requestContext", {}):
+        return http_router(event)
+    if event.get("action") == "post_url":                      # 수동 호출용(콘솔·CLI)
+        return post_url(event.get("url", ""), dry_run=bool(event.get("dry_run")), force=bool(event.get("force")))
+    if event.get("action") == "history":
+        return {"items": history(int(event.get("limit", 30)))}
+    return auto_post(event)                                   # EventBridge 자동 게시(기존 동작 그대로)
