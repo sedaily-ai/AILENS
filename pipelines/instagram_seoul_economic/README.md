@@ -118,7 +118,8 @@ aws lambda invoke --function-name sedaily-instagram-seoul-economic --payload '{"
 
 ## 직접 올리기 사이트 "서울경제 인스타 — 인스타 바로 게시" (11/27 배포)
 
-**주소:** https://dokvadx52y5zlcpqcykjiewc5u0mqgzw.lambda-url.us-east-1.on.aws/ (공용 비밀번호는 SSM에만 — 문서에 적지 않는다)
+**주소:** https://insta.sedaily.ai (공용 비밀번호는 SSM에만 — 문서에 적지 않는다)
+원래 주소 https://dokvadx52y5zlcpqcykjiewc5u0mqgzw.lambda-url.us-east-1.on.aws/ 도 그대로 열린다(새 주소는 그 앞에 CloudFront를 둔 것).
 
 기자가 고른 기사 링크를 붙여 넣고 채널을 고르면, 자동 게시와 같은 카드·캡션 규칙(숫자 대조·한자·따옴표 검사 포함)으로
 만들어 **확인 없이 바로** 올리고, 카드·캡션·해시태그·게시물 링크와 그 채널의 최근 게시 목록을 보여 준다.
@@ -150,8 +151,16 @@ aws lambda invoke --function-name sedaily-instagram-seoul-economic --payload '{"
 3. Lambda 코드 교체 → 자동 게시 dry_run 3종(front·ent·cojuboo) 정상.
 4. Function URL(AuthType NONE) + 리소스 정책 `function-url-public`(lambda:InvokeFunctionUrl, principal *).
    확인: `GET /` 200, `/history` 비밀번호 없음·틀림 401, 맞음 200(채널별 기록). `POST /post`는 실제 게시라 시험하지 않음.
+5. 새 주소 `insta.sedaily.ai` 연결(11/27 13시경):
+   - ACM 인증서 `insta.sedaily.ai`(us-east-1, DNS 검증 — sedaily.ai 호스팅 영역에 `_5313944a….insta` CNAME).
+   - CloudFront `EGM2ROBIJ6HKV`(`d36zxwhc6kzoq1.cloudfront.net`): 원본 = Function URL(https-only), 캐시 끔(CachingDisabled),
+     원본 요청 정책 AllViewerExceptHostHeader(`X-Upload-Key` 헤더 전달), 모든 메서드 허용, http→https, **원본 응답 대기 60초**.
+   - Route53 `insta.sedaily.ai` A/AAAA → CloudFront 별칭.
+   - 확인: `GET /` 200, 비밀번호 없음 401, 맞음 `/auth`·`/history` 200, http 301.
+   - 주의: 게시가 60초를 넘기면 인스타엔 올라가도 화면엔 실패(504)로 보일 수 있다(자동 게시 실측 약 33초).
 
 되돌리기:
+- 새 주소만 없애기: Route53 `insta.sedaily.ai` A/AAAA 삭제 → CloudFront `EGM2ROBIJ6HKV` 끄고 삭제 → ACM 인증서 삭제(원래 주소는 그대로).
 - 사이트만 닫기: `aws lambda delete-function-url-config --function-name sedaily-instagram-seoul-economic` (자동 게시는 그대로).
 - 코드까지 되돌리기: 배포 직전 코드(CodeSha256 `sn5sNMyGKc3LxTBDTZ8fEEa0RgD8nytq67RmR9mqsXw=`, 브랜치 feat/instagram-seoul-economic a541543d)를
   그 브랜치에서 `build_zip.py`로 다시 묶어 `update-function-code`.
