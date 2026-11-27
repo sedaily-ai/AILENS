@@ -69,7 +69,12 @@
   .gate h2 { margin:0 0 6px; font-size:20px; }
   .gate p { color:var(--sub); margin:0 0 18px; font-size:14px; }
   .gate form { display:flex; gap:8px; }
-  .gate input { flex:1; min-width:0; font:inherit; font-size:16px; padding:12px 14px; border:1px solid var(--line); border-radius:10px; }
+  .gate .pw-box { flex:1; min-width:0; position:relative; display:flex; }
+  .gate input { flex:1; min-width:0; font:inherit; font-size:16px; padding:12px 44px 12px 14px; border:1px solid var(--line); border-radius:10px; }
+  .gate .eye { position:absolute; right:4px; top:50%; transform:translateY(-50%); width:36px; height:36px; border:0; background:none; cursor:pointer; color:var(--sub); display:flex; align-items:center; justify-content:center; padding:0; }
+  .gate .eye:hover { color:var(--ink); }
+  .gate input::-ms-reveal, .gate input::-ms-clear { display:none; }
+  .gate .eye svg { width:20px; height:20px; }
   .gate .err { color:var(--red); font-size:14px; margin-top:10px; min-height:20px; }
   .hidden { display:none !important; }
   @media (max-width:640px) {
@@ -86,7 +91,7 @@
 <div class="gate hidden" id="gate">
   <h2>🔒 비밀번호</h2>
   <p>공용 비밀번호를 넣어 주세요. 이 브라우저에선 한 번만 넣으면 돼요.</p>
-  <form id="gate-f"><input id="gate-pw" type="password" autocomplete="current-password" placeholder="비밀번호"><button class="go" type="submit">확인</button></form>
+  <form id="gate-f"><div class="pw-box"><input id="gate-pw" type="password" autocomplete="current-password" placeholder="비밀번호"><button class="eye" id="gate-eye" type="button" aria-label="비밀번호 보기" title="비밀번호 보기"></button></div><button class="go" type="submit">확인</button></form>
   <div class="err" id="gate-err"></div>
 </div>
 <div class="wrap" id="app">
@@ -210,6 +215,19 @@ if (window.__DEMO__) {                       // 예시 화면(로컬 캡처용)
   if (window.__DEMO__.result) renderResult(window.__DEMO__.result);
   renderHistory(window.__DEMO__.history || []);
 } else {
+  const EYE_OPEN = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7S2 12 2 12z"/><circle cx="12" cy="12" r="3"/></svg>';
+  const EYE_OFF = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17.9 17.9A10.4 10.4 0 0 1 12 19c-6.5 0-10-7-10-7a18 18 0 0 1 4.1-5.1M9.9 5.2A9.6 9.6 0 0 1 12 5c6.5 0 10 7 10 7a18 18 0 0 1-2.2 3.2M14.1 14.1a3 3 0 1 1-4.2-4.2"/><path d="M2 2l20 20"/></svg>';
+  const eye = $("gate-eye");
+  eye.innerHTML = EYE_OPEN;
+  eye.addEventListener("click", () => {
+    const pw = $("gate-pw");
+    const show = pw.type === "password";
+    pw.type = show ? "text" : "password";
+    eye.innerHTML = show ? EYE_OFF : EYE_OPEN;
+    eye.setAttribute("aria-label", show ? "비밀번호 숨기기" : "비밀번호 보기");
+    eye.title = eye.getAttribute("aria-label");
+    pw.focus();
+  });
   $("gate-f").addEventListener("submit", async (e) => {
     e.preventDefault();
     setKey($("gate-pw").value.trim());
