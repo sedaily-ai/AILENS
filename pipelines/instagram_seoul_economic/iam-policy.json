@@ -48,7 +48,10 @@
    "Sid": "Token",
    "Effect": "Allow",
    "Action": "ssm:GetParameter",
-   "Resource": "arn:aws:ssm:us-east-1:887078546492:parameter/sedaily-lens/instagram/token-seoul-economic"
+   "Resource": [
+    "arn:aws:ssm:us-east-1:887078546492:parameter/sedaily-lens/instagram/token-seoul-economic",
+    "arn:aws:ssm:us-east-1:887078546492:parameter/sedaily-lens/instagram/upload-password"
+   ]
   },
   {
    "Sid": "BedrockProfile",

@@ -99,7 +99,7 @@
       <label for="ch">채널</label>
       <select id="ch">
         <option value="seoul_economic" selected>서울경제 (@seoul_economic)</option>
-        <option value="co.ju.boo" disabled>코주부 (@co.ju.boo) — 연결 전</option>
+        <option value="co.ju.boo">코주부 (@co.ju.boo)</option>
         <option value="awsomemoney_official" disabled>어썸머니 (@awsomemoney_official) — 연결 전</option>
       </select>
     </div>
@@ -133,7 +133,7 @@
 
 <script>
 const $ = (id) => document.getElementById(id);
-const BADGE = { "1면": "", "연예": "ent", "직접": "manual" };
+const BADGE = { "1면": "", "연예": "ent", "직접": "manual", "자동": "" };
 
 // ── 공용 비밀번호: 브라우저에 기억(localStorage), 401이면 다시 묻기 ──
 function getKey() { try { return localStorage.getItem("upload_key") || ""; } catch { return ""; } }
@@ -156,7 +156,7 @@ function renderResult(r) {
   const tagLine = lines.length && lines[lines.length - 1].trim().startsWith("#") ? lines.pop() : "";
   $("r-img").src = r.image_url || r.image_data || "";
   $("r-done").textContent = r.permalink ? "✅ 인스타에 올렸어요" : "🧪 예시 — 실제로 올리지 않았어요";
-  $("r-kind").textContent = r.kind === "ent" ? "연예" : "뉴스";
+  $("r-kind").textContent = r.kind === "ent" ? "연예" : r.kind === "cojuboo" ? "코주부 · 증권·부동산·코인" : "뉴스";
   $("r-kind").className = "badge" + (r.kind === "ent" ? " ent" : "");
   $("r-card").textContent = (r.card_title || []).join(" / ");
   $("r-title").textContent = "기사: " + (r.title || "");
@@ -180,7 +180,7 @@ function renderHistory(items) {
 }
 
 async function loadHistory() {
-  try { const res = await api("history"); renderHistory((await res.json()).items); }
+  try { const res = await api("history?channel=" + encodeURIComponent($("ch").value)); renderHistory((await res.json()).items); }
   catch (e) { if (e.message !== "401") $("history").innerHTML = '<div class="empty">기록을 불러오지 못했어요.</div>'; }
 }
 
@@ -199,7 +199,11 @@ $("f").addEventListener("submit", async (e) => {
   finally { $("go").disabled = false; }
 });
 
-$("ch").addEventListener("change", () => { $("ch-name").textContent = "@" + $("ch").value; });
+$("ch").addEventListener("change", () => {
+  $("ch-name").textContent = "@" + $("ch").value;
+  $("result").classList.remove("show"); hideStatus();
+  if (!window.__DEMO__) loadHistory();          // 고른 채널 기록으로 다시 불러오기
+});
 
 if (window.__DEMO__) {                       // 예시 화면(로컬 캡처용)
   $("url").value = window.__DEMO__.url || "";

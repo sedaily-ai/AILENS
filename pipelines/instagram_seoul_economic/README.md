@@ -116,29 +116,34 @@ aws lambda invoke --function-name sedaily-instagram-seoul-economic --payload '{"
 `sedaily-logo-white.png`는 sedaily.com이 쓰는 로고 두 개를 합친 것이다 — CSS 안의 "서울경제" 글자 SVG(검정 → 흰색)와
 `static.sedaily.com/img/favicon-228.png`(파란 S). 공식 원본 파일을 받으면 같은 이름으로 바꾸면 된다.
 
-## 직접 올리기 페이지(기사 링크 → 바로 게시) — 시제품, 아직 배포 안 함
+## 직접 올리기 사이트 "서울경제 인스타 — 인스타 바로 게시" (11/27, 아직 배포 안 함)
 
-기자가 고른 기사 링크를 붙여 넣으면 같은 카드·캡션 규칙으로 만들어 `@seoul_economic`에 **확인 없이 바로** 올리고,
-만들어진 카드·캡션·해시태그·게시물 링크와 최근 게시 목록(자동 1면·연예 + 직접)을 보여 준다.
-카드뉴스 사이트(AX-CONTENTS-LAB)는 최신 원본 코드가 GitHub에 없어(서버엔 컴파일본만) 손대지 않고, 같은 Lambda에
-화면을 붙인다. 나중에 그 사이트 메뉴에 링크만 걸면 된다.
+기자가 고른 기사 링크를 붙여 넣고 채널을 고르면, 자동 게시와 같은 카드·캡션 규칙(숫자 대조·한자·따옴표 검사 포함)으로
+만들어 **확인 없이 바로** 올리고, 카드·캡션·해시태그·게시물 링크와 그 채널의 최근 게시 목록을 보여 준다.
+카드뉴스 사이트(AX-CONTENTS-LAB)는 최신 원본이 GitHub에 없어(서버엔 컴파일본만, 마지막 배포 8/10) 손대지 않고
+**별도 사이트**로 둔다(같은 Lambda의 Function URL).
 
 | 구성 | 내용 |
 |---|---|
-| 화면 | `page.html` (Lambda Function URL `GET /`) |
-| 올리기 | `POST /post` `{"url": "...", "force": false}` → `post_url()` |
-| 기록 | `GET /history` → 최근 30건 |
-| 수동 호출 | `{"action": "post_url", "url": "...", "dry_run": true}`, `{"action": "history", "limit": 30}` |
-| 자동 게시 | 그 밖의 이벤트 → `auto_post()` (기존 동작 그대로) |
+| 화면 | `page.html` (`GET /`, 누구나) — 공용 비밀번호를 한 번 넣으면 브라우저가 기억(localStorage) |
+| 비밀번호 | 헤더 `X-Upload-Key` ↔ SSM SecureString `/sedaily-lens/instagram/upload-password`(5분 캐시). 틀리면 401 + 1초 지연 |
+| 확인 | `GET /auth` → 200/401 |
+| 올리기 | `POST /post` `{"url": "...", "channel": "seoul_economic"\|"co.ju.boo", "force": false}` → `post_url()` |
+| 기록 | `GET /history?channel=...` → 그 채널 최근 30건 |
+| 수동 호출 | `{"action": "post_url", "url": "...", "channel": "...", "dry_run": true}`, `{"action": "history", "channel": "..."}` |
+| 자동 게시 | 그 밖의 이벤트 → `auto_post()` (front·ent·cojuboo 그대로) |
 
-- 링크 인식: `…sedaily.com/…/article/{번호}` (www·m·signal 모두). 최근 4일 daily-xml에서 `key`로 찾고, 없으면
-  기사 페이지를 직접 읽는다(og:title·og:image·부제·본문·figcaption).
-- 분류가 연예·영화면 연예 말투, 아니면 1면과 같은 뉴스 제목체. 이미 올린 기사는 거절(`force`로 허용).
-- 기록은 `{날짜}_manual` 키에 따로 쌓아 자동 게시 하루 한도와 섞이지 않게 한다(중복 검사는 모든 키를 본다).
+- 채널: 서울경제(@seoul_economic) · 코주부(@co.ju.boo) 연결됨, 어썸머니는 화면에 "연결 전"으로만 보이고 서버도 거절.
+- 코주부로 올리면 프롬프트 라벨 "증권·부동산·코인", 투자 권유 금지 검사, 캡션 끝 면책 문구가 적용된다.
+  서울경제는 분류가 연예·영화면 연예 말투, 아니면 1면 뉴스 제목체.
+- 기록 키: 서울경제 `{날짜}_manual`, 코주부 `{날짜}_cojuboo_manual` — 자동 게시 하루 한도와 섞이지 않는다.
+  중복은 **계정별**(서울경제 키끼리 / `_cojuboo` 들어간 키끼리)로 막는다(`force`로 허용).
+- 링크 인식: `…sedaily.com/…/article/{번호}` (www·m·signal). 최근 4일 daily-xml에서 `key`로 찾고, 없으면 기사 페이지를
+  직접 읽는다(og:title·og:image·부제·본문·figcaption).
 
-배포 때 할 일(승인 필요, 30분 안팎):
-1. **비밀번호 먼저** — 공개 주소라 그대로 열면 아무나 공식 계정에 올릴 수 있다. `http_router()`의 TODO 자리에
-   비밀번호 확인(예: SSM SecureString과 비교) 또는 사내 IP 제한을 넣는다.
-2. `build_zip.py`(page.html 포함) → `update-function-code`
-3. Lambda 제한 시간 300초 유지(카드 생성 15~30초 + 게시 대기). Function URL(AuthType NONE + 1번의 비밀번호) 생성.
-4. 카드뉴스 사이트 메뉴에 링크 추가(사이트 담당자에게 부탁).
+배포 때 할 일(승인 필요):
+1. SSM SecureString `/sedaily-lens/instagram/upload-password` 만들기(비밀번호는 사용자가 정함).
+2. IAM 인라인 정책 갱신 — `iam-policy.json`의 Token 문에 upload-password GetParameter가 추가돼 있음.
+3. `build_zip.py`(page.html 포함) → `update-function-code` → 자동 게시 dry_run 3종 확인.
+4. Function URL 만들기(AuthType NONE, 비밀번호는 코드가 검사) + `lambda:InvokeFunctionUrl` 공개 권한.
+   제한 시간 300초 유지(카드 생성 15~30초 + 게시 대기).

@@ -647,7 +647,7 @@ COJUBOO_START = os.environ.get("COJUBOO_START", "2026-11-30")         # 이 날�
 
 
 def auto_post(event: dict) -> dict:
-    """EventBridge 자동 게시(1면·연예) — 한 번에 1건."""
+    """EventBridge 자동 게시(1면·연예·코주부) — 한 번에 1건."""
     now = datetime.fromisoformat(event["now"]).replace(tzinfo=KST) if event.get("now") else datetime.now(KST)  # now는 시험용
     date = event.get("date") or now.strftime("%Y-%m-%d")
     kind = event.get("kind") or ("ent" if now.hour in ENT_HOURS else "front")
@@ -770,49 +770,74 @@ def is_ent(art: dict) -> bool:
     return any(c.startswith("연예,") or c == "문화·라이프,문화,영화" for c in art.get("categories", []))
 
 
-def post_url(url: str, dry_run: bool = False, force: bool = False) -> dict:
-    """기자가 고른 기사 링크 1건 → 카드·캡션 만들어 바로 게시(dry_run이면 만들기만)."""
+# 직접 올리기 채널 — 화면 드롭다운 값 → (게시 계정, 기록 키 접미사). 어썸머니는 연결 전이라 없음.
+CHANNELS = {
+    "seoul_economic": {"ig": IG_USER_ID, "manual": "_manual"},
+    "co.ju.boo": {"ig": COJUBOO_IG_ID, "manual": "_cojuboo_manual"},
+}
+# 기록 키 접미사 → (채널, 화면 표시 종류)
+STATE_KINDS = {"": ("seoul_economic", "1면"), "_ent": ("seoul_economic", "연예"),
+               "_manual": ("seoul_economic", "직접"),
+               "_cojuboo": ("co.ju.boo", "자동"), "_cojuboo_manual": ("co.ju.boo", "직접")}
+
+
+def post_url(url: str, dry_run: bool = False, force: bool = False, channel: str = "seoul_economic") -> dict:
+    """기자가 고른 기사 링크 1건 → 카드·캡션 만들어 고른 채널에 바로 게시(dry_run이면 만들기만).
+    숫자 대조·한자·따옴표 검사는 build_post 그대로. 코주부는 프롬프트 라벨 cojuboo(증권·부동산·코인) +
+    투자 권유 금지·면책 문구가 적용된다."""
+    if channel not in CHANNELS:
+        raise UserError("아직 연결되지 않은 채널이에요.")
+    ch = CHANNELS[channel]
     key = article_key(url)
     art = find_in_xml(key) or article_from_page(key)
     if not art.get("photo_url"):
         raise UserError("사진이 없는 기사라 카드를 만들 수 없어요.")
     state = load_state()
-    posted = {d["id"]: d for k, v in state.items() if not k.endswith("_failed") for d in v}
+    # 같은 계정에 같은 기사 중복 금지(서울경제와 코주부는 서로 겹쳐도 됨 — 자동 게시와 같은 규칙)
+    is_coj = channel == "co.ju.boo"
+    posted = {d["id"]: d for k, v in state.items()
+              if not k.endswith("_failed") and (("_cojuboo" in k) == is_coj) for d in v}
     if art["id"] in posted and not force:
-        raise UserError(f"이미 올린 기사예요 ({posted[art['id']].get('link', '')}).")
+        raise UserError(f"이 채널에 이미 올린 기사예요 ({posted[art['id']].get('link', '')}).")
     now = datetime.now(KST)
     date = now.strftime("%Y-%m-%d")
-    kind = "ent" if is_ent(art) else "front"
+    kind = "cojuboo" if is_coj else ("ent" if is_ent(art) else "front")
     try:
         jpeg, caption, g = build_post(art, date, kind)
+    except CopyCheckError as e:
+        raise UserError(f"AI가 쓴 글에 기사와 다른 숫자·표현이 있어 올리지 않았어요: {e}") from e
     except RuntimeError as e:
         raise UserError(f"카드를 만들지 못했어요: {e}") from e
-    result = {"title": art["title"], "card_title": [g["title1"], g["title2"]], "kind": kind,
+    result = {"title": art["title"], "card_title": [g["title1"], g["title2"]], "kind": kind, "channel": channel,
               "caption": caption, "source_url": art.get("url") or url}
     if dry_run:
         global LAST_JPEG
         LAST_JPEG = jpeg
         return {**result, "dry_run": True, "image_url": None, "permalink": None}
-    s3_key = f"{S3_PREFIX}/{date}/manual-{art['id']}.jpg"
-    link = publish_single(jpeg, s3_key, caption, get_token())
-    rows = state.get(f"{date}_manual", [])                   # 자동 게시 하루 한도와 섞이지 않게 별도 키
+    sub = f"cojuboo/{date}" if is_coj else date
+    s3_key = f"{S3_PREFIX}/{sub}/manual-{art['id']}.jpg"
+    link = publish_single(jpeg, s3_key, caption, get_token(), ch["ig"])
+    skey = f"{date}{ch['manual']}"                            # 자동 게시 하루 한도와 섞이지 않게 별도 키
+    rows = state.get(skey, [])
     rows.append({"id": art["id"], "title": art["title"], "link": link, "at": now.strftime("%H:%M"),
                  "via": "manual_url", "url": url})
-    state[f"{date}_manual"] = rows
+    state[skey] = rows
     save_state(state)
     return {**result, "image_url": f"https://{S3_BUCKET}.s3.us-east-1.amazonaws.com/{urllib.parse.quote(s3_key)}",
             "permalink": link}
 
 
-def history(limit: int = 30) -> list[dict]:
-    """게시 기록(자동 1면·연예 + 직접 올리기) 최신순."""
-    kinds = {"": "1면", "_ent": "연예", "_manual": "직접", "_cojuboo": "코주부"}
+def history(limit: int = 30, channel: str | None = None) -> list[dict]:
+    """게시 기록 최신순. channel을 주면 그 채널 것만(서울경제 = 1면·연예·직접, 코주부 = 자동·직접)."""
     rows = []
     for k, v in load_state().items():
-        if k.endswith("_failed"):
+        if k.endswith("_failed") or k[10:] not in STATE_KINDS:
+            continue
+        ch, kind = STATE_KINDS[k[10:]]
+        if channel and ch != channel:
             continue
         for d in v:
-            rows.append({"date": k[:10], "at": d.get("at", ""), "kind": kinds.get(k[10:], "기타"),
+            rows.append({"date": k[:10], "at": d.get("at", ""), "kind": kind, "channel": ch,
                          "title": d.get("title", ""), "link": d.get("link", "")})
     rows.sort(key=lambda r: (r["date"], r["at"]), reverse=True)
     return rows[:limit]
@@ -860,16 +885,18 @@ def http_router(event: dict) -> dict:
     if method == "GET" and path == "/auth":
         return _http(200, {"ok": True})
     if method == "GET" and path == "/history":
-        return _http(200, {"items": history()})
+        ch = (event.get("queryStringParameters") or {}).get("channel") or None
+        if ch and ch not in CHANNELS:
+            return _http(400, {"error": "아직 연결되지 않은 채널이에요."})
+        return _http(200, {"items": history(channel=ch)})
     if method == "POST" and path == "/post":
         raw = event.get("body") or "{}"
         if event.get("isBase64Encoded"):
             raw = base64.b64decode(raw).decode("utf-8")
         try:
             body = json.loads(raw)
-            if body.get("channel", "seoul_economic") != "seoul_economic":   # 화면 드롭다운: 다른 채널은 연결 전
-                raise UserError("아직 연결되지 않은 채널이에요. 지금은 서울경제만 올릴 수 있어요.")
-            return _http(200, post_url(body.get("url", ""), force=bool(body.get("force"))))
+            return _http(200, post_url(body.get("url", ""), force=bool(body.get("force")),
+                                       channel=body.get("channel", "seoul_economic")))
         except UserError as e:
             return _http(400, {"error": str(e)})
         except Exception as e:  # noqa: BLE001
@@ -883,7 +910,8 @@ def lambda_handler(event, context):
     if "requestContext" in event and "http" in event.get("requestContext", {}):
         return http_router(event)
     if event.get("action") == "post_url":                      # 수동 호출용(콘솔·CLI)
-        return post_url(event.get("url", ""), dry_run=bool(event.get("dry_run")), force=bool(event.get("force")))
+        return post_url(event.get("url", ""), dry_run=bool(event.get("dry_run")), force=bool(event.get("force")),
+                        channel=event.get("channel", "seoul_economic"))
     if event.get("action") == "history":
-        return {"items": history(int(event.get("limit", 30)))}
+        return {"items": history(int(event.get("limit", 30)), event.get("channel"))}
     return auto_post(event)                                   # EventBridge 자동 게시(기존 동작 그대로)
