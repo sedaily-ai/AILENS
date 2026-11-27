@@ -116,7 +116,9 @@ aws lambda invoke --function-name sedaily-instagram-seoul-economic --payload '{"
 `sedaily-logo-white.png`는 sedaily.com이 쓰는 로고 두 개를 합친 것이다 — CSS 안의 "서울경제" 글자 SVG(검정 → 흰색)와
 `static.sedaily.com/img/favicon-228.png`(파란 S). 공식 원본 파일을 받으면 같은 이름으로 바꾸면 된다.
 
-## 직접 올리기 사이트 "서울경제 인스타 — 인스타 바로 게시" (11/27, 아직 배포 안 함)
+## 직접 올리기 사이트 "서울경제 인스타 — 인스타 바로 게시" (11/27 배포)
+
+**주소:** https://dokvadx52y5zlcpqcykjiewc5u0mqgzw.lambda-url.us-east-1.on.aws/ (공용 비밀번호는 SSM에만 — 문서에 적지 않는다)
 
 기자가 고른 기사 링크를 붙여 넣고 채널을 고르면, 자동 게시와 같은 카드·캡션 규칙(숫자 대조·한자·따옴표 검사 포함)으로
 만들어 **확인 없이 바로** 올리고, 카드·캡션·해시태그·게시물 링크와 그 채널의 최근 게시 목록을 보여 준다.
@@ -141,9 +143,15 @@ aws lambda invoke --function-name sedaily-instagram-seoul-economic --payload '{"
 - 링크 인식: `…sedaily.com/…/article/{번호}` (www·m·signal). 최근 4일 daily-xml에서 `key`로 찾고, 없으면 기사 페이지를
   직접 읽는다(og:title·og:image·부제·본문·figcaption).
 
-배포 때 할 일(승인 필요):
-1. SSM SecureString `/sedaily-lens/instagram/upload-password` 만들기(비밀번호는 사용자가 정함).
-2. IAM 인라인 정책 갱신 — `iam-policy.json`의 Token 문에 upload-password GetParameter가 추가돼 있음.
-3. `build_zip.py`(page.html 포함) → `update-function-code` → 자동 게시 dry_run 3종 확인.
-4. Function URL 만들기(AuthType NONE, 비밀번호는 코드가 검사) + `lambda:InvokeFunctionUrl` 공개 권한.
-   제한 시간 300초 유지(카드 생성 15~30초 + 게시 대기).
+배포 기록(11/27 11:24 KST):
+1. SSM SecureString `/sedaily-lens/instagram/upload-password` 생성(태그 6키, Workload=instagram-seoul-economic).
+   비밀번호 바꾸기: `aws ssm put-parameter --name /sedaily-lens/instagram/upload-password --type SecureString --overwrite --value '<새 값>'` → 5분 안에 반영.
+2. IAM 인라인 정책 `instagram-seoul-economic` 갱신(upload-password GetParameter 추가).
+3. Lambda 코드 교체 → 자동 게시 dry_run 3종(front·ent·cojuboo) 정상.
+4. Function URL(AuthType NONE) + 리소스 정책 `function-url-public`(lambda:InvokeFunctionUrl, principal *).
+   확인: `GET /` 200, `/history` 비밀번호 없음·틀림 401, 맞음 200(채널별 기록). `POST /post`는 실제 게시라 시험하지 않음.
+
+되돌리기:
+- 사이트만 닫기: `aws lambda delete-function-url-config --function-name sedaily-instagram-seoul-economic` (자동 게시는 그대로).
+- 코드까지 되돌리기: 배포 직전 코드(CodeSha256 `sn5sNMyGKc3LxTBDTZ8fEEa0RgD8nytq67RmR9mqsXw=`, 브랜치 feat/instagram-seoul-economic a541543d)를
+  그 브랜치에서 `build_zip.py`로 다시 묶어 `update-function-code`.
