@@ -28,9 +28,11 @@ from __future__ import annotations
 import html
 import io
 import json
+import math
 import os
 import re
 import time
+import unicodedata
 import urllib.error
 import urllib.parse
 import urllib.request
@@ -364,6 +366,104 @@ def no_hanja(t: str) -> str:
     return t
 
 
+# ── 숫자 대조·투자 권유 검사(11/27) ─────────────────────────────────
+# AI가 지시를 어기고 기사에 없는 숫자(예: 700조·2000조 → "3배")를 만들어 낸 적이 있어, 프롬프트만 믿지 않고 코드로 대조한다.
+
+class CopyCheckError(RuntimeError):
+    """AI 글이 숫자·표현 검사를 두 번 다 통과하지 못함 → 그 기사는 실패 처리(다음 칸은 다음 기사)."""
+
+
+_BIG = {"조": 10**12, "억": 10**8, "만": 10**4, "천": 10**3}
+_NUM_RE = re.compile(
+    r"(약\s*)?"
+    r"((?:\d+(?:\.\d+)?\s*(?:조|억|만|천)\s*)*\d+(?:\.\d+)?(?:\s*(?:조|억|만|천))?)"
+    r"\s*(%\s*p|%\s*P|%\s*포인트|퍼센트\s*포인트|%|퍼센트|포인트|배|년|월|일|분기|차|호|위|시|세|회|번째|주년|기|대|명|건|가구|원|달러|위안|엔|유로|개|곳|종|단|층|주|㎡|GWh|MWh|GW|MW|kWh|톤)?")
+_STRICT = {"pct", "pp", "times"}                     # 이 단위는 기사에도 같은 단위로 있어야 함
+_LENIENT = {"년", "월", "일", "분기", "차", "호", "위", "시", "세", "회", "번째", "주년", "기"}  # 날짜·서수: 숫자만 있으면 통과
+
+
+def _norm_num_text(s: str) -> str:
+    s = unicodedata.normalize("NFKC", s or "")
+    return re.sub(r"(?<=\d),(?=\d{3})", "", s)     # 3,000 → 3000
+
+
+def _unit_class(u: str) -> str:
+    u = (u or "").replace(" ", "")
+    if u in ("%p", "%P", "%포인트", "퍼센트포인트"):
+        return "pp"
+    if u in ("%", "퍼센트"):
+        return "pct"
+    if u == "배":
+        return "times"
+    if u in _LENIENT:
+        return "lenient"
+    return "other"
+
+
+def _num_value(body: str) -> tuple[float, float]:
+    """'72만6454' → (726454, 1), '3000억' → (3e11, 1e8), '1.2조' → (1.2e12, 1e11). (값, 마지막 자리 크기)"""
+    body = body.replace(" ", "")
+    total, prec = 0.0, 1.0
+    for num, big in re.findall(r"(\d+(?:\.\d+)?)(조|억|만|천)?", body):
+        mult = _BIG.get(big, 1)
+        total += float(num) * mult
+        dec = len(num.split(".")[1]) if "." in num else 0
+        prec = mult / (10 ** dec)
+    return total, prec
+
+
+def extract_numbers(text: str) -> list[dict]:
+    out = []
+    for m in _NUM_RE.finditer(_norm_num_text(text)):
+        approx, body, unit = m.group(1), m.group(2), m.group(3) or ""
+        v, prec = _num_value(body)
+        out.append({"raw": m.group(0).strip(), "value": v, "prec": prec, "cls": _unit_class(unit),
+                    "approx": bool(approx), "digits": re.findall(r"\d+(?:\.\d+)?", body)})
+    return out
+
+
+def missing_numbers(text: str, source: str) -> list[str]:
+    """text(AI 글)의 숫자 중 source(기사)에 근거가 없는 것. 쉼표·띄어쓰기·전각 차이는 무시.
+    %·%p·배는 기사에도 같은 단위여야 하고, 날짜·서수(년·월·일·분기·차·호·위 등)는 숫자만 있으면 통과.
+    "약"이 붙으면 기사 숫자를 같은 자리에서 내림·반올림한 값까지 인정(약 72만 ← 72만6454), "약" 없이 반올림하면 불일치."""
+    src = extract_numbers(source)
+    src_digits = {d for s in src for d in s["digits"]}
+    bad = []
+    for n in extract_numbers(text):
+        if n["cls"] == "lenient":
+            if not all(d in src_digits for d in n["digits"]):
+                bad.append(n["raw"])
+            continue
+        if n["cls"] in _STRICT:
+            pool = [s for s in src if s["cls"] == n["cls"]]
+        else:
+            pool = [s for s in src if s["cls"] != "times"]
+        ok = any(abs(s["value"] - n["value"]) <= 1e-9 * max(1.0, abs(s["value"])) for s in pool)
+        if not ok and n["approx"]:
+            p = n["prec"]
+            ok = any(abs(math.floor(s["value"] / p) * p - n["value"]) < p * 1e-6
+                     or abs(round(s["value"] / p) * p - n["value"]) < p * 1e-6 for s in pool)
+        if not ok:
+            bad.append(n["raw"])
+    return bad
+
+
+ADVICE_RE = re.compile(
+    r"(매수|매도|투자)\s*(기회|추천|타이밍|적기|하세요|해야|할\s*때)|지금\s*(사|팔|담|매수|매도)|사야\s*(할|한다|해|합니다)|팔아야|"
+    r"급등\s*(예상|임박)|추천\s*(종목|주)|기회(를\s*잡|입니다|예요|일까|로\s*삼)|수익\s*보장|대박|놓치지\s*마|담아야")
+COJUBOO_DISCLAIMER = "※ 본 게시물은 투자 권유가 아닙니다."
+
+
+def copy_problems(g: dict, art: dict, kind: str) -> list[str]:
+    """AI 결과(제목 2줄·캡션 본문)의 숫자·표현 문제. 캡션 본문 = 출처·원문·해시태그를 붙이기 전 g['caption']."""
+    text = "\n".join((g.get("title1", ""), g.get("title2", ""), g.get("caption", "")))
+    source = "\n".join((art.get("title", ""), art.get("sub_title", ""), art.get("content", ""), art.get("photo_caption", "")))
+    probs = [f"기사에 없는 숫자: {x}" for x in missing_numbers(text, source)]
+    if kind == "cojuboo":
+        probs += [f"투자 권유 표현: {m.group(0)}" for m in ADVICE_RE.finditer(text)]
+    return probs
+
+
 # ── 2. 글(AI) ───────────────────────────────────────────────────────
 
 PROMPT = """아래는 서울경제신문 지면 1면 기사와, 게시물에 쓸 기사 사진(첨부)·사진 설명이다.
@@ -378,6 +478,9 @@ PROMPT = """아래는 서울경제신문 지면 1면 기사와, 게시물에 쓸
 - 금지: ㄷㄷ·ㅋㅋ 같은 인터넷 말투, 감탄사, 궁금증만 부추기는 물음표, 과장된 표현, 이모지.
 - 사실을 과장·왜곡하지 말 것. 줄이다가 뜻이 바뀌면 안 된다(예: '첫 여성'을 '65년 만의 여성'으로 줄이면 예전에도 있었던 것처럼 읽힌다 → 금지).
 - 숫자는 기사에 쓰인 그대로만. 기사 숫자로 배수·비율·합계를 직접 계산해 새 숫자를 만들지 말 것(예: 영업익 700조·시총 2000조 → "3배" 금지).
+- 숫자에는 단위를 붙인다(예: "3000억"이 아니라 "3000억 원", "73만"이 아니라 "73만 명"). %%와 %%p(퍼센트포인트)를 기사 표기대로 구분한다.
+- 숫자를 반올림·줄이면 반드시 "약"을 붙인다(예: 72만6454명 → "약 72만 명"). "약" 없이 반올림 금지.
+- 전망·목표·계획·추정을 확정된 일처럼 쓰지 말 것(예: "~할 전망"을 "~했다"로, "목표 50만 가구"를 "50만 가구 공급"으로 바꾸기 금지).
 - 기사 속 서로 다른 대상·조치를 한 문장으로 합치지 말 것. 1줄의 주어·상황과 2줄의 결과는 기사에서 실제로 이어진 내용이어야 한다(예: 내신 부정행위는 '퇴학', 국가자격시험 부정행위는 '징역 5년'인데 "시험때 스마트워치 / 퇴학+징역 5년"으로 쓰면 한 사람이 둘 다 받는 것처럼 읽힌다 → 금지).
 
 [사진 자르기] 사진은 세로 4:5로 잘린다. 사진 설명을 근거로, 제목에서 말하는 주인공이 사진 가로 어디에 있는지 focus_x(0=왼쪽 끝, 1=오른쪽 끝)로 답하라.
@@ -404,18 +507,32 @@ PROMPT = """아래는 서울경제신문 지면 1면 기사와, 게시물에 쓸
 """
 
 
-def write_copy(art: dict, photo: Image.Image, kind: str = "front") -> dict:
-    """AI가 가끔 항목을 빠뜨리고 답해서 한 번 더 묻는다."""
+PROMPT_LABEL = {"front": "서울경제신문 지면 1면 기사", "ent": "서울경제 연예·영화 기사",
+                "cojuboo": "서울경제신문 지면 증권·부동산·코인 기사"}
+COJUBOO_RULE = """
+[코주부 추가 규칙] 코인·주식·부동산 정보 계정이다. 투자 권유로 읽힐 표현 금지: 매수·매도 권유, "지금 사야", "급등 예상", "추천 종목", "투자 기회" 같은 말.
+기사 사실만 전하고, 특정 종목을 사라·팔라는 뉘앙스를 피한다.
+"""
+
+
+def write_copy(art: dict, photo: Image.Image, kind: str = "front", note: str = "") -> dict:
+    """AI가 가끔 항목을 빠뜨리고 답해서 한 번 더 묻는다. note = 다시 쓰게 할 때 붙이는 지적."""
     try:
-        return _write_copy(art, photo, kind)
+        return _write_copy(art, photo, kind, note)
     except (RuntimeError, ValueError) as e:
         print(f"AI 응답 문제 → 한 번 더: {e}")
-        return _write_copy(art, photo, kind)
+        return _write_copy(art, photo, kind, note)
 
 
-def _write_copy(art: dict, photo: Image.Image, kind: str) -> dict:
-    base = PROMPT if kind == "front" else PROMPT.replace("서울경제신문 지면 1면 기사", "서울경제 연예·영화 기사")
+def _write_copy(art: dict, photo: Image.Image, kind: str, note: str = "") -> dict:
+    # 11/27 고침: 전엔 front가 아니면 모두 '연예·영화 기사'로 바뀌어 코주부도 연예 기사라고 소개됐다
+    base = PROMPT.replace("서울경제신문 지면 1면 기사", PROMPT_LABEL.get(kind, PROMPT_LABEL["front"]))
     prompt = base % (art["photo_caption"] or "(없음)", art["title"], art["sub_title"] or "(없음)", art["content"][:6000])
+    if kind == "cojuboo":
+        prompt += COJUBOO_RULE
+    if note:
+        prompt += "\n[다시 쓰기] 이전 답에 문제가 있었다. 아래를 고쳐서 처음부터 다시 써라.\n" + note + \
+                  "\n숫자는 기사 본문에 있는 그대로(단위 포함)만 쓰고, 기사에서 찾을 수 없는 숫자는 빼라.\n"
     small = photo.copy()
     small.thumbnail((1200, 1200))
     buf = io.BytesIO()
@@ -495,6 +612,14 @@ def build_post(art: dict, date: str, kind: str = "front") -> tuple[bytes, str, d
     """기사 1건 → (JPEG, 캡션, AI 결과)."""
     photo = Image.open(io.BytesIO(http_bytes(art["photo_url"]))).convert("RGB")
     g = write_copy(art, photo, kind)
+    probs = copy_problems(g, art, kind)                  # 숫자 대조(+코주부 투자 권유) — 걸리면 지적을 붙여 1회 다시 쓰기
+    if probs:
+        print(f"글 검사 걸림 → 다시 쓰기: {probs}")
+        g = write_copy(art, photo, kind, note="\n".join("- " + p for p in probs))
+        probs = copy_problems(g, art, kind)
+        if probs:
+            print(f"글 검사 다시 걸림 → 이 기사 실패: {probs}")
+            raise CopyCheckError("; ".join(probs))
     g["title1"], g["title2"] = no_hanja(g["title1"].strip()), no_hanja(g["title2"].strip())
     g["title1"], g["title2"] = check_quotes(g["title1"], art), check_quotes(g["title2"], art)
     # 따옴표가 두 줄에 걸친 경우("…시총 / 영업익…")도 이어서 검사(11/27)
@@ -503,7 +628,8 @@ def build_post(art: dict, date: str, kind: str = "front") -> tuple[bytes, str, d
     buf = io.BytesIO()
     make_image(photo, g["title1"].strip(), g["title2"].strip(), fx, date).save(buf, "JPEG", quality=92)
     credit = photo_credit(art["photo_caption"])
-    caption = (g["caption"].strip() + "\n\n" + (credit + "\n" if credit else "") + "원문: 서울경제신문\n\n"
+    caption = (g["caption"].strip() + "\n\n" + (credit + "\n" if credit else "") + "원문: 서울경제신문\n"
+               + (COJUBOO_DISCLAIMER + "\n" if kind == "cojuboo" else "") + "\n"
                + " ".join("#" + h.lstrip("#").replace(" ", "") for h in g.get("hashtags", [])))[:2200]
     g["focus_x"] = fx
     return buf.getvalue(), caption, g
